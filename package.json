@@ -1,0 +1,19 @@
+{
+  "name": "makerble-api-docs",
+  "version": "1.0.0",
+  "description": "Makerble API documentation — self-hosted, Makerble-branded, with Prism mock server",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@stoplight/prism-cli": "^5.14.2",
+    "@stoplight/prism-http": "^5.14.2",
+    "express": "^4.18.0",
+    "http-proxy-middleware": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

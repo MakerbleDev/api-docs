@@ -1,0 +1,2761 @@
+openapi: 3.0.3
+info:
+  title: Makerble API
+  description: |
+    The Makerble API enables developers to integrate with the Makerble CRM and impact measurement platform — reading and writing data on contacts, projects, surveys, cases, outcomes, metrics, and more.
+
+    ## Base URL
+    ```
+    https://makerble.com/api/v2
+    ```
+    A staging environment is also available at `https://staging.makerble.com/api/v2`.
+
+    ## Authentication
+    All endpoints (except `/users/sign_in` and the password reset endpoints) require token-based authentication. Pass both headers on every authenticated request:
+
+    | Header | Value |
+    |---|---|
+    | `X-User-Email` | The authenticated user's email address |
+    | `X-User-Token` | The user's long-lived authentication token |
+
+    Tokens are obtained via `POST /users/sign_in` and **do not expire**. Each user has one fixed token.
+
+    > **Multi-user integrations:** If activity must be attributed to specific users, authenticate separately per user. A single Organisation Admin token is acceptable when attribution to one admin is sufficient.
+
+    ## Creating Users via the API
+    `POST /users` requires a separate API Key (`auth_code`). Request one at [api-key-request@makerble.com](mailto:api-key-request@makerble.com).
+
+    ## Terminology
+    Makerble uses different terms in the UI and the API:
+
+    | Front-end | API |
+    |---|---|
+    | Organisation | Charity |
+    | Contact | Beneficiary |
+    | Contact Bio Form | Beneficiary Category |
+    | Contact Type | Beneficiary Type |
+    | Survey | Story Category |
+    | Survey Campaign | Project Story Category |
+    | Survey Response / Timeline Update / Instant Update | Story |
+    | Activity / Engagement tracker | Change (stage: activity / participation) |
+    | Achievement / Choice / Numerical tracker | Indicator (type: binary / scale / value) |
+    | Dropdown / List field | Ratio Set |
+    | Answer Choice | Sub Ratio |
+    | Case Form | Custom Field Category |
+    | Case Owner | Case Creator |
+    | Case Worker | Case Member |
+    | Project Manager | Project Editor |
+    | Changemaker | Project Reporter |
+    | Analyst | Project Observer |
+
+    ## Story timestamps
+    Stories carry three timestamps:
+
+    | API field | Front-end label | Meaning |
+    |---|---|---|
+    | `actual_created_at` | Date Posted | Real database insertion time |
+    | `created_at` | Date Happened | Activity date chosen by the user (can be backdated) |
+    | `updated_at` | Date Edited | Most recent modification |
+
+    ## Pagination
+    All list endpoints accept:
+
+    | Parameter | Type | Default | Max | Description |
+    |---|---|---|---|---|
+    | `page` | integer | 1 | — | Page number |
+    | `per_page` | integer | 10 | 200 | Records per page |
+    | `last_sync_datetime` | string (ISO 8601) | — | — | Return only records updated after this datetime |
+
+    Paginated responses use this envelope:
+    ```json
+    { "page": 1, "page_size": 10, "page_count": 146, "total_count": 1458, "data": [] }
+    ```
+
+  version: "2.0.0"
+  contact:
+    name: Makerble Support
+    url: https://discover.makerble.com
+    email: support@makerble.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://makerble.com/api/v2
+    description: Production
+  - url: https://staging.makerble.com/api/v2
+    description: Staging
+  - url: /mock
+    description: Mock server (safe for testing — no real data)
+
+tags:
+  - name: Authentication
+    description: Obtain and manage authentication tokens
+  - name: Users
+    description: Platform users with login credentials
+  - name: Charities
+    description: Organisations — the top-level entity that owns Projects
+  - name: Projects
+    description: The primary organisational unit — every Story and Case belongs to a Project
+  - name: Beneficiaries
+    description: Contacts — the people your organisation works with
+  - name: Beneficiary Categories
+    description: Contact Bio Forms — field schemas for creating and editing Beneficiary records
+  - name: Beneficiary Types
+    description: The four contact types — Person, Organisation, Animal, Object
+  - name: Cases
+    description: Cases linked to a Beneficiary and a Project
+  - name: Stories
+    description: Survey responses, timeline updates, and instant updates — the primary content format
+  - name: Story Categories
+    description: Surveys — form templates used to create Stories
+  - name: Project Story Categories
+    description: Survey Campaigns — a Survey assigned to a specific Project
+  - name: Story Metrics
+    description: Per-story metric records (Story Changes, Story Indicators, Story Beneficiaries)
+  - name: Changes
+    description: Activity and Participation custom KPIs tracked across Projects
+  - name: Indicators
+    description: Scale, Binary, and Value progress trackers linked to Outcomes
+  - name: Outcomes
+    description: Impact outcomes that Indicators are grouped under
+  - name: Outcome Indicators
+    description: Join table linking Outcomes to Indicators
+  - name: Ratio Sets
+    description: Dropdown / List field definitions
+  - name: Sub Ratios
+    description: Individual answer choices within a Ratio Set
+  - name: Ratio Set Choiceables
+    description: Selection rules governing how many Sub Ratios can be chosen from a Ratio Set
+  - name: Custom Field Categories
+    description: Case Forms — field schemas for creating Case records
+
+paths:
+
+  /users/sign_in:
+    post:
+      tags: [Authentication]
+      summary: Sign in — obtain an authentication token
+      description: |
+        Authenticates with email and password. Returns a long-lived token for all subsequent requests.
+        Tokens **do not expire**. No auth headers needed on this endpoint.
+      operationId: signIn
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: ["user[email]", "user[password]"]
+              properties:
+                "user[email]":
+                  type: string
+                  format: email
+                  example: user@example.com
+                "user[password]":
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                user_id: 42
+                email: user@example.com
+                authentication_token: "sJxyz_abc123longtoken"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List all Users
+      operationId: listUsers
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Users]
+      summary: Create a new User
+      description: |
+        Registers a new user. Requires an `auth_code` API Key — request one at [api-key-request@makerble.com](mailto:api-key-request@makerble.com).
+
+        **Password rules:** min 8 chars · at least 1 number · 1 special character · 1 capital letter
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [auth_code, user, charity_id]
+              properties:
+                auth_code:
+                  type: string
+                  description: API Key from api-key-request@makerble.com
+                user:
+                  type: object
+                  required: [email, first_name, last_name, password, password_confirmation]
+                  properties:
+                    email:
+                      type: string
+                      format: email
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    password:
+                      type: string
+                    password_confirmation:
+                      type: string
+                charity_id:
+                  type: integer
+                charity_controlled:
+                  type: boolean
+                  default: false
+                disable_email_notification:
+                  type: boolean
+                  default: false
+            example:
+              auth_code: "qspehLnbRlUS0uiA2mN..."
+              user:
+                email: "jane@charity.org"
+                first_name: "Jane"
+                last_name: "Smith"
+                password: "Secur3!Pass"
+                password_confirmation: "Secur3!Pass"
+              charity_id: 31
+              charity_controlled: true
+              disable_email_notification: false
+      responses:
+        "200":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      email:
+                        type: string
+                        format: email
+                  message:
+                    type: string
+                    example: "Sign up successfully!!!"
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get a single User
+      operationId: getUser
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: User record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /users/permissions:
+    get:
+      tags: [Users]
+      summary: Get user permissions
+      description: Returns the authenticated user's permissions across all Projects and Organisations.
+      operationId: getUserPermissions
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Permissions object
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/request_password_reset_code:
+    get:
+      tags: [Users]
+      summary: Request a password reset code
+      description: Sends a reset code to the user's email. No authentication required.
+      operationId: requestPasswordResetCode
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        "200":
+          description: Reset code sent
+
+  /users/check_password_reset_code:
+    get:
+      tags: [Users]
+      summary: Verify a password reset code
+      operationId: checkPasswordResetCode
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+        - name: reset_code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Validity result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_reset_code_correct:
+                    type: boolean
+
+  /users/reset_password:
+    post:
+      tags: [Users]
+      summary: Reset a user's password
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, reset_code, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                reset_code:
+                  type: string
+                  example: "DD3CB5B7C260"
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Password reset successful
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /charities/{id}:
+    get:
+      tags: [Charities]
+      summary: Get a single Organisation
+      description: Returns a single Charity (Organisation). Each Charity owns one or more Projects.
+      operationId: getCharity
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Charity record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charity'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List all Projects
+      description: |
+        Returns all Projects accessible to the authenticated user. Every Story and Case belongs to a Project.
+
+        Users hold one of three roles per Project:
+
+        | Role | API name | Front-end | Permissions |
+        |---|---|---|---|
+        | Editor | `editor` | Manager | Admin — edit Project, manage users |
+        | Reporter | `reporter` | Changemaker | Create Stories |
+        | Observer | `observer` | Analyst | Read-only |
+      operationId: listProjects
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Projects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjects'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /projects/{id}:
+    get:
+      tags: [Projects]
+      summary: Get a single Project
+      operationId: getProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Project record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /projects/add_colleague.json:
+    post:
+      tags: [Projects]
+      summary: Add users to a Project
+      description: Grants roles on a Project. A user can hold Editor, Reporter, and Observer simultaneously.
+      operationId: addColleague
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role_data]
+              properties:
+                role_data:
+                  type: array
+                  items:
+                    type: object
+                    required: [project_id]
+                    properties:
+                      project_id:
+                        type: integer
+                        example: 619
+                      editor_ids:
+                        type: array
+                        items:
+                          type: integer
+                        example: [559]
+                      reporter_ids:
+                        type: array
+                        items:
+                          type: integer
+                        example: [560]
+                      observer_ids:
+                        type: array
+                        items:
+                          type: integer
+                        example: [561]
+      responses:
+        "200":
+          description: Users added
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries:
+    get:
+      tags: [Beneficiaries]
+      summary: List all Beneficiaries (Contacts)
+      description: |
+        Returns all Contacts visible to the authenticated user. Filter by `charity_id` or `project_id`.
+        Response includes `custom_fields` defined by the Beneficiary Category.
+      operationId: listBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: charity_id
+          in: query
+          schema:
+            type: integer
+          description: Filter to Contacts in this Organisation
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: Filter to Contacts enrolled in this Project
+      responses:
+        "200":
+          description: Paginated list of Beneficiaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBeneficiaries'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Beneficiaries]
+      summary: Create a Beneficiary (Contact)
+      description: |
+        Creates a new Contact. Required: `name`, `owner_id`.
+
+        Call `GET /beneficiary_types` for `beneficiary_type_id` values and `GET /custom_fields` for available custom field IDs.
+      operationId: createBeneficiary
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeneficiaryCreateRequest'
+            example:
+              beneficiary:
+                name: "Jack Smith"
+                date_of_birth: "13-05-1990"
+                address: "123 Example Street, London"
+                latitude: "51.5074"
+                longitude: "-0.1278"
+                beneficiary_type_id: 1
+                owner_id: 237
+              project_ids: [572]
+              beneficiary_category_ids: [294]
+              custom_fields:
+                "173": "some value"
+      responses:
+        "200":
+          description: Beneficiary created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beneficiary'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries/{id}:
+    get:
+      tags: [Beneficiaries]
+      summary: Get a single Beneficiary (Contact)
+      description: Returns full profile including all custom fields.
+      operationId: getBeneficiary
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Beneficiary record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beneficiary'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /beneficiaries/advanced_custom_fields:
+    get:
+      tags: [Beneficiaries]
+      summary: Get advanced custom fields for all Beneficiaries
+      description: Returns the per-record custom field values for all Beneficiaries.
+      operationId: listBeneficiaryAdvancedCustomFields
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated custom field records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiaries/impact_box_data:
+    get:
+      tags: [Beneficiaries]
+      summary: Get Impact Box data (Progress Trackers per Contact)
+      description: Aggregated metric progress per Beneficiary — the data shown in the Progress Trackers box on a Contact Profile page.
+      operationId: getBeneficiaryImpactBoxData
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated impact box records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /project_beneficiaries:
+    get:
+      tags: [Beneficiaries]
+      summary: List Project–Beneficiary associations
+      description: Join table linking Beneficiaries to Projects (many-to-many).
+      operationId: listProjectBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Project–Beneficiary records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiary_categories:
+    get:
+      tags: [Beneficiary Categories]
+      summary: List all Beneficiary Categories (Contact Bio Forms)
+      operationId: listBeneficiaryCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBeneficiaryCategories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiary_categories/{id}:
+    get:
+      tags: [Beneficiary Categories]
+      summary: Get a single Beneficiary Category
+      operationId: getBeneficiaryCategory
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Beneficiary Category record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiaryCategory'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /beneficiary_categories/current_fields:
+    get:
+      tags: [Beneficiary Categories]
+      summary: Get current active fields for Beneficiary Categories
+      operationId: getBeneficiaryCategoryCurrentFields
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Current field definitions
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /custom_fields:
+    get:
+      tags: [Beneficiary Categories]
+      summary: List Custom Field definitions (Contact Bio Forms)
+      description: Filter by `beneficiary_category_ids[]` to get fields for specific forms.
+      operationId: listCustomFields
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: "beneficiary_category_ids[]"
+          in: query
+          schema:
+            type: integer
+          description: Filter by Beneficiary Category ID (repeat for multiple)
+      responses:
+        "200":
+          description: Paginated Custom Field definitions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiary_types:
+    get:
+      tags: [Beneficiary Types]
+      summary: List all Beneficiary Types
+      description: Returns the four types — Person (1), Organisation (2), Animal (3), Object (4). The ID is required when creating a Beneficiary.
+      operationId: listBeneficiaryTypes
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of Beneficiary Types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBeneficiaryTypes'
+              example:
+                page: 1
+                page_size: 4
+                page_count: 1
+                total_count: 4
+                data:
+                  - id: 1
+                    name: "Person"
+                    updated_at: "2020-09-28T15:19:24.310+01:00"
+                    created_at: "2020-09-28T15:19:24.310+01:00"
+                  - id: 2
+                    name: "Object"
+                    updated_at: "2020-09-28T15:19:24.319+01:00"
+                    created_at: "2020-09-28T15:19:24.319+01:00"
+                  - id: 3
+                    name: "Organisation"
+                    updated_at: "2020-09-28T15:19:24.324+01:00"
+                    created_at: "2020-09-28T15:19:24.324+01:00"
+                  - id: 4
+                    name: "Animal"
+                    updated_at: "2021-09-11T10:04:59.074+01:00"
+                    created_at: "2021-09-11T10:04:59.074+01:00"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiary_types_categories:
+    get:
+      tags: [Beneficiary Types]
+      summary: List Beneficiary Type–Category associations
+      operationId: listBeneficiaryTypesCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /stories:
+    get:
+      tags: [Stories]
+      summary: List all Stories
+      description: |
+        Returns all Stories visible to the authenticated user. Stories capture text, media, and progress towards Changes and Indicators, and can be tagged to Beneficiaries.
+
+        **Timestamp note:** `actual_created_at` = Date Posted · `created_at` = Date Happened · `updated_at` = Date Edited
+      operationId: listStories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Stories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Stories]
+      summary: Create a Story
+      description: |
+        Creates a Story tagged to zero, one, or multiple Beneficiaries.
+
+        **Recommended workflow:**
+        1. `GET /story_categories/:id` — retrieve the survey's fields, Indicators, Outcomes, and scale choices
+        2. `GET /sub_ratios?ratio_set_ids[]=N` — retrieve valid answer choice IDs for Scale Indicators
+        3. Submit this endpoint with the full payload
+
+        | Field | Notes |
+        |---|---|
+        | `story.story_group` | Always `"change_created"` |
+        | `story.story_format` | Always `"old"` |
+        | `story.created_at` | Date Happened in `YYYY-MM-DD` |
+        | `story_changes` | Activity/Participation totals — `[{change_id, number}]` |
+        | `story_change_beneficiaries` | Per-contact Participation records — `[{change_id, beneficiary_id}]` |
+        | `story_indicator_beneficiaries` | Per-contact indicator responses (see schema) |
+        | `custom_fields` | `{custom_field_id: value}` for text/date/time fields |
+
+        > For binary indicators: include `binray_indicator_value: "on"` if ticked; omit the record entirely if not.
+        > Activity Changes: include in `story_changes` only — cannot be tagged to beneficiaries.
+      operationId: createStory
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoryCreateRequest'
+            example:
+              story:
+                story_group: "change_created"
+                story_format: "old"
+                project_id: 19
+                story_category_id: 327
+                text: "Session notes from today."
+                created_at: "2024-06-01"
+                source_of_story: "api"
+                is_public: false
+              story_privacy: "only_charity_colleagues"
+              beneficiary_ids: [413]
+              story_changes:
+                - change_id: 199
+                  number: 2
+              story_change_beneficiaries:
+                - change_id: 199
+                  beneficiary_id: 413
+              story_indicator_beneficiaries:
+                - indicator_id: 243
+                  indicator_type: "scale"
+                  outcome_id: 145
+                  sub_ratio_id: 54
+                  beneficiary_id: 413
+              custom_fields:
+                "19": "2024-06-01"
+                "26": "Some text answer"
+      responses:
+        "200":
+          description: Story created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Story'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /stories/{id}:
+    get:
+      tags: [Stories]
+      summary: Get a single Story
+      description: Returns a Story with full detail — custom fields, beneficiary IDs, case IDs, indicator responses, change values, and verdict scores.
+      operationId: getStory
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Story with full detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /stories/{id}/attachments:
+    get:
+      tags: [Stories]
+      summary: Get attachments for a single Story
+      operationId: getStoryAttachments
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated attachments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /stories/attachments:
+    get:
+      tags: [Stories]
+      summary: List all Story attachments
+      operationId: listStoryAttachments
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated attachments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /stories/story_category_response:
+    get:
+      tags: [Stories]
+      summary: Get Stories with full survey response detail
+      description: |
+        Returns Stories enriched with named Indicators, Changes, and Custom Fields — ideal for reporting and data exports.
+      operationId: listStoryCategoryResponses
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: story_category_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by a specific Survey
+        - name: "project_ids[]"
+          in: query
+          schema:
+            type: integer
+          description: Filter by Project ID (repeat for multiple)
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Filter: stories on or after this date (YYYY-MM-DD)"
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Filter: stories on or before this date (YYYY-MM-DD)"
+      responses:
+        "200":
+          description: Stories with full survey response data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStoryCategoryResponses'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_categories:
+    get:
+      tags: [Story Categories]
+      summary: List all Story Categories (Surveys)
+      operationId: listStoryCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStoryCategories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_categories/{id}:
+    get:
+      tags: [Story Categories]
+      summary: Get a single Story Category (Survey) — with full field detail
+      description: |
+        Returns the survey's complete structure:
+        - `current_fields` — all questions in order with `field_class_name`, `priority`, `is_mandatory`, `outcome_id`
+        - `scale_indicator_choices` — choice type per Scale Indicator
+        - `verdict_data` — scoring bands and point values per level
+
+        **Always call this before posting a Story** to determine which Indicators are in the survey, their Outcome IDs, and valid Sub Ratio IDs.
+      operationId: getStoryCategory
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Story Category with full detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryCategoryDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /story_categories/{id}/verdicts:
+    get:
+      tags: [Story Categories]
+      summary: Get verdict scores for a Survey Campaign
+      description: Verdict scores grouped by Beneficiary for a specific Survey within a Project.
+      operationId: getStoryCategoryVerdicts
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Story Category ID
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Verdict scores grouped by Beneficiary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerdictScoresResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /project_story_categories:
+    get:
+      tags: [Project Story Categories]
+      summary: List all Survey Campaigns (Project Story Categories)
+      operationId: listProjectStoryCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectStoryCategories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_beneficiaries:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Beneficiaries
+      description: |
+        Records that directly tag a Beneficiary to a Story. The three tagging mechanisms are:
+        1. **Story Beneficiary** — direct tag (this endpoint)
+        2. **Story Change Beneficiary** — tagged via a Participation Change
+        3. **Story Indicator Beneficiary** — tagged via an Indicator response
+      operationId: listStoryBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_changes:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Changes
+      description: |
+        Per-story metric totals for Activity and Participation Changes. Filter by `story_id`.
+
+        - Activity Changes: value = number entered directly
+        - Participation Changes: value = tagged Beneficiaries + anonymous participants
+      operationId: listStoryChanges
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: story_id
+          in: query
+          schema:
+            type: integer
+          description: Filter to a specific Story
+      responses:
+        "200":
+          description: Paginated Story Change records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_change_beneficiaries:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Change Beneficiaries
+      description: Per-Beneficiary Participation Change records. Only applies to Participation type Changes.
+      operationId: listStoryChangeBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_indicators:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Indicators
+      description: Total indicator progress logged per Story. Filter by `story_id`.
+      operationId: listStoryIndicators
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: story_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_indicator_beneficiaries:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Indicator Beneficiaries
+      description: Per-Beneficiary indicator responses. Each record = one Contact's answer to one Indicator in one Story.
+      operationId: listStoryIndicatorBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: story_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /cases:
+    get:
+      tags: [Cases]
+      summary: List all Cases
+      description: Each Case is linked to one Beneficiary and one Project.
+      operationId: listCases
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Cases
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCases'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Cases]
+      summary: Create a Case
+      description: |
+        Creates a Case for a Beneficiary within a Project.
+
+        Call `GET /custom_field_categories` first to discover the field definition IDs for `custom_field_categories_definition`.
+      operationId: createCase
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseCreateRequest'
+            example:
+              case:
+                title: "Housing support case"
+              custom_field_categories_definition:
+                "71": "My case note"
+                "121": true
+              case_owner_id: 654
+              case_worker_ids: [231, 422]
+              project_id: 123
+              beneficiary_id: 321
+      responses:
+        "200":
+          description: Case created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Case'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects_beneficiaries_cases:
+    get:
+      tags: [Cases]
+      summary: List Project–Beneficiary–Case associations
+      operationId: listProjectsBeneficiariesCases
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectsBeneficiariesCases'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /custom_field_categories:
+    get:
+      tags: [Custom Field Categories]
+      summary: List all Custom Field Categories (Case Forms)
+      description: |
+        Case Form field schemas. Use field definition IDs in `custom_field_categories_definition` when creating a Case.
+
+        Supported field types: Text (short/long) · Number · Date & time · Time · Attachment · Select · Tickbox
+      operationId: listCustomFieldCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCustomFieldCategories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /changes:
+    get:
+      tags: [Changes]
+      summary: List all Changes (Activity & Participation metrics)
+      description: |
+        Custom KPIs / progress trackers. Two types:
+        - **Activity** — numerical, not linked to an Outcome, beneficiaries cannot be tagged (Progress Panel col 1)
+        - **Participation** — attendance-type, per-beneficiary tagging supported (Progress Panel col 2)
+      operationId: listChanges
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Changes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedChanges'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /indicators:
+    get:
+      tags: [Indicators]
+      summary: List all Indicators
+      description: |
+        Indicative Progress Trackers linked to Outcomes. Three types:
+        - **Scale** — multiple-choice using a Ratio Set
+        - **Binary** — tickbox (yes/no)
+        - **Value** — numerical
+      operationId: listIndicators
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Indicators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedIndicators'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /indicators/{id}:
+    get:
+      tags: [Indicators]
+      summary: Get a single Indicator
+      operationId: getIndicator
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Indicator record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndicatorDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /scale_indicator_choices:
+    get:
+      tags: [Indicators]
+      summary: Get Scale Indicator choices
+      description: Choice configuration (single/multiple) for Scale Indicators in a Story Category.
+      operationId: listScaleIndicatorChoices
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: story_category_id
+          in: query
+          schema:
+            type: integer
+        - name: indicator_id
+          in: query
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Scale indicator choice records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScaleIndicatorChoice'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /outcomes:
+    get:
+      tags: [Outcomes]
+      summary: List all Outcomes
+      description: Each Outcome has a stage (short/medium/long-term) placing it in Progress Panel cols 3–5.
+      operationId: listOutcomes
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Outcomes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOutcomes'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /outcomes/{id}:
+    get:
+      tags: [Outcomes]
+      summary: Get a single Outcome
+      operationId: getOutcome
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Outcome record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outcome'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /outcome_indicators:
+    get:
+      tags: [Outcome Indicators]
+      summary: List all Outcome Indicators
+      description: Join table pairing Outcomes with Indicators (many-to-many). Use to find the `outcome_id` when creating story indicator responses.
+      operationId: listOutcomeIndicators
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOutcomeIndicators'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /ratio_sets:
+    get:
+      tags: [Ratio Sets]
+      summary: List all Ratio Sets (Dropdown/List fields)
+      description: |
+        Reusable dropdown field definitions. Each has a type:
+        - **Identity** — for Beneficiary Categories (Contact Bio Forms)
+        - **Progress** — for Scale Indicators
+      operationId: listRatioSets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Ratio Sets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRatioSets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /sub_ratios:
+    get:
+      tags: [Sub Ratios]
+      summary: List all Sub Ratios (Answer Choices)
+      description: |
+        Individual answer choices within Ratio Sets. Filter by `ratio_set_ids[]`.
+
+        Use returned IDs as `sub_ratio_id` when submitting Scale Indicator responses in a Story.
+      operationId: listSubRatios
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: "ratio_set_ids[]"
+          in: query
+          schema:
+            type: integer
+          description: Filter by Ratio Set ID (repeat for multiple)
+      responses:
+        "200":
+          description: Paginated list of Sub Ratios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSubRatios'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /sub_ratios/{id}:
+    get:
+      tags: [Sub Ratios]
+      summary: Get a single Sub Ratio
+      operationId: getSubRatio
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Sub Ratio record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubRatio'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /ratio_set_choiceables:
+    get:
+      tags: [Ratio Set Choiceables]
+      summary: List all Ratio Set Choiceables
+      description: |
+        Selection rules for Ratio Sets within forms. Choice types:
+        - `single` — one answer only (default)
+        - `limited_multiple` — up to `limit` answers
+        - `unlimited_multiple` — any number of answers
+      operationId: listRatioSetChoiceables
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: "beneficiary_category_ids[]"
+          in: query
+          schema:
+            type: integer
+          description: Filter by Contact Bio Form ID
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRatioSetChoiceables'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+
+  securitySchemes:
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: X-User-Token
+      description: |
+        Long-lived token from `POST /users/sign_in`. Does not expire.
+        Must be accompanied by `X-User-Email` header.
+
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Unique integer identifier
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+      description: Page number (default 1)
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        default: 10
+        maximum: 200
+      description: Records per page (default 10, max 200)
+    LastSyncDatetime:
+      name: last_sync_datetime
+      in: query
+      schema:
+        type: string
+        example: "2023-07-30 08:48:55.781228"
+      description: ISO 8601 datetime — returns only records updated after this value
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You need to sign in before continuing."
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Record not found."
+    UnprocessableEntity:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    Timestamps:
+      type: object
+      properties:
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T09:30:00.000+00:00"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T09:30:00.000+00:00"
+
+    PaginationEnvelope:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 10
+        page_count:
+          type: integer
+          example: 42
+        total_count:
+          type: integer
+          example: 418
+
+    PaginatedGeneric:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+
+    AuthResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 42
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        authentication_token:
+          type: string
+          description: Long-lived token. Does not expire.
+          example: "sJxyz_abc123longtoken"
+
+    Charity:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 31
+            name:
+              type: string
+              example: "Greenfield Community Trust"
+
+    Project:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 572
+            name:
+              type: string
+              example: "Youth Mentoring Programme 2024"
+            charity_id:
+              type: integer
+              example: 31
+
+    User:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 237
+            name:
+              type: string
+              example: "Sarah Jones"
+            email:
+              type: string
+              format: email
+              example: "sarah@charity.org"
+
+    Beneficiary:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 160498
+            name:
+              type: string
+              example: "Jack Smith"
+            dob:
+              type: string
+              format: date
+              nullable: true
+              example: "1990-05-13"
+            charity_id:
+              type: integer
+              example: 31
+            mobile:
+              type: string
+              nullable: true
+              example: "+44 7700 900123"
+            email:
+              type: string
+              nullable: true
+              example: "jack@example.com"
+            address:
+              type: string
+              nullable: true
+              example: "123 Example Street, London"
+            avatar:
+              type: string
+              nullable: true
+            created_by:
+              type: integer
+              example: 237
+            custom_fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomFieldValue'
+
+    BeneficiaryCreateRequest:
+      type: object
+      required: [beneficiary]
+      properties:
+        beneficiary:
+          type: object
+          required: [name, owner_id]
+          properties:
+            name:
+              type: string
+            date_of_birth:
+              type: string
+              description: Format DD-MM-YYYY
+            address:
+              type: string
+            latitude:
+              type: string
+            longitude:
+              type: string
+            beneficiary_type_id:
+              type: integer
+              description: "1=Person  2=Object  3=Organisation  4=Animal"
+              default: 1
+            owner_id:
+              type: integer
+        project_ids:
+          type: array
+          items:
+            type: integer
+        beneficiary_category_ids:
+          type: array
+          items:
+            type: integer
+        custom_fields:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Dictionary of custom_field_id → value"
+
+    BeneficiaryType:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+              enum: [Person, Organisation, Animal, Object]
+
+    BeneficiaryCategory:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 294
+            name:
+              type: string
+              example: "Standard Contact Form"
+
+    CustomFieldValue:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 173
+        name:
+          type: string
+          example: "Employment Status"
+        type:
+          type: string
+          example: "text"
+          description: "Field type: text, date, time, file, etc."
+        value:
+          description: Field value (string for most types; object for file attachments)
+          example: "Employed"
+
+    Story:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 369011
+            text:
+              type: string
+              nullable: true
+              example: "Session went well — good engagement from all attendees."
+            number:
+              type: string
+              example: "0"
+            approved:
+              type: boolean
+              example: true
+            story_group:
+              type: string
+              example: "change_created"
+            location:
+              type: string
+              nullable: true
+            project_id:
+              type: integer
+              example: 572
+            charity_id:
+              type: integer
+              nullable: true
+              example: 31
+            story_category_id:
+              type: integer
+              example: 327
+            edited_by:
+              type: integer
+              example: 237
+            user_id:
+              type: integer
+              example: 237
+            actual_created_at:
+              type: string
+              format: date-time
+              description: Date Posted — real database insertion time
+              example: "2024-06-01T14:22:35.000+01:00"
+            beneficiary_ids:
+              type: array
+              items:
+                type: integer
+              example: [160498]
+            custom_fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomFieldValue'
+            verdict_scores:
+              type: array
+              items:
+                $ref: '#/components/schemas/VerdictScore'
+
+    StoryDetail:
+      allOf:
+        - $ref: '#/components/schemas/Story'
+        - type: object
+          properties:
+            case_ids:
+              type: array
+              items:
+                type: integer
+            story_indicator_beneficiaries:
+              type: array
+              items:
+                $ref: '#/components/schemas/StoryIndicatorBeneficiary'
+            story_change_beneficiaries:
+              type: array
+              items:
+                type: object
+            story_changes:
+              type: array
+              items:
+                type: object
+
+    StoryCreateRequest:
+      type: object
+      required: [story]
+      properties:
+        story:
+          type: object
+          required: [story_group, story_format, project_id, story_category_id]
+          properties:
+            story_group:
+              type: string
+              enum: [change_created]
+            story_format:
+              type: string
+              enum: [old]
+            display_as:
+              type: string
+              example: "survey_questions_view"
+            project_id:
+              type: integer
+            story_category_id:
+              type: integer
+            text:
+              type: string
+              description: "Main narrative text (supports Markdown)"
+            created_at:
+              type: string
+              format: date
+              description: "Date Happened — YYYY-MM-DD"
+            source_of_story:
+              type: string
+              example: "api"
+            is_public:
+              type: boolean
+              default: false
+        story_privacy:
+          type: string
+          enum: [only_charity_colleagues, public, specific_individuals_only]
+          default: only_charity_colleagues
+        beneficiary_ids:
+          type: array
+          items:
+            type: integer
+        case_ids:
+          type: array
+          items:
+            type: integer
+        story_changes:
+          type: array
+          items:
+            type: object
+            properties:
+              change_id:
+                type: integer
+              number:
+                type: number
+        story_change_beneficiaries:
+          type: array
+          items:
+            type: object
+            properties:
+              change_id:
+                type: integer
+              beneficiary_id:
+                type: integer
+        story_indicator_beneficiaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryIndicatorBeneficiaryInput'
+        custom_fields:
+          type: object
+          additionalProperties: true
+          description: "Dictionary of custom_field_id → value"
+
+    StoryIndicatorBeneficiaryInput:
+      type: object
+      required: [indicator_id, indicator_type, outcome_id]
+      properties:
+        indicator_id:
+          type: integer
+        indicator_type:
+          type: string
+          enum: [scale, binary, value]
+        outcome_id:
+          type: integer
+        beneficiary_id:
+          type: integer
+          nullable: true
+        sub_ratio_id:
+          type: integer
+          nullable: true
+          description: "Scale only — selected answer choice ID"
+        binray_indicator_value:
+          type: string
+          enum: ["on"]
+          nullable: true
+          description: "Binary only — 'on' if ticked; omit record if not"
+        number:
+          type: number
+          nullable: true
+          description: "Value only — numerical response"
+
+    StoryIndicatorBeneficiary:
+      type: object
+      properties:
+        id:
+          type: integer
+        beneficiary_id:
+          type: integer
+        indicator_id:
+          type: integer
+        indicator_type:
+          type: string
+          enum: [scale, binary, value]
+        sub_ratio_id:
+          type: integer
+          nullable: true
+        outcome_id:
+          type: integer
+          nullable: true
+
+    VerdictScore:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 675900
+        total_points:
+          type: string
+          example: "9.0"
+        beneficiary_id:
+          type: integer
+          example: 147750
+        story_id:
+          type: integer
+          example: 573975
+        verdict_id:
+          type: integer
+          example: 8
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    VerdictScoreDetail:
+      allOf:
+        - $ref: '#/components/schemas/VerdictScore'
+        - type: object
+          properties:
+            story_created_at:
+              type: string
+              format: date-time
+            beneficiary_owner_id:
+              type: integer
+            story_category_id:
+              type: integer
+
+    VerdictScoresResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: array
+            items:
+              type: object
+              properties:
+                beneficiary_id:
+                  type: integer
+                story_points:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/VerdictScoreDetail'
+
+    StoryCategory:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 841
+            name:
+              type: string
+              example: "Monthly Wellbeing Check-in"
+
+    StoryCategoryDetail:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            color:
+              type: string
+              example: "#4a8ac9"
+            is_stopped:
+              type: boolean
+            is_default:
+              type: boolean
+            description:
+              type: string
+              nullable: true
+            intro_message:
+              type: string
+              nullable: true
+            current_fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/StoryCategoryField'
+            scale_indicator_choices:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScaleIndicatorChoice'
+            verdict_data:
+              $ref: '#/components/schemas/VerdictData'
+
+    StoryCategoryField:
+      type: object
+      properties:
+        id:
+          type: integer
+        field_id:
+          type: integer
+          description: ID of the underlying field (e.g. Indicator ID when field_class_name is Indicator)
+        field_name:
+          type: string
+          example: "How are you feeling today?"
+        field_class_name:
+          type: string
+          example: "Indicator"
+          description: "e.g. CustomField, Indicator, Change"
+        priority:
+          type: integer
+          description: "Display order — 1 is first"
+          example: 3
+        is_mandatory:
+          type: boolean
+        display_info:
+          type: string
+          nullable: true
+        document_category_id:
+          type: integer
+          nullable: true
+        outcome_id:
+          type: integer
+          nullable: true
+          example: 145
+        indicator_type:
+          type: string
+          nullable: true
+          enum: [scale, binary, value]
+        change_type:
+          type: string
+          nullable: true
+
+    ScaleIndicatorChoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        indicator_id:
+          type: integer
+        choice:
+          type: string
+          enum: [single_choice, multiple_choice]
+        choice_value:
+          type: string
+
+    VerdictData:
+      type: object
+      properties:
+        verdict:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: integer
+                example: 0
+              to:
+                type: integer
+                example: 4
+              text:
+                type: string
+                example: "None-minimal Depression"
+        indicators:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              levels:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      example: "Not at all"
+                    points:
+                      type: integer
+                      example: 0
+
+    ProjectStoryCategory:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            project_id:
+              type: integer
+            story_category_id:
+              type: integer
+            allow_sign_out_story:
+              type: boolean
+            is_stopped:
+              type: boolean
+            display_intro_message:
+              type: boolean
+            display_respondent_name:
+              type: boolean
+
+    StoryCategoryResponse:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            text:
+              type: string
+              nullable: true
+            story_category_id:
+              type: integer
+            story_category:
+              type: string
+            project_id:
+              type: integer
+            project:
+              type: string
+            user_id:
+              type: integer
+            charity_id:
+              type: integer
+              nullable: true
+            known_beneficiaries_count:
+              type: integer
+            unknown_beneficiaries_count:
+              type: integer
+            latitude:
+              type: string
+              nullable: true
+            longitude:
+              type: string
+              nullable: true
+            indicator:
+              type: array
+              items:
+                type: object
+            change:
+              type: array
+              items:
+                type: object
+            custom_field:
+              type: array
+              items:
+                type: object
+
+    Case:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 96
+            beneficiary_id:
+              type: integer
+              example: 160498
+            project_id:
+              type: integer
+              example: 572
+            case_creator_id:
+              type: integer
+              description: User ID of the Case Owner
+              example: 237
+
+    CaseCreateRequest:
+      type: object
+      required: [project_id, beneficiary_id]
+      properties:
+        case:
+          type: object
+          properties:
+            title:
+              type: string
+        custom_field_categories_definition:
+          type: object
+          additionalProperties: true
+          description: "Case form field values: {field_definition_id: value}"
+        case_owner_id:
+          type: integer
+        case_worker_ids:
+          type: array
+          items:
+            type: integer
+        project_id:
+          type: integer
+        beneficiary_id:
+          type: integer
+
+    ProjectBeneficiaryCase:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            project_id:
+              type: integer
+            beneficiary_id:
+              type: integer
+            case_id:
+              type: integer
+
+    CustomFieldCategory:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 47
+            name:
+              type: string
+              example: "The Legal Aid Form"
+
+    Change:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 276
+            name:
+              type: string
+              example: "Sessions Attended"
+            stage:
+              type: string
+              enum: [activity, participation]
+              example: participation
+
+    Indicator:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 577
+            name:
+              type: string
+              example: "Confidence in finding work"
+            indicator_type:
+              type: string
+              enum: [scale, binary, value]
+              example: scale
+
+    IndicatorDetail:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            icon:
+              type: string
+              nullable: true
+            ratio_set_id:
+              type: integer
+              nullable: true
+            detail:
+              type: string
+              nullable: true
+            approved:
+              type: boolean
+            description:
+              type: string
+              nullable: true
+            instruction:
+              type: string
+              nullable: true
+            private:
+              type: boolean
+            stage_id:
+              type: integer
+              nullable: true
+            default_question:
+              type: string
+              nullable: true
+
+    Outcome:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 145
+            title:
+              type: string
+              example: "Improved employability skills"
+            icon:
+              type: string
+              format: uri
+              nullable: true
+            stage:
+              type: string
+              enum: [short_term, medium_term, long_term]
+              example: medium_term
+
+    OutcomeIndicator:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            outcome_id:
+              type: integer
+              example: 145
+            indicator_id:
+              type: integer
+              example: 577
+
+    RatioSet:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 11
+            name:
+              type: string
+              example: "Agreement Scale (1–5)"
+            ratio_set_category_type:
+              type: string
+              enum: [identity, progress]
+              example: progress
+
+    SubRatio:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 54
+            name:
+              type: string
+              example: "Strongly agree"
+            ratio_set_id:
+              type: integer
+              example: 11
+            priority:
+              type: integer
+              example: 5
+            default_criteria:
+              type: string
+              nullable: true
+              example: "Respondent shows strong agreement"
+            default_points:
+              type: number
+              nullable: true
+              example: 5
+
+    RatioSetChoiceable:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            ratio_set_id:
+              type: integer
+            choice:
+              type: string
+              enum: [single, limited_multiple, unlimited_multiple]
+              example: single
+            limit:
+              type: integer
+              nullable: true
+              description: "For limited_multiple — max selections allowed"
+
+    # ── Paginated wrappers ──────────────────────────────────────────────────────
+
+    PaginatedProjects:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Project'
+
+    PaginatedUsers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+
+    PaginatedBeneficiaries:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Beneficiary'
+
+    PaginatedBeneficiaryTypes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/BeneficiaryType'
+
+    PaginatedBeneficiaryCategories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/BeneficiaryCategory'
+
+    PaginatedStories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Story'
+
+    PaginatedStoryCategories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/StoryCategory'
+
+    PaginatedProjectStoryCategories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectStoryCategory'
+
+    PaginatedStoryCategoryResponses:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            total_metrics_count_per_page:
+              type: integer
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/StoryCategoryResponse'
+
+    PaginatedCases:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Case'
+
+    PaginatedProjectsBeneficiariesCases:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectBeneficiaryCase'
+
+    PaginatedCustomFieldCategories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomFieldCategory'
+
+    PaginatedChanges:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Change'
+
+    PaginatedIndicators:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Indicator'
+
+    PaginatedOutcomes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Outcome'
+
+    PaginatedOutcomeIndicators:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/OutcomeIndicator'
+
+    PaginatedRatioSets:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/RatioSet'
+
+    PaginatedSubRatios:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SubRatio'
+
+    PaginatedRatioSetChoiceables:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/RatioSetChoiceable'
