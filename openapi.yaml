@@ -47,6 +47,7 @@ info:
     | Project Manager | Project Editor |
     | Changemaker | Project Reporter |
     | Analyst | Project Observer |
+    | Signup Page | Referral Link Detail |
 
     ## Story timestamps
     Stories carry three timestamps:
@@ -128,6 +129,11 @@ tags:
     description: Selection rules governing how many Sub Ratios can be chosen from a Ratio Set
   - name: Custom Field Categories
     description: Case Forms — field schemas for creating Case records
+  - name: Signup Pages
+    description: |
+      Referral Link Details — public-facing signup forms, including the
+      Offline Collector endpoints that let a form be filled in with no
+      network connection and synced back later.
 
 paths:
 
@@ -1583,6 +1589,152 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /referral_link_details/{id}/definition:
+    get:
+      tags: [Signup Pages]
+      summary: Get a Signup Page's Form Definition (staff API access)
+      description: |
+        Returns the Form Definition JSON for a Signup Page — its contact form/survey
+        fields, skip logic, branding, and settings — the same document format the
+        Offline Collector renderer ingests.
+
+        This is the **staff, token-authenticated** variant: standard `X-User-Email` /
+        `X-User-Token` headers, scoped to Signup Pages belonging to a charity the
+        authenticated user has access to. Useful for testing or integration work
+        without a browser session.
+
+        Unlike the anonymous device-fetch variant (`GET /offline_collector_definition`),
+        this response does **not** include `submission_credential` — that bearer token
+        is only issued to the offline device itself.
+      operationId: getReferralLinkDetailDefinition
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Form Definition JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormDefinition'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          description: Signup Page not found, or not accessible to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /offline_collector_definition:
+    get:
+      tags: [Signup Pages]
+      summary: Get a Signup Page's Form Definition (offline device fetch)
+      description: |
+        The **anonymous** variant of the Form Definition endpoint, called automatically
+        by the installed Offline Collector PWA (`/offline/:token`) when it first loads.
+        There is no Devise session and no `X-User-Email`/`X-User-Token` pair involved —
+        the query-param token stands in for both identifying the Signup Page and
+        authorising the request.
+
+        The response is identical to the staff API variant, **plus one extra key**:
+        `submission_credential` — the bearer token the device later uses to post the
+        completed submission back via `POST /referral_submissions`.
+      operationId: getOfflineCollectorDefinition
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The offline collector token embedded in the Signup Page's "Offline QR Code" / "Offline version" links
+      responses:
+        "200":
+          description: Form Definition JSON, including submission_credential
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/FormDefinition'
+                  - type: object
+                    properties:
+                      submission_credential:
+                        $ref: '#/components/schemas/SubmissionCredential'
+        "401":
+          description: Token unknown, or the Signup Page has been deactivated since the token was issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "unauthorized"
+
+  /referral_submissions:
+    post:
+      tags: [Signup Pages]
+      summary: Sync a completed offline submission
+      description: |
+        The endpoint an offline device posts a completed Signup Page submission to,
+        once it regains connectivity. Reuses the exact same model methods the live,
+        online submission flow calls — there's no separate "offline" data path to
+        keep in sync with the online one.
+
+        **Authentication is a `ReferralLinkSubmissionCredential` bearer token** (the
+        `submission_credential.token` from the Form Definition), **not** the standard
+        `X-User-Email`/`X-User-Token` pair. Deactivating a Signup Page automatically
+        revokes its credential — there's no separate revoke action.
+
+        `primary` is used for a **structured** link (one primary person plus zero or
+        more `related_people`); `roles` is used instead for a **personalised** link
+        (one entry per person, no "primary" concept). Every `contact_form_answers` /
+        survey `answers` object is keyed by the field's `id` from the Form Definition,
+        never by name. See the Form Definition's Field object for the value shape
+        each `field_type` expects (Sub Ratio ids for dropdown/scale fields, digits-only
+        for `telephone`, base64-encoded payload for `media`/`file`, etc.).
+      operationId: createReferralSubmission
+      security: [{submissionBearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferralSubmissionRequest'
+      responses:
+        "201":
+          description: New submission processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferralSubmissionResponse'
+        "200":
+          description: This `idempotency_key` had already been processed — returns the original result, not a new one
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferralSubmissionResponse'
+        "401":
+          description: Token unknown, or the Signup Page has been deactivated since the token was issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "unauthorized"
+        "422":
+          description: |
+            Either the contact form is a `CustomFieldCategory` ("advanced custom field")
+            form — unsupported by this endpoint — or a model validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unsupportedContactForm:
+                  value: { error: "unsupported-contact-form", detail: "..." }
+                invalidSubmission:
+                  value: { error: "invalid-submission", detail: ["..."] }
+
 components:
 
   securitySchemes:
@@ -1593,6 +1745,14 @@ components:
       description: |
         Long-lived token from `POST /users/sign_in`. Does not expire.
         Must be accompanied by `X-User-Email` header.
+    submissionBearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        A `ReferralLinkSubmissionCredential` token, scoped to a single Signup Page —
+        obtained from `submission_credential.token` in the Offline Collector's Form
+        Definition response, **not** a Devise session or `X-User-Email`/`X-User-Token`
+        pair. Used only by `POST /referral_submissions`.
 
   parameters:
     ResourceId:
@@ -2759,3 +2919,350 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/RatioSetChoiceable'
+
+    FormDefinitionField:
+      type: object
+      description: One entry in `contact_form.fields` or a survey's `fields` — the same shape regardless of which form it came from.
+      properties:
+        id:
+          type: integer
+          description: The CurrentField id — key submitted answers back to the server using this, not the field name
+          example: 500
+        name:
+          type: string
+          example: "Full Name"
+        field_type:
+          type: string
+          nullable: true
+          enum: [string, text, boolean, integer, float, date, time, datetime, list, media, file, telephone, email_address, location, extended_table, section]
+          description: "null for a genuinely unrecognised field"
+        field_kind:
+          type: string
+          enum: [in_built_field, custom_field, ratio_set, indicator, change, outcome]
+        order:
+          type: integer
+        mandatory:
+          type: boolean
+        options:
+          type: array
+          description: "{id, name} Sub Ratio options, for ratio_set/indicator fields — always submit the id, never the name"
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+        choice:
+          type: string
+          nullable: true
+          enum: [single_choice, limited_choice, unlimited_choice]
+          description: Only present for ratio_set/indicator fields
+        choice_max:
+          type: integer
+          nullable: true
+          description: Only present when choice is limited_choice
+        indicator_type:
+          type: string
+          nullable: true
+          enum: [scale, binary, value]
+          description: "Only present for field_kind: indicator"
+        validation:
+          type: object
+          nullable: true
+          description: Only present for CustomFields with validation configured
+          properties:
+            add_validation:
+              type: boolean
+            min_length:
+              type: integer
+            max_length:
+              type: integer
+            character_type:
+              type: string
+            earliest_date:
+              type: string
+            latest_date:
+              type: string
+            default_country:
+              type: string
+        columns:
+          type: array
+          items:
+            type: string
+          description: "Column names — only present for field_type: extended_table"
+        description:
+          type: string
+          description: The field's Question Explanation — only present when set
+
+    FormDefinitionSkipLogicRule:
+      type: object
+      properties:
+        source_field_id:
+          type: integer
+          description: The field whose answer is the trigger
+        destination_field_id:
+          type: integer
+          description: The field the rule affects
+        kind:
+          type: string
+          enum: [hide_unless, jump_to]
+          description: Contact forms only ever produce hide_unless; surveys can produce either
+        sub_ratio_ids:
+          type: array
+          items:
+            type: integer
+
+    FormDefinitionFormSection:
+      type: object
+      description: Shared shape for contact_form and each entry in surveys
+      properties:
+        type:
+          type: string
+          example: "BeneficiaryCategory"
+        id:
+          type: integer
+        name:
+          type: string
+        wave:
+          nullable: true
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormDefinitionField'
+        skip_logic:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormDefinitionSkipLogicRule'
+        beneficiary_role:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        beneficiary_type:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+
+    FormDefinition:
+      type: object
+      properties:
+        definition_version:
+          type: string
+          description: ISO 8601 timestamp identifying this snapshot of the Signup Page — echo back unchanged in the submission sync request
+          example: "2026-08-28T12:00:00.000+01:00"
+        signup_page:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 123
+            name:
+              type: string
+              example: "Bambanani Signup"
+            description:
+              type: string
+              nullable: true
+            link_type:
+              type: string
+              enum: [structured, personalised]
+            status:
+              type: string
+              example: "activated"
+            thank_you_message:
+              type: string
+            allow_referrer:
+              type: boolean
+            project:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+            beneficiary_state:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+            contact_form:
+              $ref: '#/components/schemas/FormDefinitionFormSection'
+            surveys:
+              type: array
+              items:
+                $ref: '#/components/schemas/FormDefinitionFormSection'
+            settings:
+              type: object
+              properties:
+                redirect_after_signup:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    url:
+                      type: string
+                      nullable: true
+                redirect_after_deactivate:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    url:
+                      type: string
+                      nullable: true
+                delete_abandoned_beneficiary:
+                  type: boolean
+                hide_add_another_button_on_thank_you_page:
+                  type: boolean
+                display_project_image:
+                  type: boolean
+                see_summary:
+                  type: boolean
+                event_guest_person_names:
+                  type: boolean
+            charity:
+              type: object
+              properties:
+                name:
+                  type: string
+                logo_url:
+                  type: string
+                  nullable: true
+                hide_makerble_cobranding:
+                  type: boolean
+        branding:
+          type: object
+          nullable: true
+          description: The charity's full ReferralLookAndFeel attributes, or null if none configured
+          additionalProperties: true
+        related_people:
+          type: array
+          description: Only present for a structured link — one entry per possible related person, each with a referral_link_relationship_detail_id
+          items:
+            type: object
+            additionalProperties: true
+        roles:
+          type: array
+          description: Only present for a personalised link — one entry per role, each with a referral_link_beneficiary_role_detail_id
+          items:
+            type: object
+            additionalProperties: true
+
+    SubmissionCredential:
+      type: object
+      description: Only present in the anonymous offline-device Form Definition response
+      properties:
+        signup_page_id:
+          type: integer
+          example: 123
+        token:
+          type: string
+          description: Bearer token for POST /referral_submissions
+        scope:
+          type: string
+          example: "referral_submission"
+        submit_url:
+          type: string
+          example: "https://makerble.com/api/v2/referral_submissions"
+
+    ReferralSubmissionRequest:
+      type: object
+      required: [idempotency_key, definition_version]
+      properties:
+        idempotency_key:
+          type: string
+          format: uuid
+          description: A fresh UUID v4, generated once at the moment a submission is completed (not per sync attempt). Retrying the same key returns the original result rather than creating duplicates.
+        definition_version:
+          type: string
+          description: The definition_version the offline device's cached Form Definition was fetched with
+        primary:
+          type: object
+          description: Present for a structured link (one primary person plus zero or more related_people)
+          properties:
+            contact_form_answers:
+              type: object
+              additionalProperties: true
+              description: Keyed by field id from the Form Definition
+            survey_answers:
+              type: array
+              items:
+                type: object
+                properties:
+                  story_category_id:
+                    type: integer
+                  answers:
+                    type: object
+                    additionalProperties: true
+        related_people:
+          type: array
+          description: Present for a structured link
+          items:
+            type: object
+            properties:
+              referral_link_relationship_detail_id:
+                type: integer
+              contact_form_answers:
+                type: object
+                additionalProperties: true
+              survey_answers:
+                type: array
+                items:
+                  type: object
+        roles:
+          type: array
+          description: Present for a personalised link instead of primary/related_people — one entry per person, no "primary" concept
+          items:
+            type: object
+            properties:
+              referral_link_beneficiary_role_detail_id:
+                type: integer
+              contact_form_answers:
+                type: object
+                additionalProperties: true
+              survey_answers:
+                type: array
+                items:
+                  type: object
+      example:
+        idempotency_key: "8f14e45f-ceea-467e-8a4c-b1a2c9c6f2a3"
+        definition_version: "2026-08-28T12:00:00.000+01:00"
+        primary:
+          contact_form_answers: { "500": "Jane Doe", "501": "44 7911 123456" }
+          survey_answers:
+            - story_category_id: 200
+              answers: { "600": "Great progress this month" }
+        related_people:
+          - referral_link_relationship_detail_id: 12
+            contact_form_answers: { "502": "Baby Doe" }
+            survey_answers: []
+
+    ReferralSubmissionResponse:
+      type: object
+      properties:
+        idempotent_replay:
+          type: boolean
+          description: true if this idempotency_key had already been processed — the response reflects the original processing result, not a new one
+        definition_version_mismatch:
+          type: boolean
+          description: true if the submitted definition_version doesn't match the Signup Page's current one. Non-blocking — surfaced but doesn't prevent processing
+        created_beneficiary_ids:
+          type: array
+          items:
+            type: integer
+        created_story_ids:
+          type: array
+          items:
+            type: integer
+      example:
+        idempotent_replay: false
+        definition_version_mismatch: false
+        created_beneficiary_ids: [4501, 4502]
+        created_story_ids: [8801]
