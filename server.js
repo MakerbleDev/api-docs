@@ -1315,6 +1315,13 @@ function buildDocsPage() {
           ], `Creates a Story tagged to zero, one, or multiple Contacts. Required: <code>story.project_id</code>, <code>story.story_category_id</code>, <code>story.story_group: "change_created"</code>, <code>story.story_format: "old"</code>.
           <br/><br/>Use <code>story_indicator_beneficiaries</code> for indicator responses, <code>story_changes</code> for metric totals, and <code>custom_fields</code> for survey text/date/time fields.
           <br/><br/>For binary indicators: include <code>binray_indicator_value: "on"</code> if ticked — omit the record entirely if not ticked. Activity Changes cannot be tagged to individual Contacts.`)}
+          ${endpointCard("POST", "/draft_stories", "Save an Answer In Progress (draft Story)", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Saved. Returns <code>draft_story_id</code>" },
+            { code: "403", cls: "response-4xx", desc: "No permission for this Project or organisation" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], `Saves a partly completed survey response as an <strong>Answer In Progress</strong> (draft Story) for a colleague to review, finish and publish in Makerble. Use it instead of <code>POST /stories</code> when a person should check the response first.
+          <br/><br/>Send <code>story.project_id</code>, <code>story.story_category_id</code> and <code>story.text</code>, plus optional <code>story.event_id</code>, <code>beneficiaries</code> (Contact IDs), <code>story_privacy</code> and <code>custom_fields</code>.
+          <br/><br/>Allowed for the Project's editors, reporters and observers, the organisation's editors and reporters, and the workers and managers of <code>story.event_id</code> when that Event belongs to the Project. Anyone else gets <code>403</code>, as does a <code>story.charity_id</code> that isn't the Project's organisation.`)}
           ${endpointCard("GET", "/stories/story_category_response", "Get Stories with full survey response detail", true, [
             { name: "story_category_id", type: "integer", required: false, desc: "Filter by Survey" },
             { name: "project_ids[]", type: "integer", required: false, desc: "Filter by Project ID (repeat for multiple)" },
