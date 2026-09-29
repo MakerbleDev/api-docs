@@ -636,22 +636,39 @@ paths:
     get:
       tags: [Beneficiaries]
       summary: List Project–Beneficiary associations
-      description: Join table linking Beneficiaries to Projects (many-to-many).
+      description: >
+        Join table linking Contacts (Beneficiaries) to Projects (many-to-many). Only projects the
+        authenticated user can see are included. Use project_ids to narrow the results to specific
+        projects; it can never widen them to projects the user cannot see.
       operationId: listProjectBeneficiaries
       security: [{tokenAuth: []}]
       parameters:
+        - name: project_ids
+          in: query
+          required: false
+          description: >
+            Only include these projects. Send as repeated project_ids[]=12&project_ids[]=34, or as a
+            JSON array string (project_ids=[12,34]).
+          schema:
+            type: array
+            items: { type: integer }
+          style: form
+          explode: true
+          example: [12, 34]
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
       responses:
         "200":
-          description: Paginated Project–Beneficiary records
+          description: Paginated Project–Beneficiary records (id, project_id, beneficiary_id, created_at, updated_at)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedGeneric'
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /beneficiary_categories:
     get:
