@@ -1382,13 +1382,15 @@ function buildDocsPage() {
         <div class="endpoint-list">
           ${endpointCard("GET", "/indicators", "List all Indicators", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
-            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list with indicator_type (scale/binary/value)" }])}
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "include_public_library", type: "boolean", required: false, desc: "Also include Indicators from the public library shared by all organisations (default false)" }
+          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list with indicator_type (scale/binary/value). Only Indicators the user can see: their own and their organisations'" }])}
           ${endpointCard("GET", "/indicators/{id}", "Get a single Indicator", true, [
-            { name: "id", in: "path", type: "integer", required: true, desc: "Indicator ID" }
+            { name: "id", in: "path", type: "integer", required: true, desc: "Indicator ID" },
+            { name: "include_public_library", type: "boolean", required: false, desc: "Allow a public-library Indicator from another organisation to be returned (default false)" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Full Indicator detail including ratio_set_id, default_question" },
-            { code: "404", cls: "response-4xx", desc: "Not found" }
+            { code: "404", cls: "response-4xx", desc: "Not found, or not visible to the user" }
           ])}
           ${endpointCard("GET", "/scale_indicator_choices", "Get Scale Indicator choices", true, [
             { name: "story_category_id", type: "integer", required: false, desc: "Filter by Survey" },

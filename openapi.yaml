@@ -1358,12 +1358,18 @@ paths:
         - **Scale** — multiple-choice using a Ratio Set
         - **Binary** — tickbox (yes/no)
         - **Value** — numerical
+
+        Returns only the Indicators the signed-in user can see: their own, and those of
+        every organisation where they are an editor, reporter or observer. Indicators from
+        the public library shared by all organisations are added only when
+        `include_public_library=true`, matching the Indicator search in the Makerble app.
       operationId: listIndicators
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
+        - $ref: '#/components/parameters/IncludePublicLibrary'
       responses:
         "200":
           description: Paginated list of Indicators
@@ -1378,10 +1384,15 @@ paths:
     get:
       tags: [Indicators]
       summary: Get a single Indicator
+      description: |
+        Returns 404 for an Indicator the signed-in user cannot see, with the same body as
+        for an ID that does not exist. A public-library Indicator owned by another
+        organisation is returned only when `include_public_library=true`.
       operationId: getIndicator
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/IncludePublicLibrary'
       responses:
         "200":
           description: Indicator record
@@ -1785,6 +1796,14 @@ components:
         type: string
         example: "2023-07-30 08:48:55.781228"
       description: ISO 8601 datetime — returns only records updated after this value
+    IncludePublicLibrary:
+      name: include_public_library
+      in: query
+      schema:
+        type: boolean
+        default: false
+      example: true
+      description: Also include Indicators from the public library shared by all organisations (default false)
 
   responses:
     Unauthorized:
