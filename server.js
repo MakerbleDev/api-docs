@@ -1481,9 +1481,34 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" },
             { code: "422", cls: "response-4xx", desc: "Unknown column, or already on the Project" }
           ])}
-          ${endpointCard("PATCH", "/cohort_trackers/{id}/projects/{project_id}", "Set a Cohort Tracker's target on a Project", true, [
-            { name: "target", type: "integer", required: true, desc: "Number of Contacts to reach, not a total that adds up across periods" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Target saved" }])}
+          ${endpointCard("GET", "/cohort_trackers/{id}/projects/{project_id}", "Get a Cohort Tracker's targets on a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{cohort_tracker_id, project_id, column, target, deadlines: [{date, number}]}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" }
+          ])}
+          ${endpointCard("PATCH", "/cohort_trackers/{id}/projects/{project_id}", "Set a Cohort Tracker's targets on a Project", true, [
+            { name: "target", type: "integer", required: false, desc: "One-off target: a number of Contacts to reach, not a total that adds up across periods" },
+            { name: "deadlines", type: "array", required: false, desc: "<code>[{date: \"YYYY-MM-DD\", number}]</code>, replacing this tracker's deadline targets; <code>[]</code> clears them" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Targets saved" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" },
+            { code: "422", cls: "response-4xx", desc: "Bad deadlines, or neither field sent" }
+          ])}
+          ${endpointCard("GET", "/cohort_trackers/{id}/albums/{bundle_id}", "Get a Cohort Tracker's targets on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{cohort_tracker_id, album_id, album_target_type, target, deadlines}</code>" },
+            { code: "404", cls: "response-4xx", desc: "The Album has no Project using the tracker" }
+          ])}
+          ${endpointCard("PATCH", "/cohort_trackers/{id}/albums/{bundle_id}", "Set a Cohort Tracker's targets on an Album", true, [
+            { name: "target", type: "integer", required: false, desc: "One-off target for the Album; never the sum of its Projects'" },
+            { name: "deadlines", type: "array", required: false, desc: "<code>[{date, number}]</code>, saved as the Album's manual targets" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Targets saved" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
+          ])}
           ${endpointCard("DELETE", "/cohort_trackers/{id}/projects/{project_id}", "Remove a Cohort Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }

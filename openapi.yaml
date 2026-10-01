@@ -1960,6 +1960,29 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
 
   /cohort_trackers/{id}/projects/{project_id}:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker's targets on a Project
+      description: The one-off target and deadline targets (the Project's Set Targets page). Requires rights to edit the Project's targets.
+      operationId: getCohortTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
     post:
       tags: [Cohort Trackers]
       summary: Add a Cohort Tracker to a Project
@@ -2007,9 +2030,12 @@ paths:
 
     patch:
       tags: [Cohort Trackers]
-      summary: Set a Cohort Tracker's target on a Project
-      description: The one-off target (Set Targets) is a number of Contacts to reach, not a total that adds up across periods.
-      operationId: setCohortTrackerTarget
+      summary: Set a Cohort Tracker's targets on a Project
+      description: |
+        Sets the one-off target and/or replaces this tracker's deadline targets on the Project (Set
+        Targets). A target is a number of Contacts to reach, not a total that adds up across periods.
+        `deadlines: []` clears the deadline targets. Requires rights to edit the Project's targets.
+      operationId: setCohortTrackerProjectTargets
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -2019,16 +2045,15 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [target]
-              properties:
-                target:
-                  type: integer
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
             example:
               target: 40
+              deadlines:
+                - { date: "2026-06-30", number: 20 }
+                - { date: "2026-12-31", number: 40 }
       responses:
         "200":
-          description: Target saved
+          description: Targets saved
           content:
             application/json:
               schema:
@@ -2036,9 +2061,11 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
-          description: The user can't edit this Project's metrics
+          description: The user can't edit this Project's targets
         "404":
           $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
     delete:
       tags: [Cohort Trackers]
@@ -2057,6 +2084,71 @@ paths:
           description: The user can't edit this Project's metrics
         "404":
           $ref: '#/components/responses/NotFound'
+
+  /cohort_trackers/{id}/albums/{bundle_id}:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker's targets on an Album
+      description: |
+        An Album inherits the Cohort Trackers on its Projects. Returns the Album's one-off and deadline
+        targets for the tracker, and `album_target_type`: the Album's Set Targets page shows Cohort
+        Tracker targets under manual targets. Requires rights to edit the Album's targets.
+      operationId: getCohortTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Cohort Trackers]
+      summary: Set a Cohort Tracker's targets on an Album
+      description: |
+        Sets the Album's one-off target and/or replaces its deadline targets (saved as manual targets) for
+        the tracker. An Album's target is never the sum of its Projects'. Requires rights to edit the
+        Album's targets.
+      operationId: setCohortTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 120
+              deadlines:
+                - { date: "2026-12-31", number: 100 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
 components:
 
@@ -2085,6 +2177,13 @@ components:
       schema:
         type: integer
       description: Unique integer identifier
+    CohortTrackerAlbumId:
+      name: bundle_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Album (Bundle) ID
     CohortTrackerProjectId:
       name: project_id
       in: path
@@ -3669,6 +3768,29 @@ components:
             criteria:
               type: object
 
+    CohortTrackerDeadline:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-12-31"
+        number:
+          type: integer
+          example: 40
+
+    CohortTrackerTargetsRequest:
+      type: object
+      description: Send target, deadlines or both. deadlines replaces the tracker's deadline targets.
+      properties:
+        target:
+          type: integer
+          minimum: 0
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
     CohortTrackerPlacement:
       type: object
       properties:
@@ -3682,6 +3804,28 @@ components:
         target:
           type: integer
           example: 40
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    CohortTrackerAlbumTargets:
+      type: object
+      properties:
+        cohort_tracker_id:
+          type: integer
+        album_id:
+          type: integer
+        album_target_type:
+          type: string
+          enum: [manual_target, automatic_target]
+        target:
+          type: integer
+          example: 120
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
 
     PaginatedCohortTrackers:
       allOf:
