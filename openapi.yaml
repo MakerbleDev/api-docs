@@ -134,6 +134,12 @@ tags:
       Referral Link Details — public-facing signup forms, including the
       Offline Collector endpoints that let a form be filled in with no
       network connection and synced back later.
+  - name: Cohort Trackers
+    description: |
+      Metrics that count the Contacts (Beneficiaries) in a Project or Album who meet a
+      set of Contact Filter criteria, e.g. "Children attending 75%+". Placed in an
+      Impact Scorecard column like other metrics, and targeted with a number of
+      Contacts to reach.
 
 paths:
 
@@ -1735,6 +1741,323 @@ paths:
                 invalidSubmission:
                   value: { error: "invalid-submission", detail: ["..."] }
 
+  /cohort_trackers:
+    get:
+      tags: [Cohort Trackers]
+      summary: List an Organisation's Cohort Trackers
+      description: |
+        The Cohort Trackers of an Organisation (Charity). Visible to the Organisation's
+        editors and reporters, and to managers (editors) of its Projects.
+      operationId: listCohortTrackers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Cohort Trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCohortTrackers'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user has no editor or reporter role in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Cohort Trackers]
+      summary: Create a Cohort Tracker
+      description: |
+        Creates a Cohort Tracker (Create a metric > Cohort Tracker). Every tracker counts only
+        members of the Project or Album it is placed on: `membership` is `ever_enrolled`
+        (default: anyone whose status History shows them Enrolled at any time) or
+        `currently_enrolled` (their current Project State). `criteria` adds further conditions, in
+        the Contact Filters format; see `POST /cohort_trackers/preview` for the supported keys.
+        Requires an editor or reporter of the Organisation. `criteria` may also be sent as a JSON string.
+      operationId: createCohortTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerRequest'
+            example:
+              cohort_tracker:
+                charity_id: 913
+                name: "Bambanani children who start Ignite"
+                membership: "ever_enrolled"
+                criteria:
+                  bundle_ids: ["57", "58"]
+      responses:
+        "201":
+          description: Cohort Tracker created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Cohort Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/preview:
+    post:
+      tags: [Cohort Trackers]
+      summary: Preview Cohort Tracker criteria
+      description: |
+        How many of the Organisation's Contacts currently meet some criteria, before the tracker is
+        placed on a Project or Album ("Currently matches N contacts across your organisation"), and
+        the criteria as they would be stored. Rejects criteria a Cohort Tracker can't use (422).
+
+        Supported `criteria` keys:
+        - `project_ids` (with `project_ids_narrow: "true"` to require all of them), in any state
+        - `bundle_ids` (Albums) and `narrow_bundle_ids`
+        - `projects_states_hash`: `{project_id: beneficiary_state_id}`, current Project State in each
+        - `project_beneficiary_states`: `{project_id: {state_id: {enabled: "true", added_from_date, removed_from_date}}}`, dates as `dd/mm/yyyy - dd/mm/yyyy`, matched against status History
+        - `project_story_category_ids` (Survey Campaigns completed) with `project_story_category_filter_data: {id: {story_date_from}}`
+        - `attendance_rate`: `{change_id, from, to, event_scope}`
+        - `distance_travelled`: `{trackers: [{indicator_id, directions: [improved|no_change|worsened]}], same_project}`
+        - `indicator_comparisons`: `{indicator_id: {response: any|latest, op, sub_ratio_ids, values}}`
+        - `indicator_sub_ratios_hash`: `{indicator_id: [sub_ratio_id]}`
+      operationId: previewCohortTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id]
+              properties:
+                charity_id:
+                  type: integer
+                cohort_tracker:
+                  type: object
+                  properties:
+                    criteria:
+                      type: object
+                    membership:
+                      type: string
+                      enum: [ever_enrolled, currently_enrolled]
+            example:
+              charity_id: 913
+              cohort_tracker:
+                criteria:
+                  attendance_rate: { change_id: "412", from: "75", to: "100" }
+      responses:
+        "200":
+          description: The count and the normalised criteria
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    example: 42
+                  criteria:
+                    type: object
+                  names_projects_or_albums:
+                    type: boolean
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Cohort Trackers for this Organisation
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/{id}:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker
+      description: |
+        A Cohort Tracker with where it is used. `names_projects_or_albums` is true when its criteria
+        point at specific Projects or Albums, so it counts against those same ones wherever it is placed.
+      operationId: getCohortTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Cohort Tracker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Cohort Trackers]
+      summary: Update a Cohort Tracker
+      description: |
+        Updates the fields sent. Changes apply everywhere the tracker is used. Requires an
+        Organisation editor, or the reporter who created it.
+      operationId: updateCohortTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerRequest'
+            example:
+              cohort_tracker:
+                name: "Children attending 80%+"
+      responses:
+        "200":
+          description: Cohort Tracker updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Cohort Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Cohort Trackers]
+      summary: Delete a Cohort Tracker
+      description: Refused (422) while the tracker is used on any Project, Album or Scorecard Template.
+      operationId: deleteCohortTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't delete this Cohort Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/{id}/projects/{project_id}:
+    post:
+      tags: [Cohort Trackers]
+      summary: Add a Cohort Tracker to a Project
+      description: |
+        Places the tracker in a column of the Project's Impact Scorecard (Edit Project Metrics),
+        optionally with a one-off target. The Project's Albums pick it up automatically. The tracker
+        and Project must belong to the same Organisation, and the user needs rights to edit the
+        Project's metrics.
+      operationId: addCohortTrackerToProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [column]
+              properties:
+                column:
+                  type: string
+                  enum: [activities, engagement, potential, behaviour, growth]
+                target:
+                  type: integer
+            example:
+              column: engagement
+              target: 40
+      responses:
+        "201":
+          description: Placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    patch:
+      tags: [Cohort Trackers]
+      summary: Set a Cohort Tracker's target on a Project
+      description: The one-off target (Set Targets) is a number of Contacts to reach, not a total that adds up across periods.
+      operationId: setCohortTrackerTarget
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target]
+              properties:
+                target:
+                  type: integer
+            example:
+              target: 40
+      responses:
+        "200":
+          description: Target saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Cohort Trackers]
+      summary: Remove a Cohort Tracker from a Project
+      operationId: removeCohortTrackerFromProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+
 components:
 
   securitySchemes:
@@ -1762,6 +2085,13 @@ components:
       schema:
         type: integer
       description: Unique integer identifier
+    CohortTrackerProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Project ID
     Page:
       name: page
       in: query
@@ -3266,3 +3596,99 @@ components:
         definition_version_mismatch: false
         created_beneficiary_ids: [4501, 4502]
         created_story_ids: [8801]
+
+    CohortTracker:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 17
+        name:
+          type: string
+          example: "Children attending 75%+"
+        description:
+          type: string
+          nullable: true
+        charity_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        membership:
+          type: string
+          enum: [ever_enrolled, currently_enrolled]
+          description: Membership of the Project or Album the tracker is placed on
+        result_type:
+          type: string
+          enum: [number]
+        criteria:
+          type: object
+          description: Contact Filter criteria, in the shape a Saved Filter uses
+          example:
+            attendance_rate: { change_id: "412", from: "75", to: "100" }
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CohortTrackerDetail:
+      allOf:
+        - $ref: '#/components/schemas/CohortTracker'
+        - type: object
+          properties:
+            usage:
+              type: object
+              properties:
+                projects:
+                  type: integer
+                albums:
+                  type: integer
+                templates:
+                  type: integer
+            names_projects_or_albums:
+              type: boolean
+
+    CohortTrackerRequest:
+      type: object
+      properties:
+        cohort_tracker:
+          type: object
+          properties:
+            charity_id:
+              type: integer
+              description: Required when creating
+            name:
+              type: string
+            description:
+              type: string
+            membership:
+              type: string
+              enum: [ever_enrolled, currently_enrolled]
+            criteria:
+              type: object
+
+    CohortTrackerPlacement:
+      type: object
+      properties:
+        cohort_tracker_id:
+          type: integer
+        project_id:
+          type: integer
+        column:
+          type: string
+          enum: [activities, engagement, potential, behaviour, growth]
+        target:
+          type: integer
+          example: 40
+
+    PaginatedCohortTrackers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CohortTracker'
