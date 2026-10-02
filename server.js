@@ -891,6 +891,7 @@ function buildDocsPage() {
       <div class="nav-section">
         <div class="nav-section-label">Impact framework</div>
         <a href="#changes"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Changes</a>
+        <a href="#versions"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Versions</a>
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
       </div>
@@ -1386,6 +1387,34 @@ function buildDocsPage() {
           ${endpointCard("GET", "/story_beneficiaries", "List Story Beneficiaries", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" }
           ], [{ code: "200", cls: "response-2xx", desc: "Direct Contact-to-Story tagging records" }])}
+        </div>
+      </section>
+
+      <!-- Versions -->
+      <section class="section" id="versions">
+        <div class="section-eyebrow">Audit &amp; compliance</div>
+        <h2 class="section-title">Versions</h2>
+        <div class="section-desc">
+          <p>Versions are the audit trail behind the <strong>Manage Versions</strong> page: every time a Contact is created or edited, a Version records who did it, when, and a full snapshot of every field at that moment. Only Contacts are versioned so far.</p>
+          <p>Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one of their Projects). Anything else returns <code>404</code>. <code>user_name</code> is <code>System</code> when no signed-in user made the change, e.g. a CSV import.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/versions", "List a Contact's Versions (audit trail)", true, [
+            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> (the only type for now)" },
+            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 — only Versions created after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Versions, newest first, plus the record's name and whether it has been deleted" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
+          ])}
+          ${endpointCard("GET", "/versions/{id}", "Get a single Version with the full record snapshot", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Version ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Version, including full_object — every field as saved at that moment" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
+          ])}
         </div>
       </section>
 
