@@ -2641,6 +2641,12 @@ components:
               type: integer
             allow_sign_out_story:
               type: boolean
+            allow_respondent_finish_later:
+              type: boolean
+              description: >-
+                When true, a Contact who opens their personal survey link (Survey Invitation)
+                without signing in can press Save & Finish Later and come back to the same link
+                to finish. Unfinished responses are deleted 30 days after they were last saved.
             is_stopped:
               type: boolean
             display_intro_message:
