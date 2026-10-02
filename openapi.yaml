@@ -1097,6 +1097,185 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /project_story_categories/{id}/survey_links:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The Survey Campaign (Project Story Category) ID
+    post:
+      tags: [Project Story Categories]
+      summary: Generate personal survey links for Contacts (without sending them)
+      description: |
+        Generates a personal survey link (Survey Invitation link) for each Contact, as the
+        **Send Survey** page does, and returns the links. **Nothing is emailed or texted.**
+        Each response submitted through a link is recorded against that Contact.
+
+        - `beneficiary_ids` must be Contacts already in the Survey Campaign's Project.
+        - `emails` are matched to an existing Contact of the organisation with that email
+          address; if there is none, a new Contact is created for the organisation.
+        - At most 200 `beneficiary_ids` and `emails` per request.
+        - `link_expiry`: `use_once` (default) — the link stops working after one response;
+          `evergreen` — the link stays active.
+
+        Requires Project Editor or Organisation Editor access to the Survey Campaign's Project.
+        The links then appear on the Unique Survey Links page.
+      operationId: createSurveyLinks
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                beneficiary_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Contacts (Beneficiaries) in the Survey Campaign's Project
+                emails:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                  description: Email addresses, matched to or creating Contacts. No email is sent.
+                send_survey_wave_id:
+                  type: integer
+                  description: Optional Wave, from GET /project_story_categories/{id}/survey_waves
+                link_expiry:
+                  type: string
+                  enum: [use_once, evergreen]
+                  default: use_once
+                is_anonymised:
+                  type: boolean
+                  default: false
+            example:
+              beneficiary_ids: [1201, 1202]
+              emails: ["sam@example.org"]
+              link_expiry: use_once
+              is_anonymised: false
+      responses:
+        "201":
+          description: Links generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  send_survey_id:
+                    type: integer
+                    description: The Survey Invitation batch the links belong to
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SurveyLink'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not send surveys for this Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: |
+            Invalid request: Contacts outside the Project (listed in `invalid_beneficiary_ids`),
+            more than 200 recipients, no recipients, an unknown `link_expiry`, or a Wave that
+            is not available for this Survey Campaign.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                  invalid_beneficiary_ids:
+                    type: array
+                    items:
+                      type: integer
+              example:
+                errors: ["These contacts are not in this project: 9876."]
+                invalid_beneficiary_ids: [9876]
+    get:
+      tags: [Project Story Categories]
+      summary: List personal survey links for a Survey Campaign
+      description: |
+        Lists the personal survey links already generated for a Survey Campaign, e.g. to
+        reuse a Contact's existing link. A `use_once` link that has been answered has
+        `expired: true`. Requires Project Editor or Organisation Editor access.
+      operationId: listSurveyLinks
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: beneficiary_id
+          in: query
+          schema:
+            type: integer
+          description: Only this Contact's links
+        - name: send_survey_wave_id
+          in: query
+          schema:
+            type: integer
+          description: Only links for this Wave
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSurveyLinks'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not send surveys for this Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /project_story_categories/{id}/survey_waves:
+    get:
+      tags: [Project Story Categories]
+      summary: List the Waves of a Survey Campaign
+      description: |
+        Lists the Waves (named rounds of a longitudinal survey, e.g. Baseline and Exit) that
+        survey links can be generated for, in priority order. Empty when the Survey Campaign
+        doesn't use Waves.
+      operationId: listSurveyWaves
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: The Survey Campaign (Project Story Category) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSurveyWaves'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /story_beneficiaries:
     get:
       tags: [Story Metrics]
@@ -2826,6 +3005,81 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/ProjectStoryCategory'
+
+    SurveyLink:
+      type: object
+      description: A personal survey link (Survey Invitation link) for one Contact
+      properties:
+        id:
+          type: integer
+        send_survey_id:
+          type: integer
+        beneficiary_id:
+          type: integer
+          description: The Contact
+        email:
+          type: string
+          nullable: true
+        survey_token:
+          type: string
+        survey_url:
+          type: string
+          format: uri
+          example: https://app.makerble.com/stories/new/0f8c1d2e3b4a59687a6b5c4d3e2f1a0b
+        link_expiry:
+          type: string
+          enum: [use_once, evergreen]
+        is_anonymised:
+          type: boolean
+        send_survey_wave_id:
+          type: integer
+          nullable: true
+        expired:
+          type: boolean
+          description: True once a use_once link has been answered
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SurveyWave:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: Baseline
+        priority:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginatedSurveyLinks:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SurveyLink'
+
+    PaginatedSurveyWaves:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SurveyWave'
 
     PaginatedStoryCategoryResponses:
       allOf:
