@@ -893,6 +893,7 @@ function buildDocsPage() {
         <a href="#changes"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Changes</a>
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
+        <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
@@ -1452,6 +1453,100 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Outcome record" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Cohort Trackers -->
+      <section class="section" id="cohort-trackers">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Cohort Trackers</h2>
+        <div class="section-desc">
+          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Check criteria with <code>POST /cohort_trackers/preview</code>, create the tracker, then place it on a Project with <code>POST /cohort_trackers/{id}/projects/{project_id}</code>. Albums pick it up from their Projects.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/cohort_trackers", "List an Organisation's Cohort Trackers", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Cohort Trackers" },
+            { code: "403", cls: "response-4xx", desc: "No editor or reporter role in the Organisation" }
+          ])}
+          ${endpointCard("GET", "/cohort_trackers/{id}", "Get a Cohort Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The tracker, with <code>usage</code> and <code>names_projects_or_albums</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
+          ])}
+          ${endpointCard("POST", "/cohort_trackers/preview", "Preview Cohort Tracker criteria", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>count</code> of matching Contacts and the normalised <code>criteria</code>" },
+            { code: "422", cls: "response-4xx", desc: "An unknown <code>membership</code>" }
+          ], "Body: <code>charity_id</code>, <code>cohort_tracker: {criteria, membership}</code>. <code>criteria</code> takes any key the Contacts page's Filters sidebar sends. <code>project_ids</code>, <code>bundle_ids</code>, <code>narrow_bundle_ids</code>, <code>projects_states_hash</code>, <code>project_beneficiary_states</code>, <code>project_story_category_ids</code>, <code>attendance_rate</code>, <code>distance_travelled</code>, <code>indicator_comparisons</code> and <code>indicator_sub_ratios_hash</code> follow the Project or Album and the reporting period; the other sections (e.g. <code>group_ids</code>, <code>age_from</code>) apply to the Contacts' current details. Keys no filter reads are dropped.")}
+          ${endpointCard("POST", "/cohort_trackers", "Create a Cohort Tracker", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Cohort Tracker created" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria}</code>.")}
+          ${endpointCard("PATCH", "/cohort_trackers/{id}", "Update a Cohort Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Cohort Tracker updated" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation editor or the reporter who created it" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Only the fields sent change. Changes apply everywhere the tracker is used.")}
+          ${endpointCard("DELETE", "/cohort_trackers/{id}", "Delete a Cohort Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Deleted" },
+            { code: "422", cls: "response-4xx", desc: "Still used on a Project, Album or Scorecard Template" }
+          ])}
+          ${endpointCard("POST", "/cohort_trackers/{id}/projects/{project_id}", "Add a Cohort Tracker to a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "column", type: "string", required: true, desc: "<code>activities</code>, <code>engagement</code>, <code>potential</code>, <code>behaviour</code> or <code>growth</code>" },
+            { name: "target", type: "integer", required: false, desc: "One-off target: a number of Contacts to reach" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Placed: <code>{cohort_tracker_id, project_id, column, target}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" },
+            { code: "422", cls: "response-4xx", desc: "Unknown column, or already on the Project" }
+          ])}
+          ${endpointCard("GET", "/cohort_trackers/{id}/projects/{project_id}", "Get a Cohort Tracker's targets on a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{cohort_tracker_id, project_id, column, target, deadlines: [{date, number}]}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" }
+          ])}
+          ${endpointCard("PATCH", "/cohort_trackers/{id}/projects/{project_id}", "Set a Cohort Tracker's targets on a Project", true, [
+            { name: "target", type: "integer", required: false, desc: "One-off target: a number of Contacts to reach, not a total that adds up across periods" },
+            { name: "deadlines", type: "array", required: false, desc: "<code>[{date: \"YYYY-MM-DD\", number}]</code>, replacing this tracker's deadline targets; <code>[]</code> clears them" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Targets saved" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" },
+            { code: "422", cls: "response-4xx", desc: "Bad deadlines, or neither field sent" }
+          ])}
+          ${endpointCard("GET", "/cohort_trackers/{id}/albums/{bundle_id}", "Get a Cohort Tracker's targets on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{cohort_tracker_id, album_id, album_target_type, target, deadlines}</code>" },
+            { code: "404", cls: "response-4xx", desc: "The Album has no Project using the tracker" }
+          ])}
+          ${endpointCard("PATCH", "/cohort_trackers/{id}/albums/{bundle_id}", "Set a Cohort Tracker's targets on an Album", true, [
+            { name: "target", type: "integer", required: false, desc: "One-off target for the Album; never the sum of its Projects'" },
+            { name: "deadlines", type: "array", required: false, desc: "<code>[{date, number}]</code>, saved as the Album's manual targets" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Targets saved" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
+          ])}
+          ${endpointCard("DELETE", "/cohort_trackers/{id}/projects/{project_id}", "Remove a Cohort Tracker from a Project", true, [], [
+            { code: "204", cls: "response-2xx", desc: "Removed" },
+            { code: "404", cls: "response-4xx", desc: "Not on the Project" }
           ])}
         </div>
       </section>
