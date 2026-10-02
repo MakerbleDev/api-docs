@@ -1451,8 +1451,8 @@ function buildDocsPage() {
           ])}
           ${endpointCard("POST", "/cohort_trackers/preview", "Preview Cohort Tracker criteria", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>count</code> of matching Contacts and the normalised <code>criteria</code>" },
-            { code: "422", cls: "response-4xx", desc: "Criteria a Cohort Tracker can't use" }
-          ], "Body: <code>charity_id</code>, <code>cohort_tracker: {criteria, membership}</code>. Supported criteria: <code>project_ids</code>, <code>bundle_ids</code>, <code>narrow_bundle_ids</code>, <code>projects_states_hash</code>, <code>project_beneficiary_states</code>, <code>project_story_category_ids</code>, <code>attendance_rate</code>, <code>distance_travelled</code>, <code>indicator_comparisons</code>, <code>indicator_sub_ratios_hash</code>.")}
+            { code: "422", cls: "response-4xx", desc: "An unknown <code>membership</code>" }
+          ], "Body: <code>charity_id</code>, <code>cohort_tracker: {criteria, membership}</code>. <code>criteria</code> takes any key the Contacts page's Filters sidebar sends. <code>project_ids</code>, <code>bundle_ids</code>, <code>narrow_bundle_ids</code>, <code>projects_states_hash</code>, <code>project_beneficiary_states</code>, <code>project_story_category_ids</code>, <code>attendance_rate</code>, <code>distance_travelled</code>, <code>indicator_comparisons</code> and <code>indicator_sub_ratios_hash</code> follow the Project or Album and the reporting period; the other sections (e.g. <code>group_ids</code>, <code>age_from</code>) apply to the Contacts' current details. Keys no filter reads are dropped.")}
           ${endpointCard("POST", "/cohort_trackers", "Create a Cohort Tracker", true, [], [
             { code: "201", cls: "response-2xx", desc: "Cohort Tracker created" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },

@@ -1782,7 +1782,7 @@ paths:
         members of the Project or Album it is placed on: `membership` is `ever_enrolled`
         (default: anyone whose status History shows them Enrolled at any time) or
         `currently_enrolled` (their current Project State). `criteria` adds further conditions, in
-        the Contact Filters format; see `POST /cohort_trackers/preview` for the supported keys.
+        the Contact Filters format; see `POST /cohort_trackers/preview` for the keys.
         Requires an editor or reporter of the Organisation. `criteria` may also be sent as a JSON string.
       operationId: createCohortTracker
       security: [{tokenAuth: []}]
@@ -1822,9 +1822,10 @@ paths:
       description: |
         How many of the Organisation's Contacts currently meet some criteria, before the tracker is
         placed on a Project or Album ("Currently matches N contacts across your organisation"), and
-        the criteria as they would be stored. Rejects criteria a Cohort Tracker can't use (422).
+        the criteria as they would be stored. `criteria` takes any key the Contacts page's Filters
+        sidebar sends; keys no filter reads are dropped from the stored criteria.
 
-        Supported `criteria` keys:
+        These keys follow the Project or Album the tracker is placed on and the reporting period:
         - `project_ids` (with `project_ids_narrow: "true"` to require all of them), in any state
         - `bundle_ids` (Albums) and `narrow_bundle_ids`
         - `projects_states_hash`: `{project_id: beneficiary_state_id}`, current Project State in each
@@ -1834,6 +1835,13 @@ paths:
         - `distance_travelled`: `{trackers: [{indicator_id, directions: [improved|no_change|worsened]}], same_project}`
         - `indicator_comparisons`: `{indicator_id: {response: any|latest, op, sub_ratio_ids, values}}`
         - `indicator_sub_ratios_hash`: `{indicator_id: [sub_ratio_id]}`
+
+        The Contacts page's other sections apply as they do there, against the Contacts' current
+        details, e.g. `group_ids`, `beneficiary_types`, `age_from` / `age_to` (`{year, month, day}`),
+        `date_of_birth_from` and `created_at_from` (`yyyy/mm/dd - yyyy/mm/dd`), `created_by_ids`,
+        `story_creator_ids`, `case_owner_ids`, `case_worker_ids`, `open_cases`, `closed_cases`,
+        `custom_field_value_hash`, `custom_field_definition_hash`, `changes_hash`, `indicators_hash`,
+        `outcome_hash`, `event_ids`, `flag_hash`, `relationship_category_hash` and `beneficiary_roles_hash`.
       operationId: previewCohortTracker
       security: [{tokenAuth: []}]
       requestBody:
