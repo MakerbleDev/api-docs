@@ -1190,10 +1190,12 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Person (1), Object (2), Organisation (3), Animal (4)" }
           ])}
           ${endpointCard("GET", "/project_beneficiaries", "List Project–Contact associations", true, [
+            { name: "project_ids", type: "integer[]", required: false, desc: "Only include these projects (project_ids[]=12&project_ids[]=34, or a JSON array string). Never widens access beyond the projects you can see." },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Join table records" }
+            { code: "200", cls: "response-2xx", desc: "Join table records: project_id and beneficiary_id (the Contact) for each link" },
+            { code: "422", cls: "response-4xx", desc: "project_ids is not an array of integers" }
           ])}
         </div>
       </section>
