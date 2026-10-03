@@ -590,6 +590,117 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /beneficiaries/{beneficiary_id}/summary:
+    parameters:
+      - name: beneficiary_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Contact (Beneficiary) ID
+    get:
+      tags: [Beneficiaries]
+      summary: Get the AI summary of a Contact (SummaryMaker)
+      description: |
+        Returns the SummaryMaker summary of a Contact, as shown in the Summary tile on the
+        Contact profile: three sections (**Who**, **Progress**, **Watch for**) written from the
+        Contact's bio and the Stories the signed-in user is allowed to see. Every sentence
+        lists its sources: `bio` (true if it came from the bio) and `story_ids`.
+
+        A summary is never made from, and never returns, a Story or bio field the user can't
+        see. Users with the same access share one summary, and it is only remade when the bio
+        or Stories change, so repeated calls return the same text.
+
+        `status` is one of:
+        - `ready`: the summary is current.
+        - `stale`: an older summary made only from Stories you can see; `new_story_count`
+          Stories have been added since. POST to make a fresh one.
+        - `pending`: SummaryMaker is writing it in the background. `summary` is null, or the
+          previous version while an update is made. Call again in a few seconds.
+        - `failed`: it could not be made. POST to try again.
+        - `empty`: the Contact has no bio or Stories you can see.
+
+        Only available to organisations that have turned on SummaryMaker in their
+        preferences (off by default).
+      operationId: getBeneficiarySummary
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Contact summary and its status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactSummaryResponse'
+              example:
+                status: ready
+                new_story_count: 0
+                summary:
+                  id: 812
+                  generated_at: "2026-09-29T10:14:03Z"
+                  model: claude-haiku-4-5-20251001
+                  source_story_ids: [5521, 5530, 5544]
+                  sections:
+                    - heading: Who
+                      text: Amira joined the programme in June and is looking for warehouse work.
+                      bio: true
+                      story_ids: []
+                      sentences:
+                        - text: Amira joined the programme in June and is looking for warehouse work.
+                          bio: true
+                          story_ids: []
+                    - heading: Progress
+                      text: Amira updated her CV and has started interview practice.
+                      bio: false
+                      story_ids: [5530, 5544]
+                      sentences:
+                        - text: Amira updated her CV and has started interview practice.
+                          bio: false
+                          story_ids: [5530, 5544]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: SummaryMaker is not turned on for this organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: SummaryMaker is not enabled for this organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Beneficiaries]
+      summary: Update the AI summary of a Contact (SummaryMaker)
+      description: |
+        Makes a fresh summary from the latest bio and Stories the signed-in user can see, like
+        the **Update summary** button on the Contact profile. Returns `202` with status
+        `pending`; call the GET endpoint until the status is `ready`. No request body.
+      operationId: updateBeneficiarySummary
+      security: [{tokenAuth: []}]
+      responses:
+        "202":
+          description: Summary update started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactSummaryResponse'
+              example:
+                status: pending
+                new_story_count: 0
+                summary: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: SummaryMaker is not turned on for this organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: SummaryMaker is not enabled for this organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /beneficiaries/advanced_custom_fields:
     get:
       tags: [Beneficiaries]
@@ -2009,6 +2120,67 @@ components:
             $ref: '#/components/schemas/Error'
 
   schemas:
+
+    ContactSummaryResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, stale, pending, failed, empty]
+        new_story_count:
+          type: integer
+          description: Stories you can see that were added since this summary was made
+        summary:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ContactSummary'
+
+    ContactSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        generated_at:
+          type: string
+          format: date-time
+        model:
+          type: string
+          example: claude-haiku-4-5-20251001
+        source_story_ids:
+          type: array
+          items:
+            type: integer
+          description: The Stories the summary was made from
+        sections:
+          type: array
+          items:
+            type: object
+            properties:
+              heading:
+                type: string
+                enum: [Who, Progress, Watch for]
+              text:
+                type: string
+              bio:
+                type: boolean
+                description: True if any sentence in the section came from the bio
+              story_ids:
+                type: array
+                items:
+                  type: integer
+              sentences:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    text:
+                      type: string
+                    bio:
+                      type: boolean
+                    story_ids:
+                      type: array
+                      items:
+                        type: integer
 
     Error:
       type: object
