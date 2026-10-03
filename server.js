@@ -1185,7 +1185,6 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "<code>status</code> (ready, stale, pending, failed or empty), <code>new_story_count</code> and the <code>summary</code>: sections Who, Progress and Watch for, each sentence with its sources (<code>bio</code>, <code>story_ids</code>)" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
-            { code: "403", cls: "response-4xx", desc: "SummaryMaker is not enabled for this organisation" },
             { code: "404", cls: "response-4xx", desc: "Contact not found, or you can't view it" }
           ], "The summary shown in the Summary tile on the Contact profile, written by SummaryMaker from the Contact's bio and the Stories you are allowed to see. It never uses a Story you can't see. If <code>status</code> is <code>pending</code>, SummaryMaker is still writing it: call again in a few seconds.")}
           ${endpointCard("POST", "/beneficiaries/{beneficiary_id}/summary", "Update the AI summary of a Contact (SummaryMaker)", true, [
@@ -1193,7 +1192,6 @@ function buildDocsPage() {
           ], [
             { code: "202", cls: "response-2xx", desc: "Update started; <code>status</code> is <code>pending</code>" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
-            { code: "403", cls: "response-4xx", desc: "SummaryMaker is not enabled for this organisation" },
             { code: "404", cls: "response-4xx", desc: "Contact not found, or you can't view it" }
           ], "Makes a fresh summary from the latest bio and Stories, like the <b>Update summary</b> button. Poll the GET endpoint until <code>status</code> is <code>ready</code>.")}
           ${endpointCard("GET", "/beneficiaries/impact_box_data", "Get Impact Box data (Progress Trackers per Contact)", true, [
