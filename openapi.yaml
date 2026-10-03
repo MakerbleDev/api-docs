@@ -619,6 +619,9 @@ paths:
           previous version while an update is made. Call again in a few seconds.
         - `failed`: it could not be made. POST to try again.
         - `empty`: the Contact has no bio or Stories you can see.
+
+        Only available to organisations that have turned on SummaryMaker in their
+        preferences (off by default).
       operationId: getBeneficiarySummary
       security: [{tokenAuth: []}]
       responses:
@@ -655,6 +658,14 @@ paths:
                           story_ids: [5530, 5544]
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: SummaryMaker is not turned on for this organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: SummaryMaker is not enabled for this organisation
         "404":
           $ref: '#/components/responses/NotFound'
     post:
@@ -679,6 +690,14 @@ paths:
                 summary: null
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: SummaryMaker is not turned on for this organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: SummaryMaker is not enabled for this organisation
         "404":
           $ref: '#/components/responses/NotFound'
 
