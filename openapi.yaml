@@ -129,6 +129,8 @@ tags:
     description: Selection rules governing how many Sub Ratios can be chosen from a Ratio Set
   - name: Custom Field Categories
     description: Case Forms — field schemas for creating Case records
+  - name: Media Gallery
+    description: Photos, videos, audio and documents attached to Stories and to Contacts' bios
   - name: Signup Pages
     description: |
       Referral Link Details — public-facing signup forms, including the
@@ -1925,6 +1927,100 @@ paths:
                 invalidSubmission:
                   value: { error: "invalid-submission", detail: ["..."] }
 
+  /media_items:
+    get:
+      tags: [Media Gallery]
+      summary: List Media Gallery files
+      description: |
+        Lists every photo, video, audio file and document attached to Stories and to Contacts' bios in one organisation — the files shown on the **Media Gallery** page (Impact → Media Gallery).
+
+        Only files from Stories and Contacts the user is already allowed to view are returned, so two users can get different results for the same organisation. Filters combine with AND.
+
+        `kind_counts` gives the number of files of each kind for the same filters, ignoring `kind` — the counts on the File type buttons.
+      operationId: listMediaItems
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Organisation ID
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [photo, video, audio, document]
+          description: File type
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Matches the start of words in the file name, Story title, Contact name and caption
+        - name: source[]
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [stories, contacts]
+          style: form
+          explode: true
+          description: Story files, Contact bio files, or both (default both)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest]
+            default: newest
+          description: By upload date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Media Gallery files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMediaItems'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                kind_counts: { all: 1, photo: 1, video: 0, audio: 0, document: 0 }
+                data:
+                  - id: 512
+                    kind: photo
+                    file_name: harvest_day.jpg
+                    content_type: image/jpeg
+                    file_size: 248310
+                    caption: Volunteers at the allotment
+                    source_type: story
+                    source_id: 90211
+                    source_title: Harvest day at the allotment
+                    project_id: 19
+                    project_name: Growing Together
+                    uploaded_by_id: 6207
+                    uploaded_at: "2026-09-12T10:14:00Z"
+                    updated_at: "2026-09-12T10:15:02Z"
+                    thumbnail_url: https://makerble.s3.amazonaws.com/medias/files/000/000/512/thumbnail/harvest_day.jpg
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user is not a member of that organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
 components:
 
   securitySchemes:
@@ -3192,6 +3288,45 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/RatioSetChoiceable'
+
+    PaginatedMediaItems:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            kind_counts:
+              type: object
+              description: Files of each kind for the same filters, ignoring `kind`
+              properties:
+                all: { type: integer }
+                photo: { type: integer }
+                video: { type: integer }
+                audio: { type: integer }
+                document: { type: integer }
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/MediaItem'
+
+    MediaItem:
+      type: object
+      description: One file in the Media Gallery. It points at the file on its Story or Contact; it is not a copy.
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [photo, video, audio, document] }
+        file_name: { type: string }
+        content_type: { type: string, nullable: true }
+        file_size: { type: integer, nullable: true, description: Bytes }
+        caption: { type: string, nullable: true }
+        source_type: { type: string, enum: [story, contact], description: "`contact` means a file on a Contact's bio" }
+        source_id: { type: integer, description: Story ID or Contact (Beneficiary) ID }
+        source_title: { type: string, nullable: true, description: Story title or Contact name }
+        project_id: { type: integer, nullable: true, description: The Story's Project; null for Contact bio files }
+        project_name: { type: string, nullable: true }
+        uploaded_by_id: { type: integer, nullable: true }
+        uploaded_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        thumbnail_url: { type: string, nullable: true, description: Photos only }
 
     FormDefinitionField:
       type: object
