@@ -1349,8 +1349,8 @@ function buildDocsPage() {
           <br/><br/>Use <code>story_indicator_beneficiaries</code> for indicator responses, <code>story_changes</code> for metric totals, and <code>custom_fields</code> for survey text/date/time fields.
           <br/><br/>For binary indicators: include <code>binray_indicator_value: "on"</code> if ticked — omit the record entirely if not ticked. Activity Changes cannot be tagged to individual Contacts.`)}
           ${endpointCard("GET", "/stories/story_category_response", "Get Stories with full survey response detail", true, [
-            { name: "story_category_id", type: "integer", required: false, desc: "Filter by Survey" },
-            { name: "project_ids[]", type: "integer", required: false, desc: "Filter by Project ID (repeat for multiple)" },
+            { name: "story_category_ids", type: "string", required: false, desc: "Filter by one or more Surveys. Accepts a JSON array, repeated story_category_ids[] params, a comma-separated list or a single ID. Only Surveys you can access are returned. story_category_id is accepted as an alias" },
+            { name: "project_ids", type: "string", required: false, desc: "Filter by one or more Project IDs. Same formats as story_category_ids" },
             { name: "start_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or after this date" },
             { name: "end_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or before this date" }
           ], [{ code: "200", cls: "response-2xx", desc: "Stories enriched with named Indicators, Changes, and Custom Field values — ideal for reporting" }])}

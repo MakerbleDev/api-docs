@@ -965,16 +965,20 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
-        - name: story_category_id
+        - name: story_category_ids
           in: query
           schema:
-            type: integer
-          description: Filter by a specific Survey
-        - name: "project_ids[]"
+            type: string
+          description: >-
+            Filter by one or more Surveys (Story Categories). Accepts a JSON array (`[1,2]`), a repeated
+            array parameter (`story_category_ids[]=1&story_category_ids[]=2`), a comma-separated list (`1,2`)
+            or a single ID. Only Surveys the authenticated user can access are returned; any others are
+            ignored. `story_category_id` is also accepted as an alias.
+        - name: project_ids
           in: query
           schema:
-            type: integer
-          description: Filter by Project ID (repeat for multiple)
+            type: string
+          description: Filter by one or more Project IDs. Accepts the same formats as `story_category_ids`.
         - name: start_date
           in: query
           schema:
