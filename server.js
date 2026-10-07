@@ -1287,6 +1287,39 @@ function buildDocsPage() {
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects" }])}
+          ${endpointCard("GET", "/project_story_categories/{id}/survey_waves", "List the Waves of a Survey Campaign", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Waves (id, name, priority) in priority order; empty if the Survey Campaign doesn't use Waves" },
+            { code: "404", cls: "response-4xx", desc: "Survey Campaign not found" }
+          ], "Use a Wave's <code>id</code> as <code>send_survey_wave_id</code> when generating survey links.")}
+          ${endpointCard("POST", "/project_story_categories/{id}/survey_links", "Generate personal survey links (without sending)", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "Contacts in the Survey Campaign's Project" },
+            { name: "emails", in: "body", type: "string[]", required: false, desc: "Email addresses, matched to an existing Contact of the organisation or creating one. No email is sent." },
+            { name: "send_survey_wave_id", in: "body", type: "integer", required: false, desc: "Wave, from the Waves endpoint" },
+            { name: "link_expiry", in: "body", type: "string", required: false, desc: "<code>use_once</code> (default) or <code>evergreen</code>" },
+            { name: "is_anonymised", in: "body", type: "boolean", required: false, desc: "Default false" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>send_survey_id</code> and <code>data</code>: one link per Contact with <code>survey_url</code>, <code>survey_token</code>, <code>link_expiry</code>, <code>expired</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Editor or Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "Survey Campaign not found" },
+            { code: "422", cls: "response-4xx", desc: "Contacts outside the Project (<code>invalid_beneficiary_ids</code>), over 200 recipients, no recipients, or an unavailable Wave" }
+          ], "Generates the same personal links as the Send Survey page, but <strong>sends nothing</strong>: share the returned <code>survey_url</code> yourself. At most 200 contacts and email addresses per request. A <code>use_once</code> link stops working after one response; an <code>evergreen</code> link stays active.")}
+          ${endpointCard("GET", "/project_story_categories/{id}/survey_links", "List personal survey links", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
+            { name: "beneficiary_id", type: "integer", required: false, desc: "Only this Contact's links" },
+            { name: "send_survey_wave_id", type: "integer", required: false, desc: "Only links for this Wave" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (max 200)" },
+            { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of links" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Editor or Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "Survey Campaign not found" }
+          ], "Use it to reuse a Contact's existing link. A <code>use_once</code> link that has been answered has <code>expired: true</code>.")}
         </div>
       </section>
 
@@ -1383,13 +1416,15 @@ function buildDocsPage() {
         <div class="endpoint-list">
           ${endpointCard("GET", "/indicators", "List all Indicators", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
-            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list with indicator_type (scale/binary/value)" }])}
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "include_public_library", type: "boolean", required: false, desc: "Also include Indicators from the public library shared by all organisations (default false)" }
+          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list with indicator_type (scale/binary/value). Only Indicators the user can see: their own and their organisations'" }])}
           ${endpointCard("GET", "/indicators/{id}", "Get a single Indicator", true, [
-            { name: "id", in: "path", type: "integer", required: true, desc: "Indicator ID" }
+            { name: "id", in: "path", type: "integer", required: true, desc: "Indicator ID" },
+            { name: "include_public_library", type: "boolean", required: false, desc: "Allow a public-library Indicator from another organisation to be returned (default false)" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Full Indicator detail including ratio_set_id, default_question" },
-            { code: "404", cls: "response-4xx", desc: "Not found" }
+            { code: "404", cls: "response-4xx", desc: "Not found, or not visible to the user" }
           ])}
           ${endpointCard("GET", "/scale_indicator_choices", "Get Scale Indicator choices", true, [
             { name: "story_category_id", type: "integer", required: false, desc: "Filter by Survey" },
