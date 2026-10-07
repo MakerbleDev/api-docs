@@ -115,6 +115,8 @@ tags:
     description: Per-story metric records (Story Changes, Story Indicators, Story Beneficiaries)
   - name: Changes
     description: Activity and Participation custom KPIs tracked across Projects
+  - name: Versions
+    description: Audit trail — who created or edited a Contact, when, and what it looked like at the time
   - name: Indicators
     description: Scale, Binary, and Value progress trackers linked to Outcomes
   - name: Outcomes
@@ -1574,6 +1576,91 @@ paths:
                 $ref: '#/components/schemas/PaginatedCustomFieldCategories'
         "401":
           $ref: '#/components/responses/Unauthorized'
+
+  /versions:
+    get:
+      tags: [Versions]
+      summary: List a record's Versions (audit trail)
+      description: |
+        Returns every Version of one record, newest first: each time it was created or edited, who did it and when.
+        Only Contacts (Beneficiaries) are versioned so far, so `record_type` must be `Contact`.
+
+        Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one
+        of their Projects). Anything the caller may not see returns `404`, so the endpoint never confirms that
+        another Organisation's record exists.
+
+        `user_name` is `System` when no signed-in user made the change (e.g. a CSV import run in the background).
+        One Save can write several Versions a fraction of a second apart. Use `GET /versions/{id}` to see the full
+        record as it was saved in a Version.
+      operationId: listVersions
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: record_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [Contact]
+          description: Type of record. Only `Contact` for now.
+        - name: record_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Contact (Beneficiary) ID
+        - $ref: '#/components/parameters/Page'
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 200
+          description: Records per page (default 10, max 200)
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of the record's Versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVersions'
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                record: { record_type: Contact, record_id: 185170, charity_id: 304, name: Bella Thornton, deleted: false }
+                data:
+                  - { id: 76, record_type: Contact, record_id: 185170, charity_id: 304, event: update, action: Edited, user_id: 190, user_name: Sam Ahmed, created_at: "2026-09-29T07:50:02.709Z" }
+                  - { id: 74, record_type: Contact, record_id: 185170, charity_id: 304, event: create, action: Created, user_id: 190, user_name: Sam Ahmed, created_at: "2026-09-29T07:50:02.319Z" }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /versions/{id}:
+    get:
+      tags: [Versions]
+      summary: Get a single Version, with the full record snapshot
+      description: |
+        Returns one Version including `full_object`: every field of the record exactly as it was saved at that
+        moment, not just the fields that changed. Compare two Versions' `full_object` to see what changed.
+        Same permissions as `GET /versions`.
+      operationId: getVersion
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Version with full_object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /changes:
     get:
@@ -3273,6 +3360,72 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/User'
+
+    Version:
+      type: object
+      properties:
+        id:
+          type: integer
+        record_type:
+          type: string
+          example: Contact
+        record_id:
+          type: integer
+          description: The Contact (Beneficiary) ID
+        charity_id:
+          type: integer
+        event:
+          type: string
+          enum: [create, update, destroy]
+        action:
+          type: string
+          enum: [Created, Edited, Destroyed]
+          description: Type of access, as worded on the Manage Versions page
+        user_id:
+          type: integer
+          nullable: true
+          description: Who did it. Null when no signed-in user made the change.
+        user_name:
+          type: string
+          description: Who did it — `System` when no signed-in user made the change, `Unknown user` if that user no longer exists
+        created_at:
+          type: string
+          format: date-time
+
+    VersionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Version'
+        - type: object
+          properties:
+            full_object:
+              type: object
+              additionalProperties: true
+              description: Snapshot of every field of the record as saved in this Version
+
+    PaginatedVersions:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            record:
+              type: object
+              properties:
+                record_type:
+                  type: string
+                record_id:
+                  type: integer
+                charity_id:
+                  type: integer
+                name:
+                  type: string
+                  description: The Contact's name (anonymised for Vault Contacts the caller can't see), or its last saved name once hard-deleted
+                deleted:
+                  type: boolean
+                  description: True once the record has been permanently deleted; its Versions remain
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Version'
 
     PaginatedBeneficiaries:
       allOf:
