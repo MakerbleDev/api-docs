@@ -887,6 +887,7 @@ function buildDocsPage() {
         <a href="#surveys"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Surveys</a>
         <a href="#stories"         class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Stories</a>
         <a href="#story-metrics"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Story Metrics</a>
+        <a href="#media-gallery"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Media Gallery</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Impact framework</div>
@@ -1359,6 +1360,34 @@ function buildDocsPage() {
           ${endpointCard("GET", "/stories/{id}/attachments", "Get attachments for a Story", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Story ID" }
           ], [{ code: "200", cls: "response-2xx", desc: "Paginated media attachments" }])}
+        </div>
+      </section>
+
+      <!-- Media Gallery -->
+      <section class="section" id="media-gallery">
+        <div class="section-eyebrow">Surveys &amp; Stories</div>
+        <h2 class="section-title">Media Gallery</h2>
+        <div class="section-desc">
+          <p>Every photo, video, audio file and document attached to Stories and to Contacts' bios in one organisation, in one list. Only files from Stories and Contacts the user is already allowed to view are returned, so two users can see different results for the same organisation.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/media_items", "List Media Gallery files", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "kind", type: "string", required: false, desc: "<code>photo</code>, <code>video</code>, <code>audio</code> or <code>document</code>" },
+            { name: "search", type: "string", required: false, desc: "Matches the start of words in the file name, Story title, Contact name and caption" },
+            { name: "source[]", type: "string", required: false, desc: "<code>stories</code> and/or <code>contacts</code> (Contact bios). Default both" },
+            { name: "sort", type: "string", required: false, desc: "<code>newest</code> (default) or <code>oldest</code>, by upload date" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — return only files indexed or changed after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of files, plus <code>kind_counts</code> per File type" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not a member of that organisation" },
+            { code: "404", cls: "response-4xx", desc: "Organisation not found" },
+            { code: "422", cls: "response-4xx", desc: "Missing <code>charity_id</code> or unreadable <code>last_synced_datetime</code>" }
+          ], `Each item gives <code>kind</code>, <code>file_name</code>, <code>content_type</code>, <code>file_size</code>, <code>caption</code>, <code>source_type</code> (<code>story</code> or <code>contact</code>), <code>source_id</code>, <code>source_title</code> (Story title or Contact name), <code>project_id</code>, <code>project_name</code>, <code>uploaded_at</code> and <code>thumbnail_url</code> (photos only).
+          <br/><br/><code>kind_counts</code> gives the number of files of each kind for the same filters, ignoring <code>kind</code>. Filters combine with AND.`)}
         </div>
       </section>
 
