@@ -912,6 +912,56 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /draft_stories:
+    post:
+      tags: [Stories]
+      summary: Save an Answer In Progress (draft Story)
+      description: |
+        Saves a partly completed survey response as an **Answer In Progress** (a draft Story).
+        It appears on the organisation's Answers In Progress page, where a colleague can
+        review it, finish it and publish it as a Story in Makerble. Use this instead of
+        `POST /stories` when a response should be checked by a person before it is published.
+
+        **Who can save one** (otherwise the response is `403`):
+        - for a Project: its editors, reporters and observers, and the organisation's editors and reporters (open Projects only);
+        - for an Event's Project: the Event's workers and managers too, when `story.event_id` belongs to that Project;
+        - with no Project: the organisation's editors and reporters for `story.charity_id`.
+
+        A `story.charity_id` that isn't the Project's organisation, a closed or unknown Project,
+        or a request with neither `project_id` nor `charity_id` is refused with `403`.
+        Contacts (Beneficiaries) go in the top-level `beneficiaries` array.
+      operationId: createDraftStory
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftStoryCreateRequest'
+            example:
+              story:
+                project_id: 19
+                story_category_id: 327
+                text: "Notes from today's session, to be reviewed."
+                event_id: 88
+              beneficiaries: [413]
+              story_privacy: "only_charity_colleagues"
+              custom_fields:
+                "26": "Some text answer"
+      responses:
+        "201":
+          description: Answer In Progress saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftStoryCreated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /stories/{id}:
     get:
       tags: [Stories]
@@ -2197,6 +2247,20 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: "Record not found."
+    Forbidden:
+      description: The user doesn't have permission for this Project or organisation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              errors:
+                type: string
+          example:
+            success: false
+            errors: "Permission denied."
     UnprocessableEntity:
       description: Validation failed
       content:
@@ -2515,6 +2579,74 @@ components:
               type: array
               items:
                 type: object
+
+    DraftStoryCreateRequest:
+      type: object
+      required: [story]
+      properties:
+        story:
+          type: object
+          properties:
+            project_id:
+              type: integer
+              description: Project the Answer In Progress belongs to. Required unless `charity_id` is given.
+            charity_id:
+              type: integer
+              description: Organisation. Must be the Project's organisation when `project_id` is given.
+            story_category_id:
+              type: integer
+              description: Survey (Story Category) being answered
+            text:
+              type: string
+            event_id:
+              type: integer
+              description: Event this response is for. Must belong to `project_id`.
+            source_of_story:
+              type: string
+              default: api
+            story_group:
+              type: string
+              default: expanded
+            story_format:
+              type: string
+            display_as:
+              type: string
+            latitude:
+              type: number
+            longitude:
+              type: number
+            location:
+              type: string
+            is_public:
+              type: boolean
+            witness_id:
+              type: integer
+        beneficiaries:
+          type: array
+          items:
+            type: integer
+          description: Contact (Beneficiary) IDs to tag
+        story_privacy:
+          type: string
+        custom_fields:
+          type: object
+          description: "Survey field values: {custom_field_id: value}"
+        send_survey_wave_id:
+          type: integer
+
+    DraftStoryCreated:
+      type: object
+      properties:
+        success:
+          type: boolean
+        draft_story_id:
+          type: integer
+        text:
+          type: string
+        project_id:
+          type: integer
+        story_category_id:
+          type: integer
 
     StoryCreateRequest:
       type: object
