@@ -2171,6 +2171,59 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /media_items/{id}:
+    get:
+      tags: [Media Gallery]
+      summary: Get one Media Gallery file, with a download link
+      description: |
+        Returns one file from the **Media Gallery**, as shown in its preview panel, with a signed `download_url` that downloads the file.
+
+        Permissions are checked again on every request. The user must still be able to view the Story or Contact the file belongs to.
+
+        The link expires after `download_url_expires_in` seconds, so request the file again for a fresh link rather than storing it.
+      operationId: getMediaItem
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The file, its field name and a short-lived download link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaItemDetail'
+              example:
+                id: 512
+                kind: document
+                file_name: consent_form.pdf
+                content_type: application/pdf
+                file_size: 84211
+                caption: null
+                source_type: contact
+                source_id: 30144
+                source_title: Jordan T.
+                project_id: null
+                project_name: null
+                uploaded_by_id: 6207
+                uploaded_at: "2026-09-12T10:14:00Z"
+                updated_at: "2026-09-12T10:15:02Z"
+                thumbnail_url: null
+                field_name: Consent form (file field)
+                download_url: https://files.example.com/medias/files/000/000/512/original/consent_form.pdf?X-Amz-Expires=300&X-Amz-Signature=...
+                download_url_expires_in: 300
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The file exists, but the user can't view its Story or Contact
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
+
 components:
 
   securitySchemes:
@@ -3559,6 +3612,22 @@ components:
         uploaded_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         thumbnail_url: { type: string, nullable: true, description: Photos only }
+
+    MediaItemDetail:
+      allOf:
+        - $ref: '#/components/schemas/MediaItem'
+        - type: object
+          properties:
+            field_name:
+              type: string
+              description: "Where the file sits: `Profile picture`, `<field> (file field)`, `Story attachment` or `Contact attachment`"
+            download_url:
+              type: string
+              nullable: true
+              description: Signed link that downloads the file. Null if the file has no stored address.
+            download_url_expires_in:
+              type: integer
+              description: Seconds until `download_url` stops working
 
     FormDefinitionField:
       type: object
