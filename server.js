@@ -1377,6 +1377,8 @@ function buildDocsPage() {
             { name: "search", type: "string", required: false, desc: "Matches the start of words in the file name, Story title, Contact name and caption" },
             { name: "source[]", type: "string", required: false, desc: "<code>stories</code> and/or <code>contacts</code> (Contact bios). Default both" },
             { name: "sort", type: "string", required: false, desc: "<code>newest</code> (default) or <code>oldest</code>, by upload date" },
+            { name: "story_filters[...]", type: "object", required: false, desc: "Timeline (Story) Filters, e.g. <code>story_filters[project_ids][]</code>, <code>story_filters[story_category_ids][]</code> (Surveys), <code>story_filters[user_ids][]</code> (Authors), <code>story_filters[created_at_from]</code> (<code>YYYY/MM/DD - YYYY/MM/DD</code>)" },
+            { name: "contact_filters[...]", type: "object", required: false, desc: "Contact Filters, e.g. <code>contact_filters[group_ids][]</code>, <code>contact_filters[beneficiary_types][]</code> (Contact types), <code>contact_filters[project_ids][]</code>" },
             { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — return only files indexed or changed after this" }
@@ -1387,7 +1389,8 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Organisation not found" },
             { code: "422", cls: "response-4xx", desc: "Missing <code>charity_id</code> or unreadable <code>last_synced_datetime</code>" }
           ], `Each item gives <code>kind</code>, <code>file_name</code>, <code>content_type</code>, <code>file_size</code>, <code>caption</code>, <code>source_type</code> (<code>story</code> or <code>contact</code>), <code>source_id</code>, <code>source_title</code> (Story title or Contact name), <code>project_id</code>, <code>project_name</code>, <code>uploaded_at</code> and <code>thumbnail_url</code> (photos only).
-          <br/><br/><code>kind_counts</code> gives the number of files of each kind for the same filters, ignoring <code>kind</code>. Filters combine with AND.`)}
+          <br/><br/><code>kind_counts</code> gives the number of files of each kind for the same filters, ignoring <code>kind</code>. Filters combine with AND.
+          <br/><br/>Story and Contact filters combine as on a Progress Board: Story files must match the Story filters and, if any Contact filter is set, involve a matching Contact. Contact bio files must match the Contact filters; the Story filters' Projects apply through Project membership, and any other Story filter means the Contact must appear in a matching Story.`)}
         </div>
       </section>
 

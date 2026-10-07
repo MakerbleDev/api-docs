@@ -1991,6 +1991,30 @@ paths:
             enum: [newest, oldest]
             default: newest
           description: By upload date
+        - name: story_filters
+          in: query
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties: true
+          example: { project_ids: [19], story_category_ids: [327] }
+          description: |
+            Timeline (Story) Filters, as on the homepage. Keys (arrays of ids unless noted): `project_ids`, `story_category_ids` (Surveys), `bundle_ids` (Albums), `beneficiary_ids` (Contacts tagged in the Story), `label_ids`, `outcome_ids`, `change_ids` (Engagement), `indicator_ids`, `user_ids` (Authors), `charity_ids`, and `created_at_from` (Date Happened range, `YYYY/MM/DD - YYYY/MM/DD`).
+
+            Story files must match them. For Contact bio files, `project_ids` matches the Contact's Project memberships, and any other key means the Contact must appear in at least one matching Story.
+        - name: contact_filters
+          in: query
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties: true
+          example: { group_ids: [4], beneficiary_types: [1] }
+          description: |
+            Contact Filters, as on Manage Contacts. Common keys (arrays of ids): `project_ids`, `group_ids`, `beneficiary_types` (Contact types: 1 Person, 2 Object, 3 Organisation, 4 Animal), `beneficiary_state_ids`, `created_by_ids`, `bundle_ids`.
+
+            Contact bio files must match them, and Story files must involve at least one matching Contact.
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
