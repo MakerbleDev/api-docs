@@ -1185,6 +1185,22 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Contact created" },
             { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required)" }
           ], "Required fields: <code>beneficiary.name</code>, <code>beneficiary.owner_id</code> (User ID of the record owner). Submit custom field values as <code>custom_fields: {\"field_id\": \"value\"}</code>.")}
+          ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/summary", "Get the AI summary of a Contact (SummaryMaker)", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>status</code> (ready, stale, pending, failed or empty), <code>new_story_count</code> and the <code>summary</code>: sections Who, Progress and Watch for, each sentence with its sources (<code>bio</code>, <code>story_ids</code>)" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "SummaryMaker is not turned on in this organisation's preferences" },
+            { code: "404", cls: "response-4xx", desc: "Contact not found, or you can't view it" }
+          ], "The summary shown in the Summary tile on the Contact profile, written by SummaryMaker from the Contact's bio and the Stories you are allowed to see. It never uses a Story you can't see. The organisation must turn on SummaryMaker in its preferences (it is off by default). If <code>status</code> is <code>pending</code>, SummaryMaker is still writing it: call again in a few seconds.")}
+          ${endpointCard("POST", "/beneficiaries/{beneficiary_id}/summary", "Update the AI summary of a Contact (SummaryMaker)", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "Update started; <code>status</code> is <code>pending</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "SummaryMaker is not turned on in this organisation's preferences" },
+            { code: "404", cls: "response-4xx", desc: "Contact not found, or you can't view it" }
+          ], "Makes a fresh summary from the latest bio and Stories, like the <b>Update summary</b> button. Poll the GET endpoint until <code>status</code> is <code>ready</code>.")}
           ${endpointCard("GET", "/beneficiaries/impact_box_data", "Get Impact Box data (Progress Trackers per Contact)", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
