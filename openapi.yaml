@@ -136,6 +136,8 @@ tags:
       Referral Link Details — public-facing signup forms, including the
       Offline Collector endpoints that let a form be filled in with no
       network connection and synced back later.
+  - name: Event Formats
+    description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
 
 paths:
 
@@ -1878,6 +1880,63 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: "unauthorized"
+
+  /event_categories/{id}:
+    delete:
+      tags: [Event Formats]
+      summary: Delete an Event Format
+      operationId: deleteEventFormat
+      description: |
+        Permanently deletes an Event Format (Event Category in the API). This is the
+        same action as **Delete** in the Actions menu on the Manage Event Formats page,
+        and runs through the same permission and blocking rules.
+
+        - Only an **Organisation Admin** of the organisation that owns the Event Format
+          may delete it. Other members of that organisation get `403`.
+        - An Event Format belonging to an organisation you are not a member of returns
+          `404`, as does an unknown id.
+        - Deletion is refused with `422` while the Event Format still has any events, or
+          is still added to any project. The `error` gives the reason and the counts.
+        - Default Event Formats (Appointments, Classes, Conferences, Gatherings, Meetings,
+          Other Events, Sessions, Workshops) can be deleted under the same rules.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Event Format was deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  message:
+                    type: string
+              example:
+                id: 4521
+                message: "Event Format was successfully deleted."
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are not an Organisation Admin of the organisation that owns this Event Format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an Organisation Admin can delete Event Formats."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: The Event Format has events or is added to projects, so it can't be deleted yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "This Event Format can't be deleted because it has 3 events. Delete or move those events first. This Event Format can't be deleted because it is added to 2 projects. Remove it from those projects first."
 
   /referral_submissions:
     post:

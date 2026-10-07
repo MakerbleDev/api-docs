@@ -896,6 +896,10 @@ function buildDocsPage() {
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
       </div>
       <div class="nav-section">
+        <div class="nav-section-label">Events</div>
+        <a href="#event-formats"   class="nav-link"><span class="nav-method method-DELETE" style="background:rgba(255,63,69,0.1);color:#c92d33;border-color:rgba(255,63,69,0.2)">DEL</span>Event Formats</a>
+      </div>
+      <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Case Forms</a>
@@ -1486,6 +1490,25 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Outcome record" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Event Formats -->
+      <section class="section" id="event-formats">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Event Formats</h2>
+        <div class="section-desc">
+          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin of the organisation that owns an Event Format can delete it, and only once it has no events and is not added to any project. Default formats can be deleted under the same rules.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("DELETE", "/event_categories/{id}", "Delete an Event Format", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Deleted — returns id and message" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "Has events or is added to projects — error gives the reason and counts" }
           ])}
         </div>
       </section>
