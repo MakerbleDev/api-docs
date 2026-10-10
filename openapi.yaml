@@ -500,6 +500,86 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /project_results:
+    get:
+      tags: [Projects]
+      summary: Get Results Canvas figures for Projects
+      description: |
+        Returns the figures shown on each Project's **Results Canvas** (the Results panel on a Project page),
+        one entry per tracker, calculated by Makerble. Covers the Projects you can view (Editor, Reporter or
+        Observer of the Project or its Organisation), optionally for a period and split by Project or month.
+
+        | Tracker (front-end) | Backend type | Figures |
+        |---|---|---|
+        | Activity tracker | Change of Activity type | `times_recorded`, `contacts`, `anonymous_count` |
+        | Engagement tracker | Change of Participation type | `times_recorded`, `contacts`, `anonymous_count` |
+        | Achievement tracker | Indicator of Binary type | `times_recorded`, `contacts_achieved`, `anonymous_count` |
+        | Choice tracker | Indicator of Scale type | `times_recorded`, `contacts`, `answers` (count and contacts per Sub Ratio), `anonymous_count` |
+        | Numerical tracker | Indicator of Value type | `total`, `contacts`, `average_per_contact`, `anonymous_count`, `anonymous_total` |
+
+        `times_recorded` counts records, including headcounts and the same Contact recorded more than once, so it is
+        not a number of people. `contacts` and `contacts_achieved` count distinct Contacts tagged. `anonymous_count`
+        is what was recorded with no Contact tagged.
+
+        Stories count by their date (`created_at`). `target`, `target_deadline` and `percent_of_target` appear when
+        the Project has a target: target deadlines dated in the period are added together, otherwise the Project's
+        own target is used. `last_sync_datetime` doesn't apply, as the figures are totals.
+      operationId: getProjectResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: project_ids
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+          example: [619, 620]
+          description: Projects to include, as project_ids[]=619&project_ids[]=620 or a JSON array string ("[619,620]"). Defaults to every Project you can view; Projects you can't view are left out.
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-04-01"
+          description: First Story date to include (YYYY-MM-DD). Omit start_date and end_date for all time.
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2027-03-31"
+          description: Last Story date to include (YYYY-MM-DD)
+        - name: tracker_types
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [activity, engagement, achievement, choice, numerical]
+          example: [activity, choice]
+          description: Tracker types to include, as an array or a comma-separated list. Defaults to all.
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [project, month]
+          description: Split each tracker's figures into a `groups` array by Project or by month (months with nothing recorded are included). Default is one total.
+      responses:
+        "200":
+          description: One page of trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectResults'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /beneficiaries:
     get:
       tags: [Beneficiaries]
@@ -2319,6 +2399,102 @@ components:
               type: array
               items:
                 type: object
+
+    PaginatedProjectResults:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            start_date:
+              type: string
+              format: date
+              nullable: true
+              example: "2026-04-01"
+            end_date:
+              type: string
+              format: date
+              nullable: true
+              example: "2027-03-31"
+            project_ids:
+              type: array
+              items:
+                type: integer
+              example: [619]
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectResultsTracker'
+
+    ProjectResultsTracker:
+      type: object
+      description: One tracker on the Results Canvas. Which figures appear depends on tracker_type.
+      properties:
+        tracker_type:
+          type: string
+          enum: [Activity tracker, Engagement tracker, Achievement tracker, Choice tracker, Numerical tracker]
+          example: Activity tracker
+        backend_type:
+          type: string
+          example: Change of Activity type
+        tracker_id:
+          type: integer
+          description: The Change ID (Activity and Engagement trackers) or Indicator ID (the others)
+          example: 1201
+        tracker_name:
+          type: string
+          example: Sessions delivered
+        outcome_name:
+          type: string
+          description: The Outcome an Indicator sits under
+          example: Into employment
+        times_recorded:
+          type: integer
+          example: 13
+        contacts:
+          type: integer
+          example: 6
+        contacts_achieved:
+          type: integer
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              sub_ratio_id:
+                type: integer
+              sub_ratio:
+                type: string
+                example: High
+              count:
+                type: integer
+              contacts:
+                type: integer
+        total:
+          type: number
+        average_per_contact:
+          type: number
+          nullable: true
+        anonymous_count:
+          type: integer
+          example: 7
+        anonymous_total:
+          type: number
+        target:
+          type: integer
+          example: 20
+        target_deadline:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-03-31"
+        percent_of_target:
+          type: number
+          example: 65.0
+        groups:
+          type: array
+          description: Present with group_by. Each row has `month` ("YYYY-MM") or `project` ({id, name}) plus the same figures; Project rows also carry that Project's target.
+          items:
+            type: object
 
     AuthResponse:
       type: object

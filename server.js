@@ -1121,6 +1121,19 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
           ], "Grant one or more users a role on a Project. A user can hold Editor, Reporter, and Observer simultaneously. Pass user IDs in <code>role_data[].editor_ids</code>, <code>reporter_ids</code>, or <code>observer_ids</code>.")}
+          ${endpointCard("GET", "/project_results", "Get Results Canvas figures for Projects", true, [
+            { name: "project_ids", type: "integer[]", required: false, desc: "Projects to include, as <code>project_ids[]=619</code> or a JSON array string. Defaults to every Project you can view" },
+            { name: "start_date", type: "string", required: false, desc: "First Story date to include, YYYY-MM-DD. Omit both dates for all time" },
+            { name: "end_date", type: "string", required: false, desc: "Last Story date to include, YYYY-MM-DD" },
+            { name: "tracker_types", type: "string[]", required: false, desc: "Any of <code>activity</code>, <code>engagement</code>, <code>achievement</code>, <code>choice</code>, <code>numerical</code>, as an array or comma-separated list. Defaults to all" },
+            { name: "group_by", type: "string", required: false, desc: "<code>project</code> or <code>month</code>: adds a <code>groups</code> array to each tracker (empty months included)" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Trackers per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated trackers, plus start_date, end_date and project_ids" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "422", cls: "response-4xx", desc: "Invalid project_ids, date, tracker_types, group_by or per_page" }
+          ], "Returns the figures on each Project's Results Canvas (the Results panel on a Project page), one entry per tracker, for the Projects you can view. Activity and Engagement trackers (Changes) give <code>times_recorded</code> and <code>contacts</code>; Achievement trackers (Binary Indicators) give <code>times_recorded</code> and <code>contacts_achieved</code>; Choice trackers (Scale Indicators) give <code>answers</code> with a count and contacts per Sub Ratio; Numerical trackers (Value Indicators) give <code>total</code> and <code>average_per_contact</code>. <code>times_recorded</code> counts records, not people; <code>contacts</code> counts distinct Contacts tagged. <code>anonymous_count</code> is what was recorded with no Contact tagged. <code>target</code>, <code>target_deadline</code> and <code>percent_of_target</code> appear when the Project has a target.")}
         </div>
       </section>
 
