@@ -1377,8 +1377,8 @@ function buildDocsPage() {
           <br/><br/>Send <code>story.project_id</code>, <code>story.story_category_id</code> and <code>story.text</code>, plus optional <code>story.event_id</code>, <code>beneficiaries</code> (Contact IDs), <code>story_privacy</code> and <code>custom_fields</code>.
           <br/><br/>Allowed for the Project's editors, reporters and observers, the organisation's editors and reporters, and the workers and managers of <code>story.event_id</code> when that Event belongs to the Project. Anyone else gets <code>403</code>, as does a <code>story.charity_id</code> that isn't the Project's organisation.`)}
           ${endpointCard("GET", "/stories/story_category_response", "Get Stories with full survey response detail", true, [
-            { name: "story_category_id", type: "integer", required: false, desc: "Filter by Survey" },
-            { name: "project_ids[]", type: "integer", required: false, desc: "Filter by Project ID (repeat for multiple)" },
+            { name: "story_category_ids", type: "string", required: false, desc: "Filter by one or more Surveys. Accepts a JSON array, repeated story_category_ids[] params, a comma-separated list or a single ID. Only Surveys you can access are returned. story_category_id is accepted as an alias" },
+            { name: "project_ids", type: "string", required: false, desc: "Filter by one or more Project IDs. Same formats as story_category_ids" },
             { name: "start_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or after this date" },
             { name: "end_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or before this date" }
           ], [{ code: "200", cls: "response-2xx", desc: "Stories enriched with named Indicators, Changes, and Custom Field values — ideal for reporting" }])}
