@@ -1416,6 +1416,15 @@ function buildDocsPage() {
           ], `Each item gives <code>kind</code>, <code>file_name</code>, <code>content_type</code>, <code>file_size</code>, <code>caption</code>, <code>source_type</code> (<code>story</code> or <code>contact</code>), <code>source_id</code>, <code>source_title</code> (Story title or Contact name), <code>project_id</code>, <code>project_name</code>, <code>uploaded_at</code> and <code>thumbnail_url</code> (photos only).
           <br/><br/><code>kind_counts</code> gives the number of files of each kind for the same filters, ignoring <code>kind</code>. Filters combine with AND.
           <br/><br/>Story and Contact filters combine as on a Progress Board: Story files must match the Story filters and, if any Contact filter is set, involve a matching Contact. Contact bio files must match the Contact filters; the Story filters' Projects apply through Project membership, and any other Story filter means the Contact must appear in a matching Story.`)}
+          ${endpointCard("GET", "/media_items/:id", "Get one Media Gallery file, with a download link", true, [
+            { name: "id", type: "integer", required: true, desc: "Media item ID, from the list above" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The file, its <code>field_name</code> and a short-lived <code>download_url</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "The user can't view the file's Story or Contact" },
+            { code: "404", cls: "response-4xx", desc: "File not found" }
+          ], `Returns the same fields as the list, plus <code>field_name</code> (<code>Profile picture</code>, <code>&lt;field&gt; (file field)</code>, <code>Story attachment</code> or <code>Contact attachment</code>), <code>download_url</code> and <code>download_url_expires_in</code> (seconds).
+          <br/><br/>Permissions are checked again on every request. <code>download_url</code> is a signed link that expires quickly, so request the file again for a fresh one rather than storing it.`)}
         </div>
       </section>
 
