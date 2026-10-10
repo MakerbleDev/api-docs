@@ -887,6 +887,7 @@ function buildDocsPage() {
         <a href="#surveys"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Surveys</a>
         <a href="#stories"         class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Stories</a>
         <a href="#story-metrics"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Story Metrics</a>
+        <a href="#media-gallery"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Media Gallery</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Impact framework</div>
@@ -894,6 +895,10 @@ function buildDocsPage() {
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">Events</div>
+        <a href="#event-formats"   class="nav-link"><span class="nav-method method-DELETE" style="background:rgba(255,63,69,0.1);color:#c92d33;border-color:rgba(255,63,69,0.2)">DEL</span>Event Formats</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
@@ -1191,10 +1196,12 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Person (1), Object (2), Organisation (3), Animal (4)" }
           ])}
           ${endpointCard("GET", "/project_beneficiaries", "List Project–Contact associations", true, [
+            { name: "project_ids", type: "integer[]", required: false, desc: "Only include these projects (project_ids[]=12&project_ids[]=34, or a JSON array string). Never widens access beyond the projects you can see." },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Join table records" }
+            { code: "200", cls: "response-2xx", desc: "Join table records: project_id and beneficiary_id (the Contact) for each link" },
+            { code: "422", cls: "response-4xx", desc: "project_ids is not an array of integers" }
           ])}
         </div>
       </section>
@@ -1349,6 +1356,13 @@ function buildDocsPage() {
           ], `Creates a Story tagged to zero, one, or multiple Contacts. Required: <code>story.project_id</code>, <code>story.story_category_id</code>, <code>story.story_group: "change_created"</code>, <code>story.story_format: "old"</code>.
           <br/><br/>Use <code>story_indicator_beneficiaries</code> for indicator responses, <code>story_changes</code> for metric totals, and <code>custom_fields</code> for survey text/date/time fields.
           <br/><br/>For binary indicators: include <code>binray_indicator_value: "on"</code> if ticked — omit the record entirely if not ticked. Activity Changes cannot be tagged to individual Contacts.`)}
+          ${endpointCard("POST", "/draft_stories", "Save an Answer In Progress (draft Story)", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Saved. Returns <code>draft_story_id</code>" },
+            { code: "403", cls: "response-4xx", desc: "No permission for this Project or organisation" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], `Saves a partly completed survey response as an <strong>Answer In Progress</strong> (draft Story) for a colleague to review, finish and publish in Makerble. Use it instead of <code>POST /stories</code> when a person should check the response first.
+          <br/><br/>Send <code>story.project_id</code>, <code>story.story_category_id</code> and <code>story.text</code>, plus optional <code>story.event_id</code>, <code>beneficiaries</code> (Contact IDs), <code>story_privacy</code> and <code>custom_fields</code>.
+          <br/><br/>Allowed for the Project's editors, reporters and observers, the organisation's editors and reporters, and the workers and managers of <code>story.event_id</code> when that Event belongs to the Project. Anyone else gets <code>403</code>, as does a <code>story.charity_id</code> that isn't the Project's organisation.`)}
           ${endpointCard("GET", "/stories/story_category_response", "Get Stories with full survey response detail", true, [
             { name: "story_category_id", type: "integer", required: false, desc: "Filter by Survey" },
             { name: "project_ids[]", type: "integer", required: false, desc: "Filter by Project ID (repeat for multiple)" },
@@ -1358,6 +1372,37 @@ function buildDocsPage() {
           ${endpointCard("GET", "/stories/{id}/attachments", "Get attachments for a Story", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Story ID" }
           ], [{ code: "200", cls: "response-2xx", desc: "Paginated media attachments" }])}
+        </div>
+      </section>
+
+      <!-- Media Gallery -->
+      <section class="section" id="media-gallery">
+        <div class="section-eyebrow">Surveys &amp; Stories</div>
+        <h2 class="section-title">Media Gallery</h2>
+        <div class="section-desc">
+          <p>Every photo, video, audio file and document attached to Stories and to Contacts' bios in one organisation, in one list. Only files from Stories and Contacts the user is already allowed to view are returned, so two users can see different results for the same organisation.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/media_items", "List Media Gallery files", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "kind", type: "string", required: false, desc: "<code>photo</code>, <code>video</code>, <code>audio</code> or <code>document</code>" },
+            { name: "search", type: "string", required: false, desc: "Matches the start of words in the file name, Story title, Contact name and caption" },
+            { name: "source[]", type: "string", required: false, desc: "<code>stories</code> and/or <code>contacts</code> (Contact bios). Default both" },
+            { name: "sort", type: "string", required: false, desc: "<code>newest</code> (default) or <code>oldest</code>, by upload date" },
+            { name: "story_filters[...]", type: "object", required: false, desc: "Timeline (Story) Filters, e.g. <code>story_filters[project_ids][]</code>, <code>story_filters[story_category_ids][]</code> (Surveys), <code>story_filters[user_ids][]</code> (Authors), <code>story_filters[created_at_from]</code> (<code>YYYY/MM/DD - YYYY/MM/DD</code>)" },
+            { name: "contact_filters[...]", type: "object", required: false, desc: "Contact Filters, e.g. <code>contact_filters[group_ids][]</code>, <code>contact_filters[beneficiary_types][]</code> (Contact types), <code>contact_filters[project_ids][]</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — return only files indexed or changed after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of files, plus <code>kind_counts</code> per File type" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not a member of that organisation" },
+            { code: "404", cls: "response-4xx", desc: "Organisation not found" },
+            { code: "422", cls: "response-4xx", desc: "Missing <code>charity_id</code> or unreadable <code>last_synced_datetime</code>" }
+          ], `Each item gives <code>kind</code>, <code>file_name</code>, <code>content_type</code>, <code>file_size</code>, <code>caption</code>, <code>source_type</code> (<code>story</code> or <code>contact</code>), <code>source_id</code>, <code>source_title</code> (Story title or Contact name), <code>project_id</code>, <code>project_name</code>, <code>uploaded_at</code> and <code>thumbnail_url</code> (photos only).
+          <br/><br/><code>kind_counts</code> gives the number of files of each kind for the same filters, ignoring <code>kind</code>. Filters combine with AND.
+          <br/><br/>Story and Contact filters combine as on a Progress Board: Story files must match the Story filters and, if any Contact filter is set, involve a matching Contact. Contact bio files must match the Contact filters; the Story filters' Projects apply through Project membership, and any other Story filter means the Contact must appear in a matching Story.`)}
         </div>
       </section>
 
@@ -1547,6 +1592,25 @@ function buildDocsPage() {
           ${endpointCard("DELETE", "/cohort_trackers/{id}/projects/{project_id}", "Remove a Cohort Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Event Formats -->
+      <section class="section" id="event-formats">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Event Formats</h2>
+        <div class="section-desc">
+          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin of the organisation that owns an Event Format can delete it, and only once it has no events and is not added to any project. Default formats can be deleted under the same rules.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("DELETE", "/event_categories/{id}", "Delete an Event Format", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Deleted — returns id and message" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "Has events or is added to projects — error gives the reason and counts" }
           ])}
         </div>
       </section>

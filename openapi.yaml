@@ -129,6 +129,8 @@ tags:
     description: Selection rules governing how many Sub Ratios can be chosen from a Ratio Set
   - name: Custom Field Categories
     description: Case Forms — field schemas for creating Case records
+  - name: Media Gallery
+    description: Photos, videos, audio and documents attached to Stories and to Contacts' bios
   - name: Signup Pages
     description: |
       Referral Link Details — public-facing signup forms, including the
@@ -140,6 +142,8 @@ tags:
       set of Contact Filter criteria, e.g. "Children attending 75%+". Placed in an
       Impact Scorecard column like other metrics, and targeted with a number of
       Contacts to reach.
+  - name: Event Formats
+    description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
 
 paths:
 
@@ -642,22 +646,39 @@ paths:
     get:
       tags: [Beneficiaries]
       summary: List Project–Beneficiary associations
-      description: Join table linking Beneficiaries to Projects (many-to-many).
+      description: >
+        Join table linking Contacts (Beneficiaries) to Projects (many-to-many). Only projects the
+        authenticated user can see are included. Use project_ids to narrow the results to specific
+        projects; it can never widen them to projects the user cannot see.
       operationId: listProjectBeneficiaries
       security: [{tokenAuth: []}]
       parameters:
+        - name: project_ids
+          in: query
+          required: false
+          description: >
+            Only include these projects. Send as repeated project_ids[]=12&project_ids[]=34, or as a
+            JSON array string (project_ids=[12,34]).
+          schema:
+            type: array
+            items: { type: integer }
+          style: form
+          explode: true
+          example: [12, 34]
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
       responses:
         "200":
-          description: Paginated Project–Beneficiary records
+          description: Paginated Project–Beneficiary records (id, project_id, beneficiary_id, created_at, updated_at)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedGeneric'
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /beneficiary_categories:
     get:
@@ -894,6 +915,56 @@ paths:
                 $ref: '#/components/schemas/Story'
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /draft_stories:
+    post:
+      tags: [Stories]
+      summary: Save an Answer In Progress (draft Story)
+      description: |
+        Saves a partly completed survey response as an **Answer In Progress** (a draft Story).
+        It appears on the organisation's Answers In Progress page, where a colleague can
+        review it, finish it and publish it as a Story in Makerble. Use this instead of
+        `POST /stories` when a response should be checked by a person before it is published.
+
+        **Who can save one** (otherwise the response is `403`):
+        - for a Project: its editors, reporters and observers, and the organisation's editors and reporters (open Projects only);
+        - for an Event's Project: the Event's workers and managers too, when `story.event_id` belongs to that Project;
+        - with no Project: the organisation's editors and reporters for `story.charity_id`.
+
+        A `story.charity_id` that isn't the Project's organisation, a closed or unknown Project,
+        or a request with neither `project_id` nor `charity_id` is refused with `403`.
+        Contacts (Beneficiaries) go in the top-level `beneficiaries` array.
+      operationId: createDraftStory
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftStoryCreateRequest'
+            example:
+              story:
+                project_id: 19
+                story_category_id: 327
+                text: "Notes from today's session, to be reviewed."
+                event_id: 88
+              beneficiaries: [413]
+              story_privacy: "only_charity_colleagues"
+              custom_fields:
+                "26": "Some text answer"
+      responses:
+        "201":
+          description: Answer In Progress saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftStoryCreated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -1866,6 +1937,63 @@ paths:
               example:
                 error: "unauthorized"
 
+  /event_categories/{id}:
+    delete:
+      tags: [Event Formats]
+      summary: Delete an Event Format
+      operationId: deleteEventFormat
+      description: |
+        Permanently deletes an Event Format (Event Category in the API). This is the
+        same action as **Delete** in the Actions menu on the Manage Event Formats page,
+        and runs through the same permission and blocking rules.
+
+        - Only an **Organisation Admin** of the organisation that owns the Event Format
+          may delete it. Other members of that organisation get `403`.
+        - An Event Format belonging to an organisation you are not a member of returns
+          `404`, as does an unknown id.
+        - Deletion is refused with `422` while the Event Format still has any events, or
+          is still added to any project. The `error` gives the reason and the counts.
+        - Default Event Formats (Appointments, Classes, Conferences, Gatherings, Meetings,
+          Other Events, Sessions, Workshops) can be deleted under the same rules.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Event Format was deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  message:
+                    type: string
+              example:
+                id: 4521
+                message: "Event Format was successfully deleted."
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are not an Organisation Admin of the organisation that owns this Event Format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an Organisation Admin can delete Event Formats."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: The Event Format has events or is added to projects, so it can't be deleted yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "This Event Format can't be deleted because it has 3 events. Delete or move those events first. This Event Format can't be deleted because it is added to 2 projects. Remove it from those projects first."
+
   /referral_submissions:
     post:
       tags: [Signup Pages]
@@ -2348,6 +2476,124 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /media_items:
+    get:
+      tags: [Media Gallery]
+      summary: List Media Gallery files
+      description: |
+        Lists every photo, video, audio file and document attached to Stories and to Contacts' bios in one organisation — the files shown on the **Media Gallery** page (Impact → Media Gallery).
+
+        Only files from Stories and Contacts the user is already allowed to view are returned, so two users can get different results for the same organisation. Filters combine with AND.
+
+        `kind_counts` gives the number of files of each kind for the same filters, ignoring `kind` — the counts on the File type buttons.
+      operationId: listMediaItems
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Organisation ID
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [photo, video, audio, document]
+          description: File type
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Matches the start of words in the file name, Story title, Contact name and caption
+        - name: source[]
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [stories, contacts]
+          style: form
+          explode: true
+          description: Story files, Contact bio files, or both (default both)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest]
+            default: newest
+          description: By upload date
+        - name: story_filters
+          in: query
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties: true
+          example: { project_ids: [19], story_category_ids: [327] }
+          description: |
+            Timeline (Story) Filters, as on the homepage. Keys (arrays of ids unless noted): `project_ids`, `story_category_ids` (Surveys), `bundle_ids` (Albums), `beneficiary_ids` (Contacts tagged in the Story), `label_ids`, `outcome_ids`, `change_ids` (Engagement), `indicator_ids`, `user_ids` (Authors), `charity_ids`, and `created_at_from` (Date Happened range, `YYYY/MM/DD - YYYY/MM/DD`).
+
+            Story files must match them. For Contact bio files, `project_ids` matches the Contact's Project memberships, and any other key means the Contact must appear in at least one matching Story.
+        - name: contact_filters
+          in: query
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties: true
+          example: { group_ids: [4], beneficiary_types: [1] }
+          description: |
+            Contact Filters, as on Manage Contacts. Common keys (arrays of ids): `project_ids`, `group_ids`, `beneficiary_types` (Contact types: 1 Person, 2 Object, 3 Organisation, 4 Animal), `beneficiary_state_ids`, `created_by_ids`, `bundle_ids`.
+
+            Contact bio files must match them, and Story files must involve at least one matching Contact.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Media Gallery files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMediaItems'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                kind_counts: { all: 1, photo: 1, video: 0, audio: 0, document: 0 }
+                data:
+                  - id: 512
+                    kind: photo
+                    file_name: harvest_day.jpg
+                    content_type: image/jpeg
+                    file_size: 248310
+                    caption: Volunteers at the allotment
+                    source_type: story
+                    source_id: 90211
+                    source_title: Harvest day at the allotment
+                    project_id: 19
+                    project_name: Growing Together
+                    uploaded_by_id: 6207
+                    uploaded_at: "2026-09-12T10:14:00Z"
+                    updated_at: "2026-09-12T10:15:02Z"
+                    thumbnail_url: https://makerble.s3.amazonaws.com/medias/files/000/000/512/thumbnail/harvest_day.jpg
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user is not a member of that organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
 components:
 
   securitySchemes:
@@ -2438,6 +2684,20 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: "Record not found."
+    Forbidden:
+      description: The user doesn't have permission for this Project or organisation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              errors:
+                type: string
+          example:
+            success: false
+            errors: "Permission denied."
     UnprocessableEntity:
       description: Validation failed
       content:
@@ -2756,6 +3016,74 @@ components:
               type: array
               items:
                 type: object
+
+    DraftStoryCreateRequest:
+      type: object
+      required: [story]
+      properties:
+        story:
+          type: object
+          properties:
+            project_id:
+              type: integer
+              description: Project the Answer In Progress belongs to. Required unless `charity_id` is given.
+            charity_id:
+              type: integer
+              description: Organisation. Must be the Project's organisation when `project_id` is given.
+            story_category_id:
+              type: integer
+              description: Survey (Story Category) being answered
+            text:
+              type: string
+            event_id:
+              type: integer
+              description: Event this response is for. Must belong to `project_id`.
+            source_of_story:
+              type: string
+              default: api
+            story_group:
+              type: string
+              default: expanded
+            story_format:
+              type: string
+            display_as:
+              type: string
+            latitude:
+              type: number
+            longitude:
+              type: number
+            location:
+              type: string
+            is_public:
+              type: boolean
+            witness_id:
+              type: integer
+        beneficiaries:
+          type: array
+          items:
+            type: integer
+          description: Contact (Beneficiary) IDs to tag
+        story_privacy:
+          type: string
+        custom_fields:
+          type: object
+          description: "Survey field values: {custom_field_id: value}"
+        send_survey_wave_id:
+          type: integer
+
+    DraftStoryCreated:
+      type: object
+      properties:
+        success:
+          type: boolean
+        draft_story_id:
+          type: integer
+        text:
+          type: string
+        project_id:
+          type: integer
+        story_category_id:
+          type: integer
 
     StoryCreateRequest:
       type: object
@@ -3629,6 +3957,45 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/RatioSetChoiceable'
+
+    PaginatedMediaItems:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            kind_counts:
+              type: object
+              description: Files of each kind for the same filters, ignoring `kind`
+              properties:
+                all: { type: integer }
+                photo: { type: integer }
+                video: { type: integer }
+                audio: { type: integer }
+                document: { type: integer }
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/MediaItem'
+
+    MediaItem:
+      type: object
+      description: One file in the Media Gallery. It points at the file on its Story or Contact; it is not a copy.
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [photo, video, audio, document] }
+        file_name: { type: string }
+        content_type: { type: string, nullable: true }
+        file_size: { type: integer, nullable: true, description: Bytes }
+        caption: { type: string, nullable: true }
+        source_type: { type: string, enum: [story, contact], description: "`contact` means a file on a Contact's bio" }
+        source_id: { type: integer, description: Story ID or Contact (Beneficiary) ID }
+        source_title: { type: string, nullable: true, description: Story title or Contact name }
+        project_id: { type: integer, nullable: true, description: The Story's Project; null for Contact bio files }
+        project_name: { type: string, nullable: true }
+        uploaded_by_id: { type: integer, nullable: true }
+        uploaded_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        thumbnail_url: { type: string, nullable: true, description: Photos only }
 
     FormDefinitionField:
       type: object
