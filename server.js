@@ -1646,7 +1646,8 @@ function buildDocsPage() {
         <div class="section-eyebrow">Integrations</div>
         <h2 class="section-title">Webhooks</h2>
         <div class="section-desc">
-          <p>Instead of polling, an Organisation's admins can register webhook endpoints: HTTPS URLs that Makerble sends a signed JSON <code>POST</code> to when records change. Only the Organisation's admins can manage them, and only once an admin has ticked <strong>Turn on Webhooks</strong> in the Organisation's Settings (Preferences) page; until then these endpoints answer <code>403</code>.</p>
+          <p>Instead of polling, an Organisation's admins can register webhook endpoints: HTTPS URLs that Makerble sends a signed JSON <code>POST</code> to when records change. Only the Organisation's admins can manage them, and only once an admin has ticked <strong>Turn on Webhooks</strong> in the Organisation's Settings (Preferences) page; until then these endpoints answer <code>403</code>. A colleague who is not an Organisation Admin also gets <code>403</code>, with an <code>error</code> message that can be shown to them as it is.</p>
+          <p><strong>Automation platforms:</strong> a connector such as the Power Automate one creates an endpoint for each flow with a Makerble trigger, usually for one event, and deletes it when the flow is deleted. The create response's <code>Location</code> header is the endpoint's full address to send that <code>DELETE</code> to, and deleting is idempotent (<code>204</code> again if it has already gone). Such endpoints have a <code>source</code> of <code>power_automate</code>, <code>zapier</code> or <code>dynamics</code>, set by Makerble from the connected app, and their own limit of 100 per Organisation, separate from the 10 added by hand (<code>source: manual</code>). Power Automate flows can't check the signature themselves; they rely on the callback address being secret, which Microsoft generates for each flow.</p>
           <p><strong>Events:</strong> <code>contact.created</code>, <code>contact.updated</code> (with <code>changed_fields</code>), <code>story.created</code> (about 30 seconds after the Story is posted, so survey answers are included; drafts are not sent), <code>story.updated</code> (including a draft being published), <code>project.created</code>, <code>project.updated</code>, <code>import.completed</code> (once per finished spreadsheet import; its rows send no events of their own) and <code>webhook.test</code>. The <code>data</code> of a Contact, Story or Project event is the same JSON as <code>GET /beneficiaries/{id}</code>, <code>GET /stories/{id}</code> or <code>GET /projects/{id}</code>, as the record is when the request is sent.</p>
           <p><strong>Envelope:</strong> <code>{ "id": "evt_…", "event": "contact.updated", "occurred_at": "2026-10-04T09:15:00Z", "charity_id": 123, "changed_fields": ["name"], "data": { … } }</code>. Headers: <code>X-Makerble-Event</code>, <code>X-Makerble-Delivery</code> (the <code>id</code>), <code>User-Agent: Makerble-Webhooks/1</code> and <code>X-Makerble-Signature: t=&lt;unix time&gt;,v1=&lt;signature&gt;</code>.</p>
           <p><strong>Verifying the signature:</strong> <code>v1</code> is the hex HMAC-SHA256 of <code>"&lt;t&gt;.&lt;raw request body&gt;"</code>, keyed with the endpoint's secret (shown once, when the endpoint is created or its secret rotated). Compare in constant time and reject timestamps more than 5 minutes old.</p>
@@ -1664,8 +1665,8 @@ function buildDocsPage() {
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list of endpoints, without secrets" },
-            { code: "403", cls: "response-4xx", desc: "Webhooks are not turned on for this Organisation" },
-            { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation" }
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin, or Webhooks are not turned on for this Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not a member of this Organisation" }
           ])}
           ${endpointCard("POST", "/webhook_endpoints", "Register a webhook endpoint", true, [
             { name: "webhook_endpoint[charity_id]", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
@@ -1673,14 +1674,16 @@ function buildDocsPage() {
             { name: "webhook_endpoint[description]", in: "body", type: "string", required: false, desc: "What it is for" },
             { name: "webhook_endpoint[event_types]", in: "body", type: "array", required: false, desc: "Events to send (default: all)" }
           ], [
-            { code: "201", cls: "response-2xx", desc: "Created — includes the secret, shown only this once" },
-            { code: "422", cls: "response-4xx", desc: "Invalid URL or events, or the Organisation already has 10 endpoints" }
+            { code: "201", cls: "response-2xx", desc: "Created — includes the secret, shown only this once. The Location header is the endpoint's full address" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin, or Webhooks are not turned on for this Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Invalid URL or events, or the Organisation already has 10 endpoints (100 from automation platforms)" }
           ])}
           ${endpointCard("GET", "/webhook_endpoints/{id}", "Get a webhook endpoint", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The endpoint, without its secret" },
-            { code: "404", cls: "response-4xx", desc: "Not found, or not an admin of its Organisation" }
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of its Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not a member of its Organisation" }
           ])}
           ${endpointCard("PATCH", "/webhook_endpoints/{id}", "Change, pause or resume a webhook endpoint", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" },
@@ -1693,7 +1696,8 @@ function buildDocsPage() {
           ${endpointCard("DELETE", "/webhook_endpoints/{id}", "Delete a webhook endpoint", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
           ], [
-            { code: "204", cls: "response-2xx", desc: "Deleted, with its delivery log" }
+            { code: "204", cls: "response-2xx", desc: "Deleted, with its delivery log, or already gone" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of its Organisation" }
           ])}
           ${endpointCard("POST", "/webhook_endpoints/{id}/rotate_secret", "Rotate a webhook endpoint's secret", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
