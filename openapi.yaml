@@ -73,7 +73,7 @@ info:
     ```
 
     ## Webhooks
-    Instead of polling, an Organisation's admins can register **webhook endpoints**: HTTPS URLs that Makerble sends a signed JSON `POST` to when records change. Manage them under **Connect > Webhooks** or with the Webhooks endpoints below. Webhooks are turned on per Organisation by Makerble; until then those endpoints answer `403`.
+    Instead of polling, an Organisation's admins can register **webhook endpoints**: HTTPS URLs that Makerble sends a signed JSON `POST` to when records change. Manage them under **Connect > Webhooks** or with the Webhooks endpoints below. An Organisation's admin turns webhooks on by ticking **Turn on Webhooks** in the Organisation's Settings (Preferences) page; until then those endpoints answer `403`.
 
     | Event | Sent when | `data` |
     |---|---|---|
@@ -2776,8 +2776,8 @@ paths:
       summary: List an Organisation's webhook endpoints
       description: |
         The Organisation's (Charity's) webhook endpoints, without their secrets. Only the
-        Organisation's admins can manage webhooks, and only once Makerble has turned them on
-        for the Organisation (otherwise `403`).
+        Organisation's admins can manage webhooks, and only once an admin has ticked **Turn on Webhooks**
+        in the Organisation's Settings (otherwise `403`).
       operationId: listWebhookEndpoints
       security: [{tokenAuth: []}]
       parameters:
