@@ -72,6 +72,45 @@ info:
     { "page": 1, "page_size": 10, "page_count": 146, "total_count": 1458, "data": [] }
     ```
 
+    ## Webhooks
+    Instead of polling, an Organisation's admins can register **webhook endpoints**: HTTPS URLs that Makerble sends a signed JSON `POST` to when records change. Manage them under **Connect > Webhooks** or with the Webhooks endpoints below. Webhooks are turned on per Organisation by Makerble; until then those endpoints answer `403`.
+
+    | Event | Sent when | `data` |
+    |---|---|---|
+    | `contact.created` | A Contact is created | Same as `GET /beneficiaries/{id}` |
+    | `contact.updated` | A Contact is edited (not when only counts Makerble keeps up to date change) | Same, plus `changed_fields` on the envelope |
+    | `story.created` | A Story is posted, about 30 seconds later so its survey answers are included (not drafts) | Same as `GET /stories/{id}` |
+    | `story.updated` | A Story is edited, including a draft being published | Same |
+    | `project.created` / `project.updated` | A Project is created / edited | Same as `GET /projects/{id}` |
+    | `import.completed` | A spreadsheet import has processed every row. Rows of an import send no events of their own | `import_id`, `import_type`, `kind`, `status`, `counts`, `charity_id` |
+    | `webhook.test` | Someone sends a test event | `{ "test": true }` |
+
+    Every request has this body:
+    ```json
+    {
+      "id": "evt_6f0c2a4e-8d1b-4b7e-9a53-2f1d6c3e9b10",
+      "event": "contact.updated",
+      "occurred_at": "2026-10-04T09:15:00Z",
+      "charity_id": 123,
+      "changed_fields": ["name", "mobile"],
+      "data": { "id": 456, "name": "Ada Lovelace" }
+    }
+    ```
+    `data` shows the record as it is when the request is sent, which can be newer than `occurred_at`. New fields may be added to `data` over time.
+
+    Headers: `X-Makerble-Event` (the event), `X-Makerble-Delivery` (the `id`), `User-Agent: Makerble-Webhooks/1` and `X-Makerble-Signature: t=<unix time>,v1=<signature>`.
+
+    **Verify the signature** before trusting a request. `v1` is the hex HMAC-SHA256 of `"<t>.<raw request body>"`, keyed with the endpoint's secret (shown once, when the endpoint is created or its secret is rotated). Reject old timestamps to stop replays:
+    ```ruby
+    t, v1 = request.headers['X-Makerble-Signature'].split(',').map { |part| part.split('=', 2).last }
+    expected = OpenSSL::HMAC.hexdigest('SHA256', secret, "#{t}.#{request.raw_post}")
+    valid = Rack::Utils.secure_compare(expected, v1) && (Time.now.to_i - t.to_i).abs < 300
+    ```
+
+    **Respond with any 2xx within 10 seconds.** Anything else, a timeout or a refused connection is retried 8 more times over about 25 hours (after 1 and 5 minutes, then 15 minutes, 1, 2, 4, 8 and 10 hours). Redirects are not followed. After 10 deliveries in a row fail, or 7 days without a success, Makerble switches the endpoint off and emails the Organisation's admins; turn it back on with `PATCH /webhook_endpoints/{id}` and `active: true`.
+
+    Delivery is **at least once** and in no guaranteed order: de-duplicate on `id`, and use `occurred_at` (or fetch the record) where order matters. Delivery logs are kept for 30 days and any delivery can be sent again with its replay endpoint.
+
   version: "2.0.0"
   contact:
     name: Makerble Support
@@ -144,6 +183,10 @@ tags:
       Contacts to reach.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
+  - name: Webhooks
+    description: |
+      HTTPS endpoints an Organisation's admins register to receive signed events when
+      Contacts, Stories and Projects change and when imports finish. See Webhooks above.
 
 paths:
 
@@ -2727,6 +2770,256 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /webhook_endpoints:
+    get:
+      tags: [Webhooks]
+      summary: List an Organisation's webhook endpoints
+      description: |
+        The Organisation's (Charity's) webhook endpoints, without their secrets. Only the
+        Organisation's admins can manage webhooks, and only once Makerble has turned them on
+        for the Organisation (otherwise `403`).
+      operationId: listWebhookEndpoints
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of webhook endpoints
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWebhookEndpoints'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Webhooks]
+      summary: Register a webhook endpoint
+      description: |
+        Starts sending the chosen events to an HTTPS URL. Leave out `event_types` to send every
+        event. An Organisation can have at most 10 endpoints. The response includes the signing
+        `secret`, which is shown only this once.
+      operationId: createWebhookEndpoint
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEndpointRequest'
+            example:
+              webhook_endpoint:
+                charity_id: 913
+                url: "https://crm.example.org/makerble"
+                description: "Dynamics sync"
+                event_types: ["contact.created", "contact.updated"]
+      responses:
+        "201":
+          description: Endpoint created, with its secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpointWithSecret'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /webhook_endpoints/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Webhooks]
+      summary: Get a webhook endpoint
+      operationId: getWebhookEndpoint
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The endpoint, without its secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpoint'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Webhooks]
+      summary: Change, pause or resume a webhook endpoint
+      description: |
+        Send only the fields to change. `active: false` pauses the endpoint; `active: true`
+        resumes it, and also turns back on an endpoint Makerble switched off after repeated
+        failure (clearing `disabled_at` and `failure_count`). Changes made while it was off are
+        not sent afterwards.
+      operationId: updateWebhookEndpoint
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEndpointRequest'
+            example:
+              webhook_endpoint:
+                active: true
+      responses:
+        "200":
+          description: The updated endpoint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpoint'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Webhooks]
+      summary: Delete a webhook endpoint
+      description: Deletes the endpoint and its delivery log. Makerble stops sending to it at once.
+      operationId: deleteWebhookEndpoint
+      security: [{tokenAuth: []}]
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints/{id}/rotate_secret:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags: [Webhooks]
+      summary: Rotate a webhook endpoint's secret
+      description: |
+        Replaces the signing secret and returns the new one, shown only this once. Deliveries
+        are signed with it straight away.
+      operationId: rotateWebhookEndpointSecret
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The endpoint with its new secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpointWithSecret'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints/{id}/test:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags: [Webhooks]
+      summary: Send a test event
+      description: |
+        Queues a `webhook.test` event (`data: { "test": true }`) for the endpoint. Check the
+        delivery log a few seconds later for the result.
+      operationId: sendWebhookTestEvent
+      security: [{tokenAuth: []}]
+      responses:
+        "202":
+          description: The queued delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDelivery'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints/{id}/deliveries:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Webhooks]
+      summary: List a webhook endpoint's deliveries
+      description: The delivery log, newest first, kept for 30 days. Payloads are not included.
+      operationId: listWebhookDeliveries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of deliveries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWebhookDeliveries'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints/{id}/deliveries/{delivery_id}/replay:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - name: delivery_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The delivery's ID
+    post:
+      tags: [Webhooks]
+      summary: Send a delivery again
+      description: |
+        Sends the delivery again with the same event `id`, so a receiver that already processed
+        it can ignore it. `data` shows the record as it is now.
+      operationId: replayWebhookDelivery
+      security: [{tokenAuth: []}]
+      responses:
+        "202":
+          description: The delivery, queued again
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDelivery'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
 components:
 
   securitySchemes:
@@ -2837,6 +3130,14 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    WebhooksNotTurnedOn:
+      description: Webhooks are not turned on for this Organisation yet
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Webhooks are not turned on for this organisation"
 
   schemas:
 
@@ -4729,3 +5030,146 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/CohortTracker'
+
+    WebhookEvent:
+      type: string
+      enum: [contact.created, contact.updated, story.created, story.updated, project.created, project.updated, import.completed]
+
+    WebhookEndpointRequest:
+      type: object
+      required: [webhook_endpoint]
+      properties:
+        webhook_endpoint:
+          type: object
+          properties:
+            charity_id:
+              type: integer
+              description: The Organisation (Charity) ID. Required when creating
+            url:
+              type: string
+              format: uri
+              description: HTTPS URL of the receiver. Required when creating
+            description:
+              type: string
+            event_types:
+              type: array
+              items:
+                $ref: '#/components/schemas/WebhookEvent'
+              description: Defaults to every event
+            active:
+              type: boolean
+              description: false pauses the endpoint; true resumes it
+
+    WebhookEndpoint:
+      type: object
+      properties:
+        id:
+          type: integer
+        charity_id:
+          type: integer
+        url:
+          type: string
+          example: "https://crm.example.org/makerble"
+        description:
+          type: string
+          nullable: true
+        event_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookEvent'
+        active:
+          type: boolean
+          description: false while paused
+        disabled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when Makerble switched the endpoint off after repeated failure
+        failure_count:
+          type: integer
+          description: Deliveries in a row that failed every attempt
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_by_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WebhookEndpointWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/WebhookEndpoint'
+        - type: object
+          properties:
+            secret:
+              type: string
+              example: "whsec_3f1c..."
+              description: The signing secret. Returned only when created or rotated
+
+    WebhookDelivery:
+      type: object
+      properties:
+        id:
+          type: integer
+        event_id:
+          type: string
+          example: "evt_6f0c2a4e-8d1b-4b7e-9a53-2f1d6c3e9b10"
+          description: The `id` the receiver saw
+        event:
+          type: string
+          example: contact.updated
+        resource_type:
+          type: string
+          nullable: true
+          description: Beneficiary (Contact), Story, Project, RecordImporter or ImportPlan
+        resource_id:
+          type: integer
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, succeeded, failed]
+        attempts:
+          type: integer
+        response_code:
+          type: integer
+          nullable: true
+          description: The receiver's HTTP status on the last attempt; null after a timeout or connection error
+        next_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginatedWebhookEndpoints:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/WebhookEndpoint'
+
+    PaginatedWebhookDeliveries:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/WebhookDelivery'
