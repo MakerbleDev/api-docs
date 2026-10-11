@@ -5108,8 +5108,9 @@ components:
           readOnly: true
           description: |
             Who created the endpoint: `manual` for one added by hand on the Webhooks page or through
-            this API, otherwise the automation platform's connector. Set by Makerble from how the
-            request was authenticated; it can't be sent or changed.
+            this API, otherwise the automation platform's connector. Set by Makerble from the
+            connected app (OAuth client) that made the request; it can't be sent or changed. A
+            connected app may list, get, create and delete endpoints, in its connected Organisation only.
         disabled_at:
           type: string
           format: date-time
