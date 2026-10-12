@@ -2809,8 +2809,14 @@ paths:
       summary: Register a webhook endpoint
       description: |
         Starts sending the chosen events to an HTTPS URL. Leave out `event_types` to send every
-        event. An Organisation can have at most 10 endpoints. The response includes the signing
-        `secret`, which is shown only this once.
+        event, or give one event for a trigger that fires on that event only. An Organisation can
+        have at most 10 endpoints added this way, and separately at most 100 created by automation
+        platforms such as Power Automate (one per flow). The response includes the signing `secret`,
+        which is shown only this once, and a `Location` header with the endpoint's full address:
+        send `DELETE` to it to unsubscribe.
+
+        Power Automate flows can't check the signature themselves. They rely instead on the callback
+        address being secret, which Microsoft generates for each flow.
       operationId: createWebhookEndpoint
       security: [{tokenAuth: []}]
       requestBody:
@@ -2828,6 +2834,12 @@ paths:
       responses:
         "201":
           description: Endpoint created, with its secret
+          headers:
+            Location:
+              description: Full address of the new endpoint, e.g. `https://app.makerble.com/api/v2/webhook_endpoints/42`
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
@@ -2899,18 +2911,19 @@ paths:
     delete:
       tags: [Webhooks]
       summary: Delete a webhook endpoint
-      description: Deletes the endpoint and its delivery log. Makerble stops sending to it at once.
+      description: |
+        Deletes the endpoint and its delivery log. Makerble stops sending to it at once. Deleting is
+        idempotent: an endpoint that is already deleted, or that the user can't see, also answers
+        `204`, so an automation platform can unsubscribe safely more than once.
       operationId: deleteWebhookEndpoint
       security: [{tokenAuth: []}]
       responses:
         "204":
-          description: Deleted
+          description: Deleted, or already gone
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
           $ref: '#/components/responses/WebhooksNotTurnedOn'
-        "404":
-          $ref: '#/components/responses/NotFound'
 
   /webhook_endpoints/{id}/rotate_secret:
     parameters:
@@ -3131,13 +3144,22 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     WebhooksNotTurnedOn:
-      description: Webhooks are not turned on for this Organisation yet
+      description: |
+        The user is a member of the Organisation but not an Organisation Admin, or webhooks are not
+        turned on for the Organisation yet. `error` says which, in words that can be shown to the
+        user. For a request from an automation platform such as Power Automate, the first reads
+        "Only an Organisation Admin can create Makerble triggers".
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-          example:
-            error: "Webhooks are not turned on for this organisation"
+          examples:
+            notAnAdmin:
+              value:
+                error: "Only an Organisation Admin can manage Webhooks"
+            notTurnedOn:
+              value:
+                error: "Webhooks are not turned on for this organisation"
 
   schemas:
 
@@ -5080,6 +5102,15 @@ components:
         active:
           type: boolean
           description: false while paused
+        source:
+          type: string
+          enum: [manual, power_automate, zapier, dynamics]
+          readOnly: true
+          description: |
+            Who created the endpoint: `manual` for one added by hand on the Webhooks page or through
+            this API, otherwise the automation platform's connector. Set by Makerble from the
+            connected app (OAuth client) that made the request; it can't be sent or changed. A
+            connected app may list, get, create and delete endpoints, in its connected Organisation only.
         disabled_at:
           type: string
           format: date-time

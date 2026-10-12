@@ -1,0 +1,5175 @@
+openapi: 3.0.3
+info:
+  title: Makerble API
+  description: |
+    The Makerble API enables developers to integrate with the Makerble CRM and impact measurement platform — reading and writing data on contacts, projects, surveys, cases, outcomes, metrics, and more.
+
+    ## Base URL
+    ```
+    https://makerble.com/api/v2
+    ```
+    A staging environment is also available at `https://staging.makerble.com/api/v2`.
+
+    ## Authentication
+    All endpoints (except `/users/sign_in` and the password reset endpoints) require token-based authentication. Pass both headers on every authenticated request:
+
+    | Header | Value |
+    |---|---|
+    | `X-User-Email` | The authenticated user's email address |
+    | `X-User-Token` | The user's long-lived authentication token |
+
+    Tokens are obtained via `POST /users/sign_in` and **do not expire**. Each user has one fixed token.
+
+    > **Multi-user integrations:** If activity must be attributed to specific users, authenticate separately per user. A single Organisation Admin token is acceptable when attribution to one admin is sufficient.
+
+    ## Creating Users via the API
+    `POST /users` requires a separate API Key (`auth_code`). Request one at [api-key-request@makerble.com](mailto:api-key-request@makerble.com).
+
+    ## Terminology
+    Makerble uses different terms in the UI and the API:
+
+    | Front-end | API |
+    |---|---|
+    | Organisation | Charity |
+    | Contact | Beneficiary |
+    | Contact Bio Form | Beneficiary Category |
+    | Contact Type | Beneficiary Type |
+    | Survey | Story Category |
+    | Survey Campaign | Project Story Category |
+    | Survey Response / Timeline Update / Instant Update | Story |
+    | Activity / Engagement tracker | Change (stage: activity / participation) |
+    | Achievement / Choice / Numerical tracker | Indicator (type: binary / scale / value) |
+    | Dropdown / List field | Ratio Set |
+    | Answer Choice | Sub Ratio |
+    | Case Form | Custom Field Category |
+    | Case Owner | Case Creator |
+    | Case Worker | Case Member |
+    | Project Manager | Project Editor |
+    | Changemaker | Project Reporter |
+    | Analyst | Project Observer |
+    | Signup Page | Referral Link Detail |
+
+    ## Story timestamps
+    Stories carry three timestamps:
+
+    | API field | Front-end label | Meaning |
+    |---|---|---|
+    | `actual_created_at` | Date Posted | Real database insertion time |
+    | `created_at` | Date Happened | Activity date chosen by the user (can be backdated) |
+    | `updated_at` | Date Edited | Most recent modification |
+
+    ## Pagination
+    All list endpoints accept:
+
+    | Parameter | Type | Default | Max | Description |
+    |---|---|---|---|---|
+    | `page` | integer | 1 | — | Page number |
+    | `per_page` | integer | 10 | 200 | Records per page |
+    | `last_sync_datetime` | string (ISO 8601) | — | — | Return only records updated after this datetime |
+
+    Paginated responses use this envelope:
+    ```json
+    { "page": 1, "page_size": 10, "page_count": 146, "total_count": 1458, "data": [] }
+    ```
+
+    ## Webhooks
+    Instead of polling, an Organisation's admins can register **webhook endpoints**: HTTPS URLs that Makerble sends a signed JSON `POST` to when records change. Manage them under **Connect > Webhooks** or with the Webhooks endpoints below. An Organisation's admin turns webhooks on by ticking **Turn on Webhooks** in the Organisation's Settings (Preferences) page; until then those endpoints answer `403`.
+
+    | Event | Sent when | `data` |
+    |---|---|---|
+    | `contact.created` | A Contact is created | Same as `GET /beneficiaries/{id}` |
+    | `contact.updated` | A Contact is edited (not when only counts Makerble keeps up to date change) | Same, plus `changed_fields` on the envelope |
+    | `story.created` | A Story is posted, about 30 seconds later so its survey answers are included (not drafts) | Same as `GET /stories/{id}` |
+    | `story.updated` | A Story is edited, including a draft being published | Same |
+    | `project.created` / `project.updated` | A Project is created / edited | Same as `GET /projects/{id}` |
+    | `import.completed` | A spreadsheet import has processed every row. Rows of an import send no events of their own | `import_id`, `import_type`, `kind`, `status`, `counts`, `charity_id` |
+    | `webhook.test` | Someone sends a test event | `{ "test": true }` |
+
+    Every request has this body:
+    ```json
+    {
+      "id": "evt_6f0c2a4e-8d1b-4b7e-9a53-2f1d6c3e9b10",
+      "event": "contact.updated",
+      "occurred_at": "2026-10-04T09:15:00Z",
+      "charity_id": 123,
+      "changed_fields": ["name", "mobile"],
+      "data": { "id": 456, "name": "Ada Lovelace" }
+    }
+    ```
+    `data` shows the record as it is when the request is sent, which can be newer than `occurred_at`. New fields may be added to `data` over time.
+
+    Headers: `X-Makerble-Event` (the event), `X-Makerble-Delivery` (the `id`), `User-Agent: Makerble-Webhooks/1` and `X-Makerble-Signature: t=<unix time>,v1=<signature>`.
+
+    **Verify the signature** before trusting a request. `v1` is the hex HMAC-SHA256 of `"<t>.<raw request body>"`, keyed with the endpoint's secret (shown once, when the endpoint is created or its secret is rotated). Reject old timestamps to stop replays:
+    ```ruby
+    t, v1 = request.headers['X-Makerble-Signature'].split(',').map { |part| part.split('=', 2).last }
+    expected = OpenSSL::HMAC.hexdigest('SHA256', secret, "#{t}.#{request.raw_post}")
+    valid = Rack::Utils.secure_compare(expected, v1) && (Time.now.to_i - t.to_i).abs < 300
+    ```
+
+    **Respond with any 2xx within 10 seconds.** Anything else, a timeout or a refused connection is retried 8 more times over about 25 hours (after 1 and 5 minutes, then 15 minutes, 1, 2, 4, 8 and 10 hours). Redirects are not followed. After 10 deliveries in a row fail, or 7 days without a success, Makerble switches the endpoint off and emails the Organisation's admins; turn it back on with `PATCH /webhook_endpoints/{id}` and `active: true`.
+
+    Delivery is **at least once** and in no guaranteed order: de-duplicate on `id`, and use `occurred_at` (or fetch the record) where order matters. Delivery logs are kept for 30 days and any delivery can be sent again with its replay endpoint.
+
+  version: "2.0.0"
+  contact:
+    name: Makerble Support
+    url: https://discover.makerble.com
+    email: support@makerble.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://makerble.com/api/v2
+    description: Production
+  - url: https://staging.makerble.com/api/v2
+    description: Staging
+  - url: /mock
+    description: Mock server (safe for testing — no real data)
+
+tags:
+  - name: Authentication
+    description: Obtain and manage authentication tokens
+  - name: Users
+    description: Platform users with login credentials
+  - name: Charities
+    description: Organisations — the top-level entity that owns Projects
+  - name: Projects
+    description: The primary organisational unit — every Story and Case belongs to a Project
+  - name: Beneficiaries
+    description: Contacts — the people your organisation works with
+  - name: Beneficiary Categories
+    description: Contact Bio Forms — field schemas for creating and editing Beneficiary records
+  - name: Beneficiary Types
+    description: The four contact types — Person, Organisation, Animal, Object
+  - name: Cases
+    description: Cases linked to a Beneficiary and a Project
+  - name: Stories
+    description: Survey responses, timeline updates, and instant updates — the primary content format
+  - name: Story Categories
+    description: Surveys — form templates used to create Stories
+  - name: Project Story Categories
+    description: Survey Campaigns — a Survey assigned to a specific Project
+  - name: Story Metrics
+    description: Per-story metric records (Story Changes, Story Indicators, Story Beneficiaries)
+  - name: Changes
+    description: Activity and Participation custom KPIs tracked across Projects
+  - name: Indicators
+    description: Scale, Binary, and Value progress trackers linked to Outcomes
+  - name: Outcomes
+    description: Impact outcomes that Indicators are grouped under
+  - name: Outcome Indicators
+    description: Join table linking Outcomes to Indicators
+  - name: Ratio Sets
+    description: Dropdown / List field definitions
+  - name: Sub Ratios
+    description: Individual answer choices within a Ratio Set
+  - name: Ratio Set Choiceables
+    description: Selection rules governing how many Sub Ratios can be chosen from a Ratio Set
+  - name: Custom Field Categories
+    description: Case Forms — field schemas for creating Case records
+  - name: Media Gallery
+    description: Photos, videos, audio and documents attached to Stories and to Contacts' bios
+  - name: Signup Pages
+    description: |
+      Referral Link Details — public-facing signup forms, including the
+      Offline Collector endpoints that let a form be filled in with no
+      network connection and synced back later.
+  - name: Cohort Trackers
+    description: |
+      Metrics that count the Contacts (Beneficiaries) in a Project or Album who meet a
+      set of Contact Filter criteria, e.g. "Children attending 75%+". Placed in an
+      Impact Scorecard column like other metrics, and targeted with a number of
+      Contacts to reach.
+  - name: Event Formats
+    description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
+  - name: Webhooks
+    description: |
+      HTTPS endpoints an Organisation's admins register to receive signed events when
+      Contacts, Stories and Projects change and when imports finish. See Webhooks above.
+
+paths:
+
+  /users/sign_in:
+    post:
+      tags: [Authentication]
+      summary: Sign in — obtain an authentication token
+      description: |
+        Authenticates with email and password. Returns a long-lived token for all subsequent requests.
+        Tokens **do not expire**. No auth headers needed on this endpoint.
+      operationId: signIn
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: ["user[email]", "user[password]"]
+              properties:
+                "user[email]":
+                  type: string
+                  format: email
+                  example: user@example.com
+                "user[password]":
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                user_id: 42
+                email: user@example.com
+                authentication_token: "sJxyz_abc123longtoken"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List all Users
+      operationId: listUsers
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Users]
+      summary: Create a new User
+      description: |
+        Registers a new user. Requires an `auth_code` API Key — request one at [api-key-request@makerble.com](mailto:api-key-request@makerble.com).
+
+        **Password rules:** min 8 chars · at least 1 number · 1 special character · 1 capital letter
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [auth_code, user, charity_id]
+              properties:
+                auth_code:
+                  type: string
+                  description: API Key from api-key-request@makerble.com
+                user:
+                  type: object
+                  required: [email, first_name, last_name, password, password_confirmation]
+                  properties:
+                    email:
+                      type: string
+                      format: email
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    password:
+                      type: string
+                    password_confirmation:
+                      type: string
+                charity_id:
+                  type: integer
+                charity_controlled:
+                  type: boolean
+                  default: false
+                disable_email_notification:
+                  type: boolean
+                  default: false
+            example:
+              auth_code: "qspehLnbRlUS0uiA2mN..."
+              user:
+                email: "jane@charity.org"
+                first_name: "Jane"
+                last_name: "Smith"
+                password: "Secur3!Pass"
+                password_confirmation: "Secur3!Pass"
+              charity_id: 31
+              charity_controlled: true
+              disable_email_notification: false
+      responses:
+        "200":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      email:
+                        type: string
+                        format: email
+                  message:
+                    type: string
+                    example: "Sign up successfully!!!"
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get a single User
+      operationId: getUser
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: User record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /users/permissions:
+    get:
+      tags: [Users]
+      summary: Get user permissions
+      description: Returns the authenticated user's permissions across all Projects and Organisations.
+      operationId: getUserPermissions
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Permissions object
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/request_password_reset_code:
+    get:
+      tags: [Users]
+      summary: Request a password reset code
+      description: Sends a reset code to the user's email. No authentication required.
+      operationId: requestPasswordResetCode
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        "200":
+          description: Reset code sent
+
+  /users/check_password_reset_code:
+    get:
+      tags: [Users]
+      summary: Verify a password reset code
+      operationId: checkPasswordResetCode
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+        - name: reset_code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Validity result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_reset_code_correct:
+                    type: boolean
+
+  /users/reset_password:
+    post:
+      tags: [Users]
+      summary: Reset a user's password
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, reset_code, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                reset_code:
+                  type: string
+                  example: "DD3CB5B7C260"
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Password reset successful
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /charities/{id}:
+    get:
+      tags: [Charities]
+      summary: Get a single Organisation
+      description: Returns a single Charity (Organisation). Each Charity owns one or more Projects.
+      operationId: getCharity
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Charity record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charity'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List all Projects
+      description: |
+        Returns all Projects accessible to the authenticated user. Every Story and Case belongs to a Project.
+
+        Users hold one of three roles per Project:
+
+        | Role | API name | Front-end | Permissions |
+        |---|---|---|---|
+        | Editor | `editor` | Manager | Admin — edit Project, manage users |
+        | Reporter | `reporter` | Changemaker | Create Stories |
+        | Observer | `observer` | Analyst | Read-only |
+      operationId: listProjects
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Projects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjects'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /projects/{id}:
+    get:
+      tags: [Projects]
+      summary: Get a single Project
+      operationId: getProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Project record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /projects/add_colleague.json:
+    post:
+      tags: [Projects]
+      summary: Add users to a Project
+      description: Grants roles on a Project. A user can hold Editor, Reporter, and Observer simultaneously.
+      operationId: addColleague
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role_data]
+              properties:
+                role_data:
+                  type: array
+                  items:
+                    type: object
+                    required: [project_id]
+                    properties:
+                      project_id:
+                        type: integer
+                        example: 619
+                      editor_ids:
+                        type: array
+                        items:
+                          type: integer
+                        example: [559]
+                      reporter_ids:
+                        type: array
+                        items:
+                          type: integer
+                        example: [560]
+                      observer_ids:
+                        type: array
+                        items:
+                          type: integer
+                        example: [561]
+      responses:
+        "200":
+          description: Users added
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /project_results:
+    get:
+      tags: [Projects]
+      summary: Get Results Canvas figures for Projects
+      description: |
+        Returns the figures shown on each Project's **Results Canvas** (the Results panel on a Project page),
+        one entry per tracker, calculated by Makerble. Covers the Projects you can view (Editor, Reporter or
+        Observer of the Project or its Organisation), optionally for a period and split by Project or month.
+
+        | Tracker (front-end) | Backend type | Figures |
+        |---|---|---|
+        | Activity tracker | Change of Activity type | `times_recorded`, `contacts`, `anonymous_count` |
+        | Engagement tracker | Change of Participation type | `times_recorded`, `contacts`, `anonymous_count` |
+        | Achievement tracker | Indicator of Binary type | `times_recorded`, `contacts_achieved`, `anonymous_count` |
+        | Choice tracker | Indicator of Scale type | `times_recorded`, `contacts`, `answers` (count and contacts per Sub Ratio), `anonymous_count` |
+        | Numerical tracker | Indicator of Value type | `total`, `contacts`, `average_per_contact`, `anonymous_count`, `anonymous_total` |
+
+        `times_recorded` counts records, including headcounts and the same Contact recorded more than once, so it is
+        not a number of people. `contacts` and `contacts_achieved` count distinct Contacts tagged. `anonymous_count`
+        is what was recorded with no Contact tagged.
+
+        Stories count by their date (`created_at`). `target`, `target_deadline` and `percent_of_target` appear when
+        the Project has a target: target deadlines dated in the period are added together, otherwise the Project's
+        own target is used. `last_sync_datetime` doesn't apply, as the figures are totals.
+      operationId: getProjectResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: project_ids
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+          example: [619, 620]
+          description: Projects to include, as project_ids[]=619&project_ids[]=620 or a JSON array string ("[619,620]"). Defaults to every Project you can view; Projects you can't view are left out.
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-04-01"
+          description: First Story date to include (YYYY-MM-DD). Omit start_date and end_date for all time.
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2027-03-31"
+          description: Last Story date to include (YYYY-MM-DD)
+        - name: tracker_types
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [activity, engagement, achievement, choice, numerical]
+          example: [activity, choice]
+          description: Tracker types to include, as an array or a comma-separated list. Defaults to all.
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [project, month]
+          description: Split each tracker's figures into a `groups` array by Project or by month (months with nothing recorded are included). Default is one total.
+      responses:
+        "200":
+          description: One page of trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectResults'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries:
+    get:
+      tags: [Beneficiaries]
+      summary: List all Beneficiaries (Contacts)
+      description: |
+        Returns all Contacts visible to the authenticated user. Filter by `charity_id` or `project_id`.
+        Response includes `custom_fields` defined by the Beneficiary Category.
+      operationId: listBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: charity_id
+          in: query
+          schema:
+            type: integer
+          description: Filter to Contacts in this Organisation
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: Filter to Contacts enrolled in this Project
+      responses:
+        "200":
+          description: Paginated list of Beneficiaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBeneficiaries'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Beneficiaries]
+      summary: Create a Beneficiary (Contact)
+      description: |
+        Creates a new Contact. Required: `name`, `owner_id`.
+
+        Call `GET /beneficiary_types` for `beneficiary_type_id` values and `GET /custom_fields` for available custom field IDs.
+      operationId: createBeneficiary
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeneficiaryCreateRequest'
+            example:
+              beneficiary:
+                name: "Jack Smith"
+                date_of_birth: "13-05-1990"
+                address: "123 Example Street, London"
+                latitude: "51.5074"
+                longitude: "-0.1278"
+                beneficiary_type_id: 1
+                owner_id: 237
+              project_ids: [572]
+              beneficiary_category_ids: [294]
+              custom_fields:
+                "173": "some value"
+      responses:
+        "200":
+          description: Beneficiary created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beneficiary'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries/{id}:
+    get:
+      tags: [Beneficiaries]
+      summary: Get a single Beneficiary (Contact)
+      description: Returns full profile including all custom fields.
+      operationId: getBeneficiary
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Beneficiary record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beneficiary'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /beneficiaries/advanced_custom_fields:
+    get:
+      tags: [Beneficiaries]
+      summary: Get advanced custom fields for all Beneficiaries
+      description: Returns the per-record custom field values for all Beneficiaries.
+      operationId: listBeneficiaryAdvancedCustomFields
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated custom field records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiaries/impact_box_data:
+    get:
+      tags: [Beneficiaries]
+      summary: Get Impact Box data (Progress Trackers per Contact)
+      description: Aggregated metric progress per Beneficiary — the data shown in the Progress Trackers box on a Contact Profile page.
+      operationId: getBeneficiaryImpactBoxData
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated impact box records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /project_beneficiaries:
+    get:
+      tags: [Beneficiaries]
+      summary: List Project–Beneficiary associations
+      description: >
+        Join table linking Contacts (Beneficiaries) to Projects (many-to-many). Only projects the
+        authenticated user can see are included. Use project_ids to narrow the results to specific
+        projects; it can never widen them to projects the user cannot see.
+      operationId: listProjectBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: project_ids
+          in: query
+          required: false
+          description: >
+            Only include these projects. Send as repeated project_ids[]=12&project_ids[]=34, or as a
+            JSON array string (project_ids=[12,34]).
+          schema:
+            type: array
+            items: { type: integer }
+          style: form
+          explode: true
+          example: [12, 34]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Project–Beneficiary records (id, project_id, beneficiary_id, created_at, updated_at)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiary_categories:
+    get:
+      tags: [Beneficiary Categories]
+      summary: List all Beneficiary Categories (Contact Bio Forms)
+      operationId: listBeneficiaryCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBeneficiaryCategories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiary_categories/{id}:
+    get:
+      tags: [Beneficiary Categories]
+      summary: Get a single Beneficiary Category
+      operationId: getBeneficiaryCategory
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Beneficiary Category record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiaryCategory'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /beneficiary_categories/current_fields:
+    get:
+      tags: [Beneficiary Categories]
+      summary: Get current active fields for Beneficiary Categories
+      operationId: getBeneficiaryCategoryCurrentFields
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Current field definitions
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /custom_fields:
+    get:
+      tags: [Beneficiary Categories]
+      summary: List Custom Field definitions (Contact Bio Forms)
+      description: Filter by `beneficiary_category_ids[]` to get fields for specific forms.
+      operationId: listCustomFields
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: "beneficiary_category_ids[]"
+          in: query
+          schema:
+            type: integer
+          description: Filter by Beneficiary Category ID (repeat for multiple)
+      responses:
+        "200":
+          description: Paginated Custom Field definitions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiary_types:
+    get:
+      tags: [Beneficiary Types]
+      summary: List all Beneficiary Types
+      description: Returns the four types — Person (1), Organisation (2), Animal (3), Object (4). The ID is required when creating a Beneficiary.
+      operationId: listBeneficiaryTypes
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of Beneficiary Types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBeneficiaryTypes'
+              example:
+                page: 1
+                page_size: 4
+                page_count: 1
+                total_count: 4
+                data:
+                  - id: 1
+                    name: "Person"
+                    updated_at: "2020-09-28T15:19:24.310+01:00"
+                    created_at: "2020-09-28T15:19:24.310+01:00"
+                  - id: 2
+                    name: "Object"
+                    updated_at: "2020-09-28T15:19:24.319+01:00"
+                    created_at: "2020-09-28T15:19:24.319+01:00"
+                  - id: 3
+                    name: "Organisation"
+                    updated_at: "2020-09-28T15:19:24.324+01:00"
+                    created_at: "2020-09-28T15:19:24.324+01:00"
+                  - id: 4
+                    name: "Animal"
+                    updated_at: "2021-09-11T10:04:59.074+01:00"
+                    created_at: "2021-09-11T10:04:59.074+01:00"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /beneficiary_types_categories:
+    get:
+      tags: [Beneficiary Types]
+      summary: List Beneficiary Type–Category associations
+      operationId: listBeneficiaryTypesCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /stories:
+    get:
+      tags: [Stories]
+      summary: List all Stories
+      description: |
+        Returns all Stories visible to the authenticated user. Stories capture text, media, and progress towards Changes and Indicators, and can be tagged to Beneficiaries.
+
+        **Timestamp note:** `actual_created_at` = Date Posted · `created_at` = Date Happened · `updated_at` = Date Edited
+      operationId: listStories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Stories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Stories]
+      summary: Create a Story
+      description: |
+        Creates a Story tagged to zero, one, or multiple Beneficiaries.
+
+        **Recommended workflow:**
+        1. `GET /story_categories/:id` — retrieve the survey's fields, Indicators, Outcomes, and scale choices
+        2. `GET /sub_ratios?ratio_set_ids[]=N` — retrieve valid answer choice IDs for Scale Indicators
+        3. Submit this endpoint with the full payload
+
+        | Field | Notes |
+        |---|---|
+        | `story.story_group` | Always `"change_created"` |
+        | `story.story_format` | Always `"old"` |
+        | `story.created_at` | Date Happened in `YYYY-MM-DD` |
+        | `story_changes` | Activity/Participation totals — `[{change_id, number}]` |
+        | `story_change_beneficiaries` | Per-contact Participation records — `[{change_id, beneficiary_id}]` |
+        | `story_indicator_beneficiaries` | Per-contact indicator responses (see schema) |
+        | `custom_fields` | `{custom_field_id: value}` for text/date/time fields |
+
+        > For binary indicators: include `binray_indicator_value: "on"` if ticked; omit the record entirely if not.
+        > Activity Changes: include in `story_changes` only — cannot be tagged to beneficiaries.
+      operationId: createStory
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoryCreateRequest'
+            example:
+              story:
+                story_group: "change_created"
+                story_format: "old"
+                project_id: 19
+                story_category_id: 327
+                text: "Session notes from today."
+                created_at: "2024-06-01"
+                source_of_story: "api"
+                is_public: false
+              story_privacy: "only_charity_colleagues"
+              beneficiary_ids: [413]
+              story_changes:
+                - change_id: 199
+                  number: 2
+              story_change_beneficiaries:
+                - change_id: 199
+                  beneficiary_id: 413
+              story_indicator_beneficiaries:
+                - indicator_id: 243
+                  indicator_type: "scale"
+                  outcome_id: 145
+                  sub_ratio_id: 54
+                  beneficiary_id: 413
+              custom_fields:
+                "19": "2024-06-01"
+                "26": "Some text answer"
+      responses:
+        "200":
+          description: Story created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Story'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /draft_stories:
+    post:
+      tags: [Stories]
+      summary: Save an Answer In Progress (draft Story)
+      description: |
+        Saves a partly completed survey response as an **Answer In Progress** (a draft Story).
+        It appears on the organisation's Answers In Progress page, where a colleague can
+        review it, finish it and publish it as a Story in Makerble. Use this instead of
+        `POST /stories` when a response should be checked by a person before it is published.
+
+        **Who can save one** (otherwise the response is `403`):
+        - for a Project: its editors, reporters and observers, and the organisation's editors and reporters (open Projects only);
+        - for an Event's Project: the Event's workers and managers too, when `story.event_id` belongs to that Project;
+        - with no Project: the organisation's editors and reporters for `story.charity_id`.
+
+        A `story.charity_id` that isn't the Project's organisation, a closed or unknown Project,
+        or a request with neither `project_id` nor `charity_id` is refused with `403`.
+        Contacts (Beneficiaries) go in the top-level `beneficiaries` array.
+      operationId: createDraftStory
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftStoryCreateRequest'
+            example:
+              story:
+                project_id: 19
+                story_category_id: 327
+                text: "Notes from today's session, to be reviewed."
+                event_id: 88
+              beneficiaries: [413]
+              story_privacy: "only_charity_colleagues"
+              custom_fields:
+                "26": "Some text answer"
+      responses:
+        "201":
+          description: Answer In Progress saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftStoryCreated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /stories/{id}:
+    get:
+      tags: [Stories]
+      summary: Get a single Story
+      description: Returns a Story with full detail — custom fields, beneficiary IDs, case IDs, indicator responses, change values, and verdict scores.
+      operationId: getStory
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Story with full detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /stories/{id}/attachments:
+    get:
+      tags: [Stories]
+      summary: Get attachments for a single Story
+      operationId: getStoryAttachments
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated attachments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /stories/attachments:
+    get:
+      tags: [Stories]
+      summary: List all Story attachments
+      operationId: listStoryAttachments
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated attachments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /stories/story_category_response:
+    get:
+      tags: [Stories]
+      summary: Get Stories with full survey response detail
+      description: |
+        Returns Stories enriched with named Indicators, Changes, and Custom Fields — ideal for reporting and data exports.
+      operationId: listStoryCategoryResponses
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: story_category_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by a specific Survey
+        - name: "project_ids[]"
+          in: query
+          schema:
+            type: integer
+          description: Filter by Project ID (repeat for multiple)
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Filter: stories on or after this date (YYYY-MM-DD)"
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Filter: stories on or before this date (YYYY-MM-DD)"
+      responses:
+        "200":
+          description: Stories with full survey response data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStoryCategoryResponses'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_categories:
+    get:
+      tags: [Story Categories]
+      summary: List all Story Categories (Surveys)
+      operationId: listStoryCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStoryCategories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_categories/{id}:
+    get:
+      tags: [Story Categories]
+      summary: Get a single Story Category (Survey) — with full field detail
+      description: |
+        Returns the survey's complete structure:
+        - `current_fields` — all questions in order with `field_class_name`, `priority`, `is_mandatory`, `outcome_id`
+        - `scale_indicator_choices` — choice type per Scale Indicator
+        - `verdict_data` — scoring bands and point values per level
+
+        **Always call this before posting a Story** to determine which Indicators are in the survey, their Outcome IDs, and valid Sub Ratio IDs.
+      operationId: getStoryCategory
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Story Category with full detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryCategoryDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /story_categories/{id}/verdicts:
+    get:
+      tags: [Story Categories]
+      summary: Get verdict scores for a Survey Campaign
+      description: Verdict scores grouped by Beneficiary for a specific Survey within a Project.
+      operationId: getStoryCategoryVerdicts
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Story Category ID
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Verdict scores grouped by Beneficiary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerdictScoresResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /project_story_categories:
+    get:
+      tags: [Project Story Categories]
+      summary: List all Survey Campaigns (Project Story Categories)
+      operationId: listProjectStoryCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectStoryCategories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /project_story_categories/{id}/survey_links:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The Survey Campaign (Project Story Category) ID
+    post:
+      tags: [Project Story Categories]
+      summary: Generate personal survey links for Contacts (without sending them)
+      description: |
+        Generates a personal survey link (Survey Invitation link) for each Contact, as the
+        **Send Survey** page does, and returns the links. **Nothing is emailed or texted.**
+        Each response submitted through a link is recorded against that Contact.
+
+        - `beneficiary_ids` must be Contacts already in the Survey Campaign's Project.
+        - `emails` are matched to an existing Contact of the organisation with that email
+          address; if there is none, a new Contact is created for the organisation.
+        - At most 200 `beneficiary_ids` and `emails` per request.
+        - `link_expiry`: `use_once` (default) — the link stops working after one response;
+          `evergreen` — the link stays active.
+
+        Requires Project Editor or Organisation Editor access to the Survey Campaign's Project.
+        The links then appear on the Unique Survey Links page.
+      operationId: createSurveyLinks
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                beneficiary_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Contacts (Beneficiaries) in the Survey Campaign's Project
+                emails:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                  description: Email addresses, matched to or creating Contacts. No email is sent.
+                send_survey_wave_id:
+                  type: integer
+                  description: Optional Wave, from GET /project_story_categories/{id}/survey_waves
+                link_expiry:
+                  type: string
+                  enum: [use_once, evergreen]
+                  default: use_once
+                is_anonymised:
+                  type: boolean
+                  default: false
+            example:
+              beneficiary_ids: [1201, 1202]
+              emails: ["sam@example.org"]
+              link_expiry: use_once
+              is_anonymised: false
+      responses:
+        "201":
+          description: Links generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  send_survey_id:
+                    type: integer
+                    description: The Survey Invitation batch the links belong to
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SurveyLink'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not send surveys for this Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: |
+            Invalid request: Contacts outside the Project (listed in `invalid_beneficiary_ids`),
+            more than 200 recipients, no recipients, an unknown `link_expiry`, or a Wave that
+            is not available for this Survey Campaign.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                  invalid_beneficiary_ids:
+                    type: array
+                    items:
+                      type: integer
+              example:
+                errors: ["These contacts are not in this project: 9876."]
+                invalid_beneficiary_ids: [9876]
+    get:
+      tags: [Project Story Categories]
+      summary: List personal survey links for a Survey Campaign
+      description: |
+        Lists the personal survey links already generated for a Survey Campaign, e.g. to
+        reuse a Contact's existing link. A `use_once` link that has been answered has
+        `expired: true`. Requires Project Editor or Organisation Editor access.
+      operationId: listSurveyLinks
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: beneficiary_id
+          in: query
+          schema:
+            type: integer
+          description: Only this Contact's links
+        - name: send_survey_wave_id
+          in: query
+          schema:
+            type: integer
+          description: Only links for this Wave
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSurveyLinks'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not send surveys for this Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /project_story_categories/{id}/survey_waves:
+    get:
+      tags: [Project Story Categories]
+      summary: List the Waves of a Survey Campaign
+      description: |
+        Lists the Waves (named rounds of a longitudinal survey, e.g. Baseline and Exit) that
+        survey links can be generated for, in priority order. Empty when the Survey Campaign
+        doesn't use Waves.
+      operationId: listSurveyWaves
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: The Survey Campaign (Project Story Category) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSurveyWaves'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /story_beneficiaries:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Beneficiaries
+      description: |
+        Records that directly tag a Beneficiary to a Story. The three tagging mechanisms are:
+        1. **Story Beneficiary** — direct tag (this endpoint)
+        2. **Story Change Beneficiary** — tagged via a Participation Change
+        3. **Story Indicator Beneficiary** — tagged via an Indicator response
+      operationId: listStoryBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_changes:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Changes
+      description: |
+        Per-story metric totals for Activity and Participation Changes. Filter by `story_id`.
+
+        - Activity Changes: value = number entered directly
+        - Participation Changes: value = tagged Beneficiaries + anonymous participants
+      operationId: listStoryChanges
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: story_id
+          in: query
+          schema:
+            type: integer
+          description: Filter to a specific Story
+      responses:
+        "200":
+          description: Paginated Story Change records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_change_beneficiaries:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Change Beneficiaries
+      description: Per-Beneficiary Participation Change records. Only applies to Participation type Changes.
+      operationId: listStoryChangeBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_indicators:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Indicators
+      description: Total indicator progress logged per Story. Filter by `story_id`.
+      operationId: listStoryIndicators
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: story_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /story_indicator_beneficiaries:
+    get:
+      tags: [Story Metrics]
+      summary: List Story Indicator Beneficiaries
+      description: Per-Beneficiary indicator responses. Each record = one Contact's answer to one Indicator in one Story.
+      operationId: listStoryIndicatorBeneficiaries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: story_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeneric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /cases:
+    get:
+      tags: [Cases]
+      summary: List all Cases
+      description: Each Case is linked to one Beneficiary and one Project.
+      operationId: listCases
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Cases
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCases'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Cases]
+      summary: Create a Case
+      description: |
+        Creates a Case for a Beneficiary within a Project.
+
+        Call `GET /custom_field_categories` first to discover the field definition IDs for `custom_field_categories_definition`.
+      operationId: createCase
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseCreateRequest'
+            example:
+              case:
+                title: "Housing support case"
+              custom_field_categories_definition:
+                "71": "My case note"
+                "121": true
+              case_owner_id: 654
+              case_worker_ids: [231, 422]
+              project_id: 123
+              beneficiary_id: 321
+      responses:
+        "200":
+          description: Case created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Case'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects_beneficiaries_cases:
+    get:
+      tags: [Cases]
+      summary: List Project–Beneficiary–Case associations
+      operationId: listProjectsBeneficiariesCases
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectsBeneficiariesCases'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /custom_field_categories:
+    get:
+      tags: [Custom Field Categories]
+      summary: List all Custom Field Categories (Case Forms)
+      description: |
+        Case Form field schemas. Use field definition IDs in `custom_field_categories_definition` when creating a Case.
+
+        Supported field types: Text (short/long) · Number · Date & time · Time · Attachment · Select · Tickbox
+      operationId: listCustomFieldCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCustomFieldCategories'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /changes:
+    get:
+      tags: [Changes]
+      summary: List all Changes (Activity & Participation metrics)
+      description: |
+        Custom KPIs / progress trackers. Two types:
+        - **Activity** — numerical, not linked to an Outcome, beneficiaries cannot be tagged (Progress Panel col 1)
+        - **Participation** — attendance-type, per-beneficiary tagging supported (Progress Panel col 2)
+      operationId: listChanges
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Changes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedChanges'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /indicators:
+    get:
+      tags: [Indicators]
+      summary: List all Indicators
+      description: |
+        Indicative Progress Trackers linked to Outcomes. Three types:
+        - **Scale** — multiple-choice using a Ratio Set
+        - **Binary** — tickbox (yes/no)
+        - **Value** — numerical
+
+        Returns only the Indicators the signed-in user can see: their own, and those of
+        every organisation where they are an editor, reporter or observer. Indicators from
+        the public library shared by all organisations are added only when
+        `include_public_library=true`, matching the Indicator search in the Makerble app.
+      operationId: listIndicators
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - $ref: '#/components/parameters/IncludePublicLibrary'
+      responses:
+        "200":
+          description: Paginated list of Indicators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedIndicators'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /indicators/{id}:
+    get:
+      tags: [Indicators]
+      summary: Get a single Indicator
+      description: |
+        Returns 404 for an Indicator the signed-in user cannot see, with the same body as
+        for an ID that does not exist. A public-library Indicator owned by another
+        organisation is returned only when `include_public_library=true`.
+      operationId: getIndicator
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/IncludePublicLibrary'
+      responses:
+        "200":
+          description: Indicator record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndicatorDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /scale_indicator_choices:
+    get:
+      tags: [Indicators]
+      summary: Get Scale Indicator choices
+      description: Choice configuration (single/multiple) for Scale Indicators in a Story Category.
+      operationId: listScaleIndicatorChoices
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: story_category_id
+          in: query
+          schema:
+            type: integer
+        - name: indicator_id
+          in: query
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Scale indicator choice records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScaleIndicatorChoice'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /outcomes:
+    get:
+      tags: [Outcomes]
+      summary: List all Outcomes
+      description: Each Outcome has a stage (short/medium/long-term) placing it in Progress Panel cols 3–5.
+      operationId: listOutcomes
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Outcomes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOutcomes'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /outcomes/{id}:
+    get:
+      tags: [Outcomes]
+      summary: Get a single Outcome
+      operationId: getOutcome
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Outcome record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outcome'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /outcome_indicators:
+    get:
+      tags: [Outcome Indicators]
+      summary: List all Outcome Indicators
+      description: Join table pairing Outcomes with Indicators (many-to-many). Use to find the `outcome_id` when creating story indicator responses.
+      operationId: listOutcomeIndicators
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOutcomeIndicators'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /ratio_sets:
+    get:
+      tags: [Ratio Sets]
+      summary: List all Ratio Sets (Dropdown/List fields)
+      description: |
+        Reusable dropdown field definitions. Each has a type:
+        - **Identity** — for Beneficiary Categories (Contact Bio Forms)
+        - **Progress** — for Scale Indicators
+      operationId: listRatioSets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Ratio Sets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRatioSets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /sub_ratios:
+    get:
+      tags: [Sub Ratios]
+      summary: List all Sub Ratios (Answer Choices)
+      description: |
+        Individual answer choices within Ratio Sets. Filter by `ratio_set_ids[]`.
+
+        Use returned IDs as `sub_ratio_id` when submitting Scale Indicator responses in a Story.
+      operationId: listSubRatios
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: "ratio_set_ids[]"
+          in: query
+          schema:
+            type: integer
+          description: Filter by Ratio Set ID (repeat for multiple)
+      responses:
+        "200":
+          description: Paginated list of Sub Ratios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSubRatios'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /sub_ratios/{id}:
+    get:
+      tags: [Sub Ratios]
+      summary: Get a single Sub Ratio
+      operationId: getSubRatio
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Sub Ratio record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubRatio'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /ratio_set_choiceables:
+    get:
+      tags: [Ratio Set Choiceables]
+      summary: List all Ratio Set Choiceables
+      description: |
+        Selection rules for Ratio Sets within forms. Choice types:
+        - `single` — one answer only (default)
+        - `limited_multiple` — up to `limit` answers
+        - `unlimited_multiple` — any number of answers
+      operationId: listRatioSetChoiceables
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: "beneficiary_category_ids[]"
+          in: query
+          schema:
+            type: integer
+          description: Filter by Contact Bio Form ID
+      responses:
+        "200":
+          description: Paginated records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRatioSetChoiceables'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /referral_link_details/{id}/definition:
+    get:
+      tags: [Signup Pages]
+      summary: Get a Signup Page's Form Definition (staff API access)
+      description: |
+        Returns the Form Definition JSON for a Signup Page — its contact form/survey
+        fields, skip logic, branding, and settings — the same document format the
+        Offline Collector renderer ingests.
+
+        This is the **staff, token-authenticated** variant: standard `X-User-Email` /
+        `X-User-Token` headers, scoped to Signup Pages belonging to a charity the
+        authenticated user has access to. Useful for testing or integration work
+        without a browser session.
+
+        Unlike the anonymous device-fetch variant (`GET /offline_collector_definition`),
+        this response does **not** include `submission_credential` — that bearer token
+        is only issued to the offline device itself.
+      operationId: getReferralLinkDetailDefinition
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Form Definition JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormDefinition'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          description: Signup Page not found, or not accessible to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /offline_collector_definition:
+    get:
+      tags: [Signup Pages]
+      summary: Get a Signup Page's Form Definition (offline device fetch)
+      description: |
+        The **anonymous** variant of the Form Definition endpoint, called automatically
+        by the installed Offline Collector PWA (`/offline/:token`) when it first loads.
+        There is no Devise session and no `X-User-Email`/`X-User-Token` pair involved —
+        the query-param token stands in for both identifying the Signup Page and
+        authorising the request.
+
+        The response is identical to the staff API variant, **plus one extra key**:
+        `submission_credential` — the bearer token the device later uses to post the
+        completed submission back via `POST /referral_submissions`.
+      operationId: getOfflineCollectorDefinition
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The offline collector token embedded in the Signup Page's "Offline QR Code" / "Offline version" links
+      responses:
+        "200":
+          description: Form Definition JSON, including submission_credential
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/FormDefinition'
+                  - type: object
+                    properties:
+                      submission_credential:
+                        $ref: '#/components/schemas/SubmissionCredential'
+        "401":
+          description: Token unknown, or the Signup Page has been deactivated since the token was issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "unauthorized"
+
+  /event_categories/{id}:
+    delete:
+      tags: [Event Formats]
+      summary: Delete an Event Format
+      operationId: deleteEventFormat
+      description: |
+        Permanently deletes an Event Format (Event Category in the API). This is the
+        same action as **Delete** in the Actions menu on the Manage Event Formats page,
+        and runs through the same permission and blocking rules.
+
+        - Only an **Organisation Admin** of the organisation that owns the Event Format
+          may delete it. Other members of that organisation get `403`.
+        - An Event Format belonging to an organisation you are not a member of returns
+          `404`, as does an unknown id.
+        - Deletion is refused with `422` while the Event Format still has any events, or
+          is still added to any project. The `error` gives the reason and the counts.
+        - Default Event Formats (Appointments, Classes, Conferences, Gatherings, Meetings,
+          Other Events, Sessions, Workshops) can be deleted under the same rules.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Event Format was deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  message:
+                    type: string
+              example:
+                id: 4521
+                message: "Event Format was successfully deleted."
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are not an Organisation Admin of the organisation that owns this Event Format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an Organisation Admin can delete Event Formats."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: The Event Format has events or is added to projects, so it can't be deleted yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "This Event Format can't be deleted because it has 3 events. Delete or move those events first. This Event Format can't be deleted because it is added to 2 projects. Remove it from those projects first."
+
+  /referral_submissions:
+    post:
+      tags: [Signup Pages]
+      summary: Sync a completed offline submission
+      description: |
+        The endpoint an offline device posts a completed Signup Page submission to,
+        once it regains connectivity. Reuses the exact same model methods the live,
+        online submission flow calls — there's no separate "offline" data path to
+        keep in sync with the online one.
+
+        **Authentication is a `ReferralLinkSubmissionCredential` bearer token** (the
+        `submission_credential.token` from the Form Definition), **not** the standard
+        `X-User-Email`/`X-User-Token` pair. Deactivating a Signup Page automatically
+        revokes its credential — there's no separate revoke action.
+
+        `primary` is used for a **structured** link (one primary person plus zero or
+        more `related_people`); `roles` is used instead for a **personalised** link
+        (one entry per person, no "primary" concept). Every `contact_form_answers` /
+        survey `answers` object is keyed by the field's `id` from the Form Definition,
+        never by name. See the Form Definition's Field object for the value shape
+        each `field_type` expects (Sub Ratio ids for dropdown/scale fields, digits-only
+        for `telephone`, base64-encoded payload for `media`/`file`, etc.).
+      operationId: createReferralSubmission
+      security: [{submissionBearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferralSubmissionRequest'
+      responses:
+        "201":
+          description: New submission processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferralSubmissionResponse'
+        "200":
+          description: This `idempotency_key` had already been processed — returns the original result, not a new one
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferralSubmissionResponse'
+        "401":
+          description: Token unknown, or the Signup Page has been deactivated since the token was issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "unauthorized"
+        "422":
+          description: |
+            Either the contact form is a `CustomFieldCategory` ("advanced custom field")
+            form — unsupported by this endpoint — or a model validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unsupportedContactForm:
+                  value: { error: "unsupported-contact-form", detail: "..." }
+                invalidSubmission:
+                  value: { error: "invalid-submission", detail: ["..."] }
+
+  /cohort_trackers:
+    get:
+      tags: [Cohort Trackers]
+      summary: List an Organisation's Cohort Trackers
+      description: |
+        The Cohort Trackers of an Organisation (Charity). Visible to the Organisation's
+        editors and reporters, and to managers (editors) of its Projects.
+      operationId: listCohortTrackers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Cohort Trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCohortTrackers'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user has no editor or reporter role in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Cohort Trackers]
+      summary: Create a Cohort Tracker
+      description: |
+        Creates a Cohort Tracker (Create a metric > Cohort Tracker). Every tracker counts only
+        members of the Project or Album it is placed on: `membership` is `ever_enrolled`
+        (default: anyone whose status History shows them Enrolled at any time) or
+        `currently_enrolled` (their current Project State). `criteria` adds further conditions, in
+        the Contact Filters format; see `POST /cohort_trackers/preview` for the keys.
+        Requires an editor or reporter of the Organisation. `criteria` may also be sent as a JSON string.
+      operationId: createCohortTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerRequest'
+            example:
+              cohort_tracker:
+                charity_id: 913
+                name: "Bambanani children who start Ignite"
+                membership: "ever_enrolled"
+                criteria:
+                  bundle_ids: ["57", "58"]
+      responses:
+        "201":
+          description: Cohort Tracker created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Cohort Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/preview:
+    post:
+      tags: [Cohort Trackers]
+      summary: Preview Cohort Tracker criteria
+      description: |
+        How many of the Organisation's Contacts currently meet some criteria, before the tracker is
+        placed on a Project or Album ("Currently matches N contacts across your organisation"), and
+        the criteria as they would be stored. `criteria` takes any key the Contacts page's Filters
+        sidebar sends; keys no filter reads are dropped from the stored criteria.
+
+        These keys follow the Project or Album the tracker is placed on and the reporting period:
+        - `project_ids` (with `project_ids_narrow: "true"` to require all of them), in any state
+        - `bundle_ids` (Albums) and `narrow_bundle_ids`
+        - `projects_states_hash`: `{project_id: beneficiary_state_id}`, current Project State in each
+        - `project_beneficiary_states`: `{project_id: {state_id: {enabled: "true", added_from_date, removed_from_date}}}`, dates as `dd/mm/yyyy - dd/mm/yyyy`, matched against status History
+        - `project_story_category_ids` (Survey Campaigns completed) with `project_story_category_filter_data: {id: {story_date_from}}`
+        - `attendance_rate`: `{change_id, from, to, event_scope}`
+        - `distance_travelled`: `{trackers: [{indicator_id, directions: [improved|no_change|worsened]}], same_project}`
+        - `indicator_comparisons`: `{indicator_id: {response: any|latest, op, sub_ratio_ids, values}}`
+        - `indicator_sub_ratios_hash`: `{indicator_id: [sub_ratio_id]}`
+
+        The Contacts page's other sections apply as they do there, against the Contacts' current
+        details, e.g. `group_ids`, `beneficiary_types`, `age_from` / `age_to` (`{year, month, day}`),
+        `date_of_birth_from` and `created_at_from` (`yyyy/mm/dd - yyyy/mm/dd`), `created_by_ids`,
+        `story_creator_ids`, `case_owner_ids`, `case_worker_ids`, `open_cases`, `closed_cases`,
+        `custom_field_value_hash`, `custom_field_definition_hash`, `changes_hash`, `indicators_hash`,
+        `outcome_hash`, `event_ids`, `flag_hash`, `relationship_category_hash` and `beneficiary_roles_hash`.
+      operationId: previewCohortTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id]
+              properties:
+                charity_id:
+                  type: integer
+                cohort_tracker:
+                  type: object
+                  properties:
+                    criteria:
+                      type: object
+                    membership:
+                      type: string
+                      enum: [ever_enrolled, currently_enrolled]
+            example:
+              charity_id: 913
+              cohort_tracker:
+                criteria:
+                  attendance_rate: { change_id: "412", from: "75", to: "100" }
+      responses:
+        "200":
+          description: The count and the normalised criteria
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    example: 42
+                  criteria:
+                    type: object
+                  names_projects_or_albums:
+                    type: boolean
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Cohort Trackers for this Organisation
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/{id}:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker
+      description: |
+        A Cohort Tracker with where it is used. `names_projects_or_albums` is true when its criteria
+        point at specific Projects or Albums, so it counts against those same ones wherever it is placed.
+      operationId: getCohortTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Cohort Tracker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Cohort Trackers]
+      summary: Update a Cohort Tracker
+      description: |
+        Updates the fields sent. Changes apply everywhere the tracker is used. Requires an
+        Organisation editor, or the reporter who created it.
+      operationId: updateCohortTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerRequest'
+            example:
+              cohort_tracker:
+                name: "Children attending 80%+"
+      responses:
+        "200":
+          description: Cohort Tracker updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Cohort Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Cohort Trackers]
+      summary: Delete a Cohort Tracker
+      description: Refused (422) while the tracker is used on any Project, Album or Scorecard Template.
+      operationId: deleteCohortTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't delete this Cohort Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/{id}/projects/{project_id}:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker's targets on a Project
+      description: The one-off target and deadline targets (the Project's Set Targets page). Requires rights to edit the Project's targets.
+      operationId: getCohortTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Cohort Trackers]
+      summary: Add a Cohort Tracker to a Project
+      description: |
+        Places the tracker in a column of the Project's Impact Scorecard (Edit Project Metrics),
+        optionally with a one-off target. The Project's Albums pick it up automatically. The tracker
+        and Project must belong to the same Organisation, and the user needs rights to edit the
+        Project's metrics.
+      operationId: addCohortTrackerToProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [column]
+              properties:
+                column:
+                  type: string
+                  enum: [activities, engagement, potential, behaviour, growth]
+                target:
+                  type: integer
+            example:
+              column: engagement
+              target: 40
+      responses:
+        "201":
+          description: Placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    patch:
+      tags: [Cohort Trackers]
+      summary: Set a Cohort Tracker's targets on a Project
+      description: |
+        Sets the one-off target and/or replaces this tracker's deadline targets on the Project (Set
+        Targets). A target is a number of Contacts to reach, not a total that adds up across periods.
+        `deadlines: []` clears the deadline targets. Requires rights to edit the Project's targets.
+      operationId: setCohortTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 40
+              deadlines:
+                - { date: "2026-06-30", number: 20 }
+                - { date: "2026-12-31", number: 40 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Cohort Trackers]
+      summary: Remove a Cohort Tracker from a Project
+      operationId: removeCohortTrackerFromProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /cohort_trackers/{id}/albums/{bundle_id}:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker's targets on an Album
+      description: |
+        An Album inherits the Cohort Trackers on its Projects. Returns the Album's one-off and deadline
+        targets for the tracker, and `album_target_type`: the Album's Set Targets page shows Cohort
+        Tracker targets under manual targets. Requires rights to edit the Album's targets.
+      operationId: getCohortTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Cohort Trackers]
+      summary: Set a Cohort Tracker's targets on an Album
+      description: |
+        Sets the Album's one-off target and/or replaces its deadline targets (saved as manual targets) for
+        the tracker. An Album's target is never the sum of its Projects'. Requires rights to edit the
+        Album's targets.
+      operationId: setCohortTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 120
+              deadlines:
+                - { date: "2026-12-31", number: 100 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /media_items:
+    get:
+      tags: [Media Gallery]
+      summary: List Media Gallery files
+      description: |
+        Lists every photo, video, audio file and document attached to Stories and to Contacts' bios in one organisation — the files shown on the **Media Gallery** page (Impact → Media Gallery).
+
+        Only files from Stories and Contacts the user is already allowed to view are returned, so two users can get different results for the same organisation. Filters combine with AND.
+
+        `kind_counts` gives the number of files of each kind for the same filters, ignoring `kind` — the counts on the File type buttons.
+      operationId: listMediaItems
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Organisation ID
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [photo, video, audio, document]
+          description: File type
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Matches the start of words in the file name, Story title, Contact name and caption
+        - name: source[]
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [stories, contacts]
+          style: form
+          explode: true
+          description: Story files, Contact bio files, or both (default both)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest]
+            default: newest
+          description: By upload date
+        - name: story_filters
+          in: query
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties: true
+          example: { project_ids: [19], story_category_ids: [327] }
+          description: |
+            Timeline (Story) Filters, as on the homepage. Keys (arrays of ids unless noted): `project_ids`, `story_category_ids` (Surveys), `bundle_ids` (Albums), `beneficiary_ids` (Contacts tagged in the Story), `label_ids`, `outcome_ids`, `change_ids` (Engagement), `indicator_ids`, `user_ids` (Authors), `charity_ids`, and `created_at_from` (Date Happened range, `YYYY/MM/DD - YYYY/MM/DD`).
+
+            Story files must match them. For Contact bio files, `project_ids` matches the Contact's Project memberships, and any other key means the Contact must appear in at least one matching Story.
+        - name: contact_filters
+          in: query
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties: true
+          example: { group_ids: [4], beneficiary_types: [1] }
+          description: |
+            Contact Filters, as on Manage Contacts. Common keys (arrays of ids): `project_ids`, `group_ids`, `beneficiary_types` (Contact types: 1 Person, 2 Object, 3 Organisation, 4 Animal), `beneficiary_state_ids`, `created_by_ids`, `bundle_ids`.
+
+            Contact bio files must match them, and Story files must involve at least one matching Contact.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Media Gallery files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMediaItems'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                kind_counts: { all: 1, photo: 1, video: 0, audio: 0, document: 0 }
+                data:
+                  - id: 512
+                    kind: photo
+                    file_name: harvest_day.jpg
+                    content_type: image/jpeg
+                    file_size: 248310
+                    caption: Volunteers at the allotment
+                    source_type: story
+                    source_id: 90211
+                    source_title: Harvest day at the allotment
+                    project_id: 19
+                    project_name: Growing Together
+                    uploaded_by_id: 6207
+                    uploaded_at: "2026-09-12T10:14:00Z"
+                    updated_at: "2026-09-12T10:15:02Z"
+                    thumbnail_url: https://makerble.s3.amazonaws.com/medias/files/000/000/512/thumbnail/harvest_day.jpg
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user is not a member of that organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /media_items/{id}:
+    get:
+      tags: [Media Gallery]
+      summary: Get one Media Gallery file, with a download link
+      description: |
+        Returns one file from the **Media Gallery**, as shown in its preview panel, with a signed `download_url` that downloads the file.
+
+        Permissions are checked again on every request. The user must still be able to view the Story or Contact the file belongs to.
+
+        The link expires after `download_url_expires_in` seconds, so request the file again for a fresh link rather than storing it.
+      operationId: getMediaItem
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The file, its field name and a short-lived download link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaItemDetail'
+              example:
+                id: 512
+                kind: document
+                file_name: consent_form.pdf
+                content_type: application/pdf
+                file_size: 84211
+                caption: null
+                source_type: contact
+                source_id: 30144
+                source_title: Jordan T.
+                project_id: null
+                project_name: null
+                uploaded_by_id: 6207
+                uploaded_at: "2026-09-12T10:14:00Z"
+                updated_at: "2026-09-12T10:15:02Z"
+                thumbnail_url: null
+                field_name: Consent form (file field)
+                download_url: https://files.example.com/medias/files/000/000/512/original/consent_form.pdf?X-Amz-Expires=300&X-Amz-Signature=...
+                download_url_expires_in: 300
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The file exists, but the user can't view its Story or Contact
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints:
+    get:
+      tags: [Webhooks]
+      summary: List an Organisation's webhook endpoints
+      description: |
+        The Organisation's (Charity's) webhook endpoints, without their secrets. Only the
+        Organisation's admins can manage webhooks, and only once an admin has ticked **Turn on Webhooks**
+        in the Organisation's Settings (otherwise `403`).
+      operationId: listWebhookEndpoints
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of webhook endpoints
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWebhookEndpoints'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Webhooks]
+      summary: Register a webhook endpoint
+      description: |
+        Starts sending the chosen events to an HTTPS URL. Leave out `event_types` to send every
+        event. An Organisation can have at most 10 endpoints. The response includes the signing
+        `secret`, which is shown only this once.
+      operationId: createWebhookEndpoint
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEndpointRequest'
+            example:
+              webhook_endpoint:
+                charity_id: 913
+                url: "https://crm.example.org/makerble"
+                description: "Dynamics sync"
+                event_types: ["contact.created", "contact.updated"]
+      responses:
+        "201":
+          description: Endpoint created, with its secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpointWithSecret'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /webhook_endpoints/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Webhooks]
+      summary: Get a webhook endpoint
+      operationId: getWebhookEndpoint
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The endpoint, without its secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpoint'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Webhooks]
+      summary: Change, pause or resume a webhook endpoint
+      description: |
+        Send only the fields to change. `active: false` pauses the endpoint; `active: true`
+        resumes it, and also turns back on an endpoint Makerble switched off after repeated
+        failure (clearing `disabled_at` and `failure_count`). Changes made while it was off are
+        not sent afterwards.
+      operationId: updateWebhookEndpoint
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEndpointRequest'
+            example:
+              webhook_endpoint:
+                active: true
+      responses:
+        "200":
+          description: The updated endpoint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpoint'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Webhooks]
+      summary: Delete a webhook endpoint
+      description: Deletes the endpoint and its delivery log. Makerble stops sending to it at once.
+      operationId: deleteWebhookEndpoint
+      security: [{tokenAuth: []}]
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints/{id}/rotate_secret:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags: [Webhooks]
+      summary: Rotate a webhook endpoint's secret
+      description: |
+        Replaces the signing secret and returns the new one, shown only this once. Deliveries
+        are signed with it straight away.
+      operationId: rotateWebhookEndpointSecret
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The endpoint with its new secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpointWithSecret'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints/{id}/test:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags: [Webhooks]
+      summary: Send a test event
+      description: |
+        Queues a `webhook.test` event (`data: { "test": true }`) for the endpoint. Check the
+        delivery log a few seconds later for the result.
+      operationId: sendWebhookTestEvent
+      security: [{tokenAuth: []}]
+      responses:
+        "202":
+          description: The queued delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDelivery'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints/{id}/deliveries:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Webhooks]
+      summary: List a webhook endpoint's deliveries
+      description: The delivery log, newest first, kept for 30 days. Payloads are not included.
+      operationId: listWebhookDeliveries
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of deliveries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWebhookDeliveries'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /webhook_endpoints/{id}/deliveries/{delivery_id}/replay:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - name: delivery_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The delivery's ID
+    post:
+      tags: [Webhooks]
+      summary: Send a delivery again
+      description: |
+        Sends the delivery again with the same event `id`, so a receiver that already processed
+        it can ignore it. `data` shows the record as it is now.
+      operationId: replayWebhookDelivery
+      security: [{tokenAuth: []}]
+      responses:
+        "202":
+          description: The delivery, queued again
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDelivery'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/WebhooksNotTurnedOn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+components:
+
+  securitySchemes:
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: X-User-Token
+      description: |
+        Long-lived token from `POST /users/sign_in`. Does not expire.
+        Must be accompanied by `X-User-Email` header.
+    submissionBearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        A `ReferralLinkSubmissionCredential` token, scoped to a single Signup Page —
+        obtained from `submission_credential.token` in the Offline Collector's Form
+        Definition response, **not** a Devise session or `X-User-Email`/`X-User-Token`
+        pair. Used only by `POST /referral_submissions`.
+
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Unique integer identifier
+    CohortTrackerAlbumId:
+      name: bundle_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Album (Bundle) ID
+    CohortTrackerProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Project ID
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+      description: Page number (default 1)
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        default: 10
+        maximum: 200
+      description: Records per page (default 10, max 200)
+    LastSyncDatetime:
+      name: last_sync_datetime
+      in: query
+      schema:
+        type: string
+        example: "2023-07-30 08:48:55.781228"
+      description: ISO 8601 datetime — returns only records updated after this value
+    IncludePublicLibrary:
+      name: include_public_library
+      in: query
+      schema:
+        type: boolean
+        default: false
+      example: true
+      description: Also include Indicators from the public library shared by all organisations (default false)
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You need to sign in before continuing."
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Record not found."
+    Forbidden:
+      description: The user doesn't have permission for this Project or organisation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              errors:
+                type: string
+          example:
+            success: false
+            errors: "Permission denied."
+    UnprocessableEntity:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    WebhooksNotTurnedOn:
+      description: Webhooks are not turned on for this Organisation yet
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Webhooks are not turned on for this organisation"
+
+  schemas:
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    Timestamps:
+      type: object
+      properties:
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T09:30:00.000+00:00"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T09:30:00.000+00:00"
+
+    PaginationEnvelope:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 10
+        page_count:
+          type: integer
+          example: 42
+        total_count:
+          type: integer
+          example: 418
+
+    PaginatedGeneric:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+
+    PaginatedProjectResults:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            start_date:
+              type: string
+              format: date
+              nullable: true
+              example: "2026-04-01"
+            end_date:
+              type: string
+              format: date
+              nullable: true
+              example: "2027-03-31"
+            project_ids:
+              type: array
+              items:
+                type: integer
+              example: [619]
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectResultsTracker'
+
+    ProjectResultsTracker:
+      type: object
+      description: One tracker on the Results Canvas. Which figures appear depends on tracker_type.
+      properties:
+        tracker_type:
+          type: string
+          enum: [Activity tracker, Engagement tracker, Achievement tracker, Choice tracker, Numerical tracker]
+          example: Activity tracker
+        backend_type:
+          type: string
+          example: Change of Activity type
+        tracker_id:
+          type: integer
+          description: The Change ID (Activity and Engagement trackers) or Indicator ID (the others)
+          example: 1201
+        tracker_name:
+          type: string
+          example: Sessions delivered
+        outcome_name:
+          type: string
+          description: The Outcome an Indicator sits under
+          example: Into employment
+        times_recorded:
+          type: integer
+          example: 13
+        contacts:
+          type: integer
+          example: 6
+        contacts_achieved:
+          type: integer
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              sub_ratio_id:
+                type: integer
+              sub_ratio:
+                type: string
+                example: High
+              count:
+                type: integer
+              contacts:
+                type: integer
+        total:
+          type: number
+        average_per_contact:
+          type: number
+          nullable: true
+        anonymous_count:
+          type: integer
+          example: 7
+        anonymous_total:
+          type: number
+        target:
+          type: integer
+          example: 20
+        target_deadline:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-03-31"
+        percent_of_target:
+          type: number
+          example: 65.0
+        groups:
+          type: array
+          description: Present with group_by. Each row has `month` ("YYYY-MM") or `project` ({id, name}) plus the same figures; Project rows also carry that Project's target.
+          items:
+            type: object
+
+    AuthResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 42
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        authentication_token:
+          type: string
+          description: Long-lived token. Does not expire.
+          example: "sJxyz_abc123longtoken"
+
+    Charity:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 31
+            name:
+              type: string
+              example: "Greenfield Community Trust"
+
+    Project:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 572
+            name:
+              type: string
+              example: "Youth Mentoring Programme 2024"
+            charity_id:
+              type: integer
+              example: 31
+
+    User:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 237
+            name:
+              type: string
+              example: "Sarah Jones"
+            email:
+              type: string
+              format: email
+              example: "sarah@charity.org"
+
+    Beneficiary:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 160498
+            name:
+              type: string
+              example: "Jack Smith"
+            dob:
+              type: string
+              format: date
+              nullable: true
+              example: "1990-05-13"
+            charity_id:
+              type: integer
+              example: 31
+            mobile:
+              type: string
+              nullable: true
+              example: "+44 7700 900123"
+            email:
+              type: string
+              nullable: true
+              example: "jack@example.com"
+            address:
+              type: string
+              nullable: true
+              example: "123 Example Street, London"
+            avatar:
+              type: string
+              nullable: true
+            created_by:
+              type: integer
+              example: 237
+            custom_fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomFieldValue'
+
+    BeneficiaryCreateRequest:
+      type: object
+      required: [beneficiary]
+      properties:
+        beneficiary:
+          type: object
+          required: [name, owner_id]
+          properties:
+            name:
+              type: string
+            date_of_birth:
+              type: string
+              description: Format DD-MM-YYYY
+            address:
+              type: string
+            latitude:
+              type: string
+            longitude:
+              type: string
+            beneficiary_type_id:
+              type: integer
+              description: "1=Person  2=Object  3=Organisation  4=Animal"
+              default: 1
+            owner_id:
+              type: integer
+        project_ids:
+          type: array
+          items:
+            type: integer
+        beneficiary_category_ids:
+          type: array
+          items:
+            type: integer
+        custom_fields:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Dictionary of custom_field_id → value"
+
+    BeneficiaryType:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+              enum: [Person, Organisation, Animal, Object]
+
+    BeneficiaryCategory:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 294
+            name:
+              type: string
+              example: "Standard Contact Form"
+
+    CustomFieldValue:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 173
+        name:
+          type: string
+          example: "Employment Status"
+        type:
+          type: string
+          example: "text"
+          description: "Field type: text, date, time, file, etc."
+        value:
+          description: Field value (string for most types; object for file attachments)
+          example: "Employed"
+
+    Story:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 369011
+            text:
+              type: string
+              nullable: true
+              example: "Session went well — good engagement from all attendees."
+            number:
+              type: string
+              example: "0"
+            approved:
+              type: boolean
+              example: true
+            story_group:
+              type: string
+              example: "change_created"
+            location:
+              type: string
+              nullable: true
+            project_id:
+              type: integer
+              example: 572
+            charity_id:
+              type: integer
+              nullable: true
+              example: 31
+            story_category_id:
+              type: integer
+              example: 327
+            edited_by:
+              type: integer
+              example: 237
+            user_id:
+              type: integer
+              example: 237
+            actual_created_at:
+              type: string
+              format: date-time
+              description: Date Posted — real database insertion time
+              example: "2024-06-01T14:22:35.000+01:00"
+            beneficiary_ids:
+              type: array
+              items:
+                type: integer
+              example: [160498]
+            custom_fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomFieldValue'
+            verdict_scores:
+              type: array
+              items:
+                $ref: '#/components/schemas/VerdictScore'
+
+    StoryDetail:
+      allOf:
+        - $ref: '#/components/schemas/Story'
+        - type: object
+          properties:
+            case_ids:
+              type: array
+              items:
+                type: integer
+            story_indicator_beneficiaries:
+              type: array
+              items:
+                $ref: '#/components/schemas/StoryIndicatorBeneficiary'
+            story_change_beneficiaries:
+              type: array
+              items:
+                type: object
+            story_changes:
+              type: array
+              items:
+                type: object
+
+    DraftStoryCreateRequest:
+      type: object
+      required: [story]
+      properties:
+        story:
+          type: object
+          properties:
+            project_id:
+              type: integer
+              description: Project the Answer In Progress belongs to. Required unless `charity_id` is given.
+            charity_id:
+              type: integer
+              description: Organisation. Must be the Project's organisation when `project_id` is given.
+            story_category_id:
+              type: integer
+              description: Survey (Story Category) being answered
+            text:
+              type: string
+            event_id:
+              type: integer
+              description: Event this response is for. Must belong to `project_id`.
+            source_of_story:
+              type: string
+              default: api
+            story_group:
+              type: string
+              default: expanded
+            story_format:
+              type: string
+            display_as:
+              type: string
+            latitude:
+              type: number
+            longitude:
+              type: number
+            location:
+              type: string
+            is_public:
+              type: boolean
+            witness_id:
+              type: integer
+        beneficiaries:
+          type: array
+          items:
+            type: integer
+          description: Contact (Beneficiary) IDs to tag
+        story_privacy:
+          type: string
+        custom_fields:
+          type: object
+          description: "Survey field values: {custom_field_id: value}"
+        send_survey_wave_id:
+          type: integer
+
+    DraftStoryCreated:
+      type: object
+      properties:
+        success:
+          type: boolean
+        draft_story_id:
+          type: integer
+        text:
+          type: string
+        project_id:
+          type: integer
+        story_category_id:
+          type: integer
+
+    StoryCreateRequest:
+      type: object
+      required: [story]
+      properties:
+        story:
+          type: object
+          required: [story_group, story_format, project_id, story_category_id]
+          properties:
+            story_group:
+              type: string
+              enum: [change_created]
+            story_format:
+              type: string
+              enum: [old]
+            display_as:
+              type: string
+              example: "survey_questions_view"
+            project_id:
+              type: integer
+            story_category_id:
+              type: integer
+            text:
+              type: string
+              description: "Main narrative text (supports Markdown)"
+            created_at:
+              type: string
+              format: date
+              description: "Date Happened — YYYY-MM-DD"
+            source_of_story:
+              type: string
+              example: "api"
+            is_public:
+              type: boolean
+              default: false
+        story_privacy:
+          type: string
+          enum: [only_charity_colleagues, public, specific_individuals_only]
+          default: only_charity_colleagues
+        beneficiary_ids:
+          type: array
+          items:
+            type: integer
+        case_ids:
+          type: array
+          items:
+            type: integer
+        story_changes:
+          type: array
+          items:
+            type: object
+            properties:
+              change_id:
+                type: integer
+              number:
+                type: number
+        story_change_beneficiaries:
+          type: array
+          items:
+            type: object
+            properties:
+              change_id:
+                type: integer
+              beneficiary_id:
+                type: integer
+        story_indicator_beneficiaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryIndicatorBeneficiaryInput'
+        custom_fields:
+          type: object
+          additionalProperties: true
+          description: "Dictionary of custom_field_id → value"
+
+    StoryIndicatorBeneficiaryInput:
+      type: object
+      required: [indicator_id, indicator_type, outcome_id]
+      properties:
+        indicator_id:
+          type: integer
+        indicator_type:
+          type: string
+          enum: [scale, binary, value]
+        outcome_id:
+          type: integer
+        beneficiary_id:
+          type: integer
+          nullable: true
+        sub_ratio_id:
+          type: integer
+          nullable: true
+          description: "Scale only — selected answer choice ID"
+        binray_indicator_value:
+          type: string
+          enum: ["on"]
+          nullable: true
+          description: "Binary only — 'on' if ticked; omit record if not"
+        number:
+          type: number
+          nullable: true
+          description: "Value only — numerical response"
+
+    StoryIndicatorBeneficiary:
+      type: object
+      properties:
+        id:
+          type: integer
+        beneficiary_id:
+          type: integer
+        indicator_id:
+          type: integer
+        indicator_type:
+          type: string
+          enum: [scale, binary, value]
+        sub_ratio_id:
+          type: integer
+          nullable: true
+        outcome_id:
+          type: integer
+          nullable: true
+
+    VerdictScore:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 675900
+        total_points:
+          type: string
+          example: "9.0"
+        beneficiary_id:
+          type: integer
+          example: 147750
+        story_id:
+          type: integer
+          example: 573975
+        verdict_id:
+          type: integer
+          example: 8
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    VerdictScoreDetail:
+      allOf:
+        - $ref: '#/components/schemas/VerdictScore'
+        - type: object
+          properties:
+            story_created_at:
+              type: string
+              format: date-time
+            beneficiary_owner_id:
+              type: integer
+            story_category_id:
+              type: integer
+
+    VerdictScoresResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: array
+            items:
+              type: object
+              properties:
+                beneficiary_id:
+                  type: integer
+                story_points:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/VerdictScoreDetail'
+
+    StoryCategory:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 841
+            name:
+              type: string
+              example: "Monthly Wellbeing Check-in"
+
+    StoryCategoryDetail:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            color:
+              type: string
+              example: "#4a8ac9"
+            is_stopped:
+              type: boolean
+            is_default:
+              type: boolean
+            description:
+              type: string
+              nullable: true
+            intro_message:
+              type: string
+              nullable: true
+            current_fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/StoryCategoryField'
+            scale_indicator_choices:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScaleIndicatorChoice'
+            verdict_data:
+              $ref: '#/components/schemas/VerdictData'
+
+    StoryCategoryField:
+      type: object
+      properties:
+        id:
+          type: integer
+        field_id:
+          type: integer
+          description: ID of the underlying field (e.g. Indicator ID when field_class_name is Indicator)
+        field_name:
+          type: string
+          example: "How are you feeling today?"
+        field_class_name:
+          type: string
+          example: "Indicator"
+          description: "e.g. CustomField, Indicator, Change"
+        priority:
+          type: integer
+          description: "Display order — 1 is first"
+          example: 3
+        is_mandatory:
+          type: boolean
+        display_info:
+          type: string
+          nullable: true
+        document_category_id:
+          type: integer
+          nullable: true
+        outcome_id:
+          type: integer
+          nullable: true
+          example: 145
+        indicator_type:
+          type: string
+          nullable: true
+          enum: [scale, binary, value]
+        change_type:
+          type: string
+          nullable: true
+
+    ScaleIndicatorChoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        indicator_id:
+          type: integer
+        choice:
+          type: string
+          enum: [single_choice, multiple_choice]
+        choice_value:
+          type: string
+
+    VerdictData:
+      type: object
+      properties:
+        verdict:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: integer
+                example: 0
+              to:
+                type: integer
+                example: 4
+              text:
+                type: string
+                example: "None-minimal Depression"
+        indicators:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              levels:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      example: "Not at all"
+                    points:
+                      type: integer
+                      example: 0
+
+    ProjectStoryCategory:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            project_id:
+              type: integer
+            story_category_id:
+              type: integer
+            allow_sign_out_story:
+              type: boolean
+            is_stopped:
+              type: boolean
+            display_intro_message:
+              type: boolean
+            display_respondent_name:
+              type: boolean
+
+    StoryCategoryResponse:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            text:
+              type: string
+              nullable: true
+            story_category_id:
+              type: integer
+            story_category:
+              type: string
+            project_id:
+              type: integer
+            project:
+              type: string
+            user_id:
+              type: integer
+            charity_id:
+              type: integer
+              nullable: true
+            known_beneficiaries_count:
+              type: integer
+            unknown_beneficiaries_count:
+              type: integer
+            latitude:
+              type: string
+              nullable: true
+            longitude:
+              type: string
+              nullable: true
+            indicator:
+              type: array
+              items:
+                type: object
+            change:
+              type: array
+              items:
+                type: object
+            custom_field:
+              type: array
+              items:
+                type: object
+
+    Case:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 96
+            beneficiary_id:
+              type: integer
+              example: 160498
+            project_id:
+              type: integer
+              example: 572
+            case_creator_id:
+              type: integer
+              description: User ID of the Case Owner
+              example: 237
+
+    CaseCreateRequest:
+      type: object
+      required: [project_id, beneficiary_id]
+      properties:
+        case:
+          type: object
+          properties:
+            title:
+              type: string
+        custom_field_categories_definition:
+          type: object
+          additionalProperties: true
+          description: "Case form field values: {field_definition_id: value}"
+        case_owner_id:
+          type: integer
+        case_worker_ids:
+          type: array
+          items:
+            type: integer
+        project_id:
+          type: integer
+        beneficiary_id:
+          type: integer
+
+    ProjectBeneficiaryCase:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            project_id:
+              type: integer
+            beneficiary_id:
+              type: integer
+            case_id:
+              type: integer
+
+    CustomFieldCategory:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 47
+            name:
+              type: string
+              example: "The Legal Aid Form"
+
+    Change:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 276
+            name:
+              type: string
+              example: "Sessions Attended"
+            stage:
+              type: string
+              enum: [activity, participation]
+              example: participation
+
+    Indicator:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 577
+            name:
+              type: string
+              example: "Confidence in finding work"
+            indicator_type:
+              type: string
+              enum: [scale, binary, value]
+              example: scale
+
+    IndicatorDetail:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            icon:
+              type: string
+              nullable: true
+            ratio_set_id:
+              type: integer
+              nullable: true
+            detail:
+              type: string
+              nullable: true
+            approved:
+              type: boolean
+            description:
+              type: string
+              nullable: true
+            instruction:
+              type: string
+              nullable: true
+            private:
+              type: boolean
+            stage_id:
+              type: integer
+              nullable: true
+            default_question:
+              type: string
+              nullable: true
+
+    Outcome:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 145
+            title:
+              type: string
+              example: "Improved employability skills"
+            icon:
+              type: string
+              format: uri
+              nullable: true
+            stage:
+              type: string
+              enum: [short_term, medium_term, long_term]
+              example: medium_term
+
+    OutcomeIndicator:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            outcome_id:
+              type: integer
+              example: 145
+            indicator_id:
+              type: integer
+              example: 577
+
+    RatioSet:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 11
+            name:
+              type: string
+              example: "Agreement Scale (1–5)"
+            ratio_set_category_type:
+              type: string
+              enum: [identity, progress]
+              example: progress
+
+    SubRatio:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 54
+            name:
+              type: string
+              example: "Strongly agree"
+            ratio_set_id:
+              type: integer
+              example: 11
+            priority:
+              type: integer
+              example: 5
+            default_criteria:
+              type: string
+              nullable: true
+              example: "Respondent shows strong agreement"
+            default_points:
+              type: number
+              nullable: true
+              example: 5
+
+    RatioSetChoiceable:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            ratio_set_id:
+              type: integer
+            choice:
+              type: string
+              enum: [single, limited_multiple, unlimited_multiple]
+              example: single
+            limit:
+              type: integer
+              nullable: true
+              description: "For limited_multiple — max selections allowed"
+
+    # ── Paginated wrappers ──────────────────────────────────────────────────────
+
+    PaginatedProjects:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Project'
+
+    PaginatedUsers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+
+    PaginatedBeneficiaries:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Beneficiary'
+
+    PaginatedBeneficiaryTypes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/BeneficiaryType'
+
+    PaginatedBeneficiaryCategories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/BeneficiaryCategory'
+
+    PaginatedStories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Story'
+
+    PaginatedStoryCategories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/StoryCategory'
+
+    PaginatedProjectStoryCategories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectStoryCategory'
+
+    SurveyLink:
+      type: object
+      description: A personal survey link (Survey Invitation link) for one Contact
+      properties:
+        id:
+          type: integer
+        send_survey_id:
+          type: integer
+        beneficiary_id:
+          type: integer
+          description: The Contact
+        email:
+          type: string
+          nullable: true
+        survey_token:
+          type: string
+        survey_url:
+          type: string
+          format: uri
+          example: https://app.makerble.com/stories/new/0f8c1d2e3b4a59687a6b5c4d3e2f1a0b
+        link_expiry:
+          type: string
+          enum: [use_once, evergreen]
+        is_anonymised:
+          type: boolean
+        send_survey_wave_id:
+          type: integer
+          nullable: true
+        expired:
+          type: boolean
+          description: True once a use_once link has been answered
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SurveyWave:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: Baseline
+        priority:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginatedSurveyLinks:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SurveyLink'
+
+    PaginatedSurveyWaves:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SurveyWave'
+
+    PaginatedStoryCategoryResponses:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            total_metrics_count_per_page:
+              type: integer
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/StoryCategoryResponse'
+
+    PaginatedCases:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Case'
+
+    PaginatedProjectsBeneficiariesCases:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectBeneficiaryCase'
+
+    PaginatedCustomFieldCategories:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomFieldCategory'
+
+    PaginatedChanges:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Change'
+
+    PaginatedIndicators:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Indicator'
+
+    PaginatedOutcomes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Outcome'
+
+    PaginatedOutcomeIndicators:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/OutcomeIndicator'
+
+    PaginatedRatioSets:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/RatioSet'
+
+    PaginatedSubRatios:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SubRatio'
+
+    PaginatedRatioSetChoiceables:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/RatioSetChoiceable'
+
+    PaginatedMediaItems:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            kind_counts:
+              type: object
+              description: Files of each kind for the same filters, ignoring `kind`
+              properties:
+                all: { type: integer }
+                photo: { type: integer }
+                video: { type: integer }
+                audio: { type: integer }
+                document: { type: integer }
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/MediaItem'
+
+    MediaItem:
+      type: object
+      description: One file in the Media Gallery. It points at the file on its Story or Contact; it is not a copy.
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [photo, video, audio, document] }
+        file_name: { type: string }
+        content_type: { type: string, nullable: true }
+        file_size: { type: integer, nullable: true, description: Bytes }
+        caption: { type: string, nullable: true }
+        source_type: { type: string, enum: [story, contact], description: "`contact` means a file on a Contact's bio" }
+        source_id: { type: integer, description: Story ID or Contact (Beneficiary) ID }
+        source_title: { type: string, nullable: true, description: Story title or Contact name }
+        project_id: { type: integer, nullable: true, description: The Story's Project; null for Contact bio files }
+        project_name: { type: string, nullable: true }
+        uploaded_by_id: { type: integer, nullable: true }
+        uploaded_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        thumbnail_url: { type: string, nullable: true, description: Photos only }
+
+    MediaItemDetail:
+      allOf:
+        - $ref: '#/components/schemas/MediaItem'
+        - type: object
+          properties:
+            field_name:
+              type: string
+              description: "Where the file sits: `Profile picture`, `<field> (file field)`, `Story attachment` or `Contact attachment`"
+            download_url:
+              type: string
+              nullable: true
+              description: Signed link that downloads the file. Null if the file has no stored address.
+            download_url_expires_in:
+              type: integer
+              description: Seconds until `download_url` stops working
+
+    FormDefinitionField:
+      type: object
+      description: One entry in `contact_form.fields` or a survey's `fields` — the same shape regardless of which form it came from.
+      properties:
+        id:
+          type: integer
+          description: The CurrentField id — key submitted answers back to the server using this, not the field name
+          example: 500
+        name:
+          type: string
+          example: "Full Name"
+        field_type:
+          type: string
+          nullable: true
+          enum: [string, text, boolean, integer, float, date, time, datetime, list, media, file, telephone, email_address, location, extended_table, section]
+          description: "null for a genuinely unrecognised field"
+        field_kind:
+          type: string
+          enum: [in_built_field, custom_field, ratio_set, indicator, change, outcome]
+        order:
+          type: integer
+        mandatory:
+          type: boolean
+        options:
+          type: array
+          description: "{id, name} Sub Ratio options, for ratio_set/indicator fields — always submit the id, never the name"
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+        choice:
+          type: string
+          nullable: true
+          enum: [single_choice, limited_choice, unlimited_choice]
+          description: Only present for ratio_set/indicator fields
+        choice_max:
+          type: integer
+          nullable: true
+          description: Only present when choice is limited_choice
+        indicator_type:
+          type: string
+          nullable: true
+          enum: [scale, binary, value]
+          description: "Only present for field_kind: indicator"
+        validation:
+          type: object
+          nullable: true
+          description: Only present for CustomFields with validation configured
+          properties:
+            add_validation:
+              type: boolean
+            min_length:
+              type: integer
+            max_length:
+              type: integer
+            character_type:
+              type: string
+            earliest_date:
+              type: string
+            latest_date:
+              type: string
+            default_country:
+              type: string
+        columns:
+          type: array
+          items:
+            type: string
+          description: "Column names — only present for field_type: extended_table"
+        description:
+          type: string
+          description: The field's Question Explanation — only present when set
+
+    FormDefinitionSkipLogicRule:
+      type: object
+      properties:
+        source_field_id:
+          type: integer
+          description: The field whose answer is the trigger
+        destination_field_id:
+          type: integer
+          description: The field the rule affects
+        kind:
+          type: string
+          enum: [hide_unless, jump_to]
+          description: Contact forms only ever produce hide_unless; surveys can produce either
+        sub_ratio_ids:
+          type: array
+          items:
+            type: integer
+
+    FormDefinitionFormSection:
+      type: object
+      description: Shared shape for contact_form and each entry in surveys
+      properties:
+        type:
+          type: string
+          example: "BeneficiaryCategory"
+        id:
+          type: integer
+        name:
+          type: string
+        wave:
+          nullable: true
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormDefinitionField'
+        skip_logic:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormDefinitionSkipLogicRule'
+        beneficiary_role:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        beneficiary_type:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+
+    FormDefinition:
+      type: object
+      properties:
+        definition_version:
+          type: string
+          description: ISO 8601 timestamp identifying this snapshot of the Signup Page — echo back unchanged in the submission sync request
+          example: "2026-08-28T12:00:00.000+01:00"
+        signup_page:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 123
+            name:
+              type: string
+              example: "Bambanani Signup"
+            description:
+              type: string
+              nullable: true
+            link_type:
+              type: string
+              enum: [structured, personalised]
+            status:
+              type: string
+              example: "activated"
+            thank_you_message:
+              type: string
+            allow_referrer:
+              type: boolean
+            project:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+            beneficiary_state:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+            contact_form:
+              $ref: '#/components/schemas/FormDefinitionFormSection'
+            surveys:
+              type: array
+              items:
+                $ref: '#/components/schemas/FormDefinitionFormSection'
+            settings:
+              type: object
+              properties:
+                redirect_after_signup:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    url:
+                      type: string
+                      nullable: true
+                redirect_after_deactivate:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    url:
+                      type: string
+                      nullable: true
+                delete_abandoned_beneficiary:
+                  type: boolean
+                hide_add_another_button_on_thank_you_page:
+                  type: boolean
+                display_project_image:
+                  type: boolean
+                see_summary:
+                  type: boolean
+                event_guest_person_names:
+                  type: boolean
+            charity:
+              type: object
+              properties:
+                name:
+                  type: string
+                logo_url:
+                  type: string
+                  nullable: true
+                hide_makerble_cobranding:
+                  type: boolean
+        branding:
+          type: object
+          nullable: true
+          description: The charity's full ReferralLookAndFeel attributes, or null if none configured
+          additionalProperties: true
+        related_people:
+          type: array
+          description: Only present for a structured link — one entry per possible related person, each with a referral_link_relationship_detail_id
+          items:
+            type: object
+            additionalProperties: true
+        roles:
+          type: array
+          description: Only present for a personalised link — one entry per role, each with a referral_link_beneficiary_role_detail_id
+          items:
+            type: object
+            additionalProperties: true
+
+    SubmissionCredential:
+      type: object
+      description: Only present in the anonymous offline-device Form Definition response
+      properties:
+        signup_page_id:
+          type: integer
+          example: 123
+        token:
+          type: string
+          description: Bearer token for POST /referral_submissions
+        scope:
+          type: string
+          example: "referral_submission"
+        submit_url:
+          type: string
+          example: "https://makerble.com/api/v2/referral_submissions"
+
+    ReferralSubmissionRequest:
+      type: object
+      required: [idempotency_key, definition_version]
+      properties:
+        idempotency_key:
+          type: string
+          format: uuid
+          description: A fresh UUID v4, generated once at the moment a submission is completed (not per sync attempt). Retrying the same key returns the original result rather than creating duplicates.
+        definition_version:
+          type: string
+          description: The definition_version the offline device's cached Form Definition was fetched with
+        primary:
+          type: object
+          description: Present for a structured link (one primary person plus zero or more related_people)
+          properties:
+            contact_form_answers:
+              type: object
+              additionalProperties: true
+              description: Keyed by field id from the Form Definition
+            survey_answers:
+              type: array
+              items:
+                type: object
+                properties:
+                  story_category_id:
+                    type: integer
+                  answers:
+                    type: object
+                    additionalProperties: true
+        related_people:
+          type: array
+          description: Present for a structured link
+          items:
+            type: object
+            properties:
+              referral_link_relationship_detail_id:
+                type: integer
+              contact_form_answers:
+                type: object
+                additionalProperties: true
+              survey_answers:
+                type: array
+                items:
+                  type: object
+        roles:
+          type: array
+          description: Present for a personalised link instead of primary/related_people — one entry per person, no "primary" concept
+          items:
+            type: object
+            properties:
+              referral_link_beneficiary_role_detail_id:
+                type: integer
+              contact_form_answers:
+                type: object
+                additionalProperties: true
+              survey_answers:
+                type: array
+                items:
+                  type: object
+      example:
+        idempotency_key: "8f14e45f-ceea-467e-8a4c-b1a2c9c6f2a3"
+        definition_version: "2026-08-28T12:00:00.000+01:00"
+        primary:
+          contact_form_answers: { "500": "Jane Doe", "501": "44 7911 123456" }
+          survey_answers:
+            - story_category_id: 200
+              answers: { "600": "Great progress this month" }
+        related_people:
+          - referral_link_relationship_detail_id: 12
+            contact_form_answers: { "502": "Baby Doe" }
+            survey_answers: []
+
+    ReferralSubmissionResponse:
+      type: object
+      properties:
+        idempotent_replay:
+          type: boolean
+          description: true if this idempotency_key had already been processed — the response reflects the original processing result, not a new one
+        definition_version_mismatch:
+          type: boolean
+          description: true if the submitted definition_version doesn't match the Signup Page's current one. Non-blocking — surfaced but doesn't prevent processing
+        created_beneficiary_ids:
+          type: array
+          items:
+            type: integer
+        created_story_ids:
+          type: array
+          items:
+            type: integer
+      example:
+        idempotent_replay: false
+        definition_version_mismatch: false
+        created_beneficiary_ids: [4501, 4502]
+        created_story_ids: [8801]
+
+    CohortTracker:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 17
+        name:
+          type: string
+          example: "Children attending 75%+"
+        description:
+          type: string
+          nullable: true
+        charity_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        membership:
+          type: string
+          enum: [ever_enrolled, currently_enrolled]
+          description: Membership of the Project or Album the tracker is placed on
+        result_type:
+          type: string
+          enum: [number]
+        criteria:
+          type: object
+          description: Contact Filter criteria, in the shape a Saved Filter uses
+          example:
+            attendance_rate: { change_id: "412", from: "75", to: "100" }
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CohortTrackerDetail:
+      allOf:
+        - $ref: '#/components/schemas/CohortTracker'
+        - type: object
+          properties:
+            usage:
+              type: object
+              properties:
+                projects:
+                  type: integer
+                albums:
+                  type: integer
+                templates:
+                  type: integer
+            names_projects_or_albums:
+              type: boolean
+
+    CohortTrackerRequest:
+      type: object
+      properties:
+        cohort_tracker:
+          type: object
+          properties:
+            charity_id:
+              type: integer
+              description: Required when creating
+            name:
+              type: string
+            description:
+              type: string
+            membership:
+              type: string
+              enum: [ever_enrolled, currently_enrolled]
+            criteria:
+              type: object
+
+    CohortTrackerDeadline:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-12-31"
+        number:
+          type: integer
+          example: 40
+
+    CohortTrackerTargetsRequest:
+      type: object
+      description: Send target, deadlines or both. deadlines replaces the tracker's deadline targets.
+      properties:
+        target:
+          type: integer
+          minimum: 0
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    CohortTrackerPlacement:
+      type: object
+      properties:
+        cohort_tracker_id:
+          type: integer
+        project_id:
+          type: integer
+        column:
+          type: string
+          enum: [activities, engagement, potential, behaviour, growth]
+        target:
+          type: integer
+          example: 40
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    CohortTrackerAlbumTargets:
+      type: object
+      properties:
+        cohort_tracker_id:
+          type: integer
+        album_id:
+          type: integer
+        album_target_type:
+          type: string
+          enum: [manual_target, automatic_target]
+        target:
+          type: integer
+          example: 120
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    PaginatedCohortTrackers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CohortTracker'
+
+    WebhookEvent:
+      type: string
+      enum: [contact.created, contact.updated, story.created, story.updated, project.created, project.updated, import.completed]
+
+    WebhookEndpointRequest:
+      type: object
+      required: [webhook_endpoint]
+      properties:
+        webhook_endpoint:
+          type: object
+          properties:
+            charity_id:
+              type: integer
+              description: The Organisation (Charity) ID. Required when creating
+            url:
+              type: string
+              format: uri
+              description: HTTPS URL of the receiver. Required when creating
+            description:
+              type: string
+            event_types:
+              type: array
+              items:
+                $ref: '#/components/schemas/WebhookEvent'
+              description: Defaults to every event
+            active:
+              type: boolean
+              description: false pauses the endpoint; true resumes it
+
+    WebhookEndpoint:
+      type: object
+      properties:
+        id:
+          type: integer
+        charity_id:
+          type: integer
+        url:
+          type: string
+          example: "https://crm.example.org/makerble"
+        description:
+          type: string
+          nullable: true
+        event_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookEvent'
+        active:
+          type: boolean
+          description: false while paused
+        disabled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when Makerble switched the endpoint off after repeated failure
+        failure_count:
+          type: integer
+          description: Deliveries in a row that failed every attempt
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_by_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WebhookEndpointWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/WebhookEndpoint'
+        - type: object
+          properties:
+            secret:
+              type: string
+              example: "whsec_3f1c..."
+              description: The signing secret. Returned only when created or rotated
+
+    WebhookDelivery:
+      type: object
+      properties:
+        id:
+          type: integer
+        event_id:
+          type: string
+          example: "evt_6f0c2a4e-8d1b-4b7e-9a53-2f1d6c3e9b10"
+          description: The `id` the receiver saw
+        event:
+          type: string
+          example: contact.updated
+        resource_type:
+          type: string
+          nullable: true
+          description: Beneficiary (Contact), Story, Project, RecordImporter or ImportPlan
+        resource_id:
+          type: integer
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, succeeded, failed]
+        attempts:
+          type: integer
+        response_code:
+          type: integer
+          nullable: true
+          description: The receiver's HTTP status on the last attempt; null after a timeout or connection error
+        next_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginatedWebhookEndpoints:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/WebhookEndpoint'
+
+    PaginatedWebhookDeliveries:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/WebhookDelivery'
