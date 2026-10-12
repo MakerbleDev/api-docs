@@ -144,6 +144,8 @@ tags:
       Contacts to reach.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
+  - name: Health
+    description: Whether the service is up, and which build of it is running
 
 paths:
 
@@ -2726,6 +2728,60 @@ paths:
                 error: forbidden
         "404":
           $ref: '#/components/responses/NotFound'
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Check the service is up and which build is running
+      operationId: getHealth
+      description: |
+        Reports whether the service and its database are answering, and which build
+        is running. No sign-in is needed: send no `X-User-Email` / `X-User-Token`.
+
+        Use `commit` to tell when a new release is live: after a deploy finishes it
+        changes to the new build's commit, and `uptime_seconds` starts again from a
+        small number. `commit` and `built_at` are `null` when the build didn't record
+        them. Always answers `200` while the service is running; check `database`
+        to see whether the database is reachable.
+      security: []
+      responses:
+        "200":
+          description: The service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database, commit, built_at, environment]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                    description: Always `ok` when the service answers
+                  database:
+                    type: boolean
+                    description: Whether the database answered a trivial query
+                  uptime_seconds:
+                    type: integer
+                    description: Seconds since the running app started
+                  commit:
+                    type: string
+                    nullable: true
+                    description: Full git commit SHA the running build was made from
+                  built_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: When the running build was made, ISO 8601 in UTC
+                  environment:
+                    type: string
+                    description: Which environment answered, e.g. `production`, `pre-production`, `qa`, `preview`
+              example:
+                status: ok
+                database: true
+                uptime_seconds: 312
+                commit: "0123456789abcdef0123456789abcdef01234567"
+                built_at: "2026-10-12T13:05:09Z"
+                environment: production
 
 components:
 
