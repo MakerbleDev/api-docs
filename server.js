@@ -896,6 +896,7 @@ function buildDocsPage() {
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
+        <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Workflow Trackers</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Events</div>
@@ -1641,6 +1642,101 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
           ])}
           ${endpointCard("DELETE", "/cohort_trackers/{id}/projects/{project_id}", "Remove a Cohort Tracker from a Project", true, [], [
+            { code: "204", cls: "response-2xx", desc: "Removed" },
+            { code: "404", cls: "response-4xx", desc: "Not on the Project" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Workflow Trackers -->
+      <section class="section" id="workflow-trackers">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Workflow Trackers</h2>
+        <div class="section-desc">
+          <p>A Workflow Tracker is a metric that counts records Makerble's own features create, rather than Contacts tagged in updates. Its <code>source</code> says what it counts: <code>signpostings</code> (Signpostings made from the Project, counted once whether they name the Organisation signposted to, the Person, or both; signpostings saved without a Project aren't counted anywhere) or <code>internal_referrals</code> (Contacts in the Project who are added to another of the Organisation's Projects, dated by the Status in Projects history). <code>count_mode</code> is <code>items</code> (each signposting or referral; adds up across periods) or <code>contacts</code> (each Contact once; a snapshot). It is placed in an Impact Scorecard column like other metrics.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Check the count with <code>POST /workflow_trackers/preview</code>, create the tracker, then place it on a Project with <code>POST /workflow_trackers/{id}/projects/{project_id}</code>. Albums pick it up from their Projects.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/workflow_trackers", "List an Organisation's Workflow Trackers", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Workflow Trackers" },
+            { code: "403", cls: "response-4xx", desc: "No editor or reporter role in the Organisation" }
+          ])}
+          ${endpointCard("GET", "/workflow_trackers/{id}", "Get a Workflow Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Workflow Tracker ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The tracker, with <code>usage</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
+          ])}
+          ${endpointCard("POST", "/workflow_trackers/preview", "Preview a Workflow Tracker", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>results: {period, year_to_date, all_time}</code> on the Project, and the latest <code>records</code> counted" },
+            { code: "404", cls: "response-4xx", desc: "The Project isn't the Organisation's" },
+            { code: "422", cls: "response-4xx", desc: "Unknown source or count_mode, or bad settings" }
+          ], "Body: <code>charity_id</code>, <code>project_id</code>, <code>workflow_tracker: {source, count_mode, settings}</code>. The Period ends at the Project's next deadline, or today when it has none ahead.")}
+          ${endpointCard("POST", "/workflow_trackers", "Create a Workflow Tracker", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Workflow Tracker created" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Body: <code>workflow_tracker: {charity_id, name, description, source, count_mode, settings}</code>. For <code>internal_referrals</code>, <code>settings</code> choose which Projects count as a referral: <code>{destinations: \"any\"}</code>, <code>{destinations: \"only\", project_ids: [...]}</code> or <code>{destinations: \"except\", project_ids: [...]}</code> (the default, with none listed).")}
+          ${endpointCard("PATCH", "/workflow_trackers/{id}", "Update a Workflow Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Workflow Tracker ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Workflow Tracker updated" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation editor or the reporter who created it" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Only the fields sent change. Changes apply everywhere the tracker is used.")}
+          ${endpointCard("DELETE", "/workflow_trackers/{id}", "Delete a Workflow Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Workflow Tracker ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Deleted" },
+            { code: "422", cls: "response-4xx", desc: "Still used on a Project, Album or Scorecard Template" }
+          ])}
+          ${endpointCard("POST", "/workflow_trackers/{id}/projects/{project_id}", "Add a Workflow Tracker to a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Workflow Tracker ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "column", type: "string", required: true, desc: "<code>activities</code>, <code>engagement</code>, <code>potential</code>, <code>behaviour</code> or <code>growth</code>" },
+            { name: "target", type: "integer", required: false, desc: "One-off target" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Placed: <code>{workflow_tracker_id, project_id, column, target}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" },
+            { code: "422", cls: "response-4xx", desc: "Unknown column, or already on the Project" }
+          ])}
+          ${endpointCard("GET", "/workflow_trackers/{id}/projects/{project_id}", "Get a Workflow Tracker's targets on a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Workflow Tracker ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{workflow_tracker_id, project_id, column, target, deadlines: [{date, number}]}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" }
+          ])}
+          ${endpointCard("PATCH", "/workflow_trackers/{id}/projects/{project_id}", "Set a Workflow Tracker's targets on a Project", true, [
+            { name: "target", type: "integer", required: false, desc: "One-off target" },
+            { name: "deadlines", type: "array", required: false, desc: "<code>[{date: \"YYYY-MM-DD\", number}]</code>, replacing this tracker's deadline targets; <code>[]</code> clears them. A tracker counting items adds them up across deadlines; one counting each Contact once uses each on its own." }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Targets saved" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" },
+            { code: "422", cls: "response-4xx", desc: "Bad deadlines, or neither field sent" }
+          ])}
+          ${endpointCard("GET", "/workflow_trackers/{id}/albums/{bundle_id}", "Get a Workflow Tracker's targets on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{workflow_tracker_id, album_id, album_target_type, target, deadlines}</code>" },
+            { code: "404", cls: "response-4xx", desc: "The Album has no Project using the tracker" }
+          ])}
+          ${endpointCard("PATCH", "/workflow_trackers/{id}/albums/{bundle_id}", "Set a Workflow Tracker's targets on an Album", true, [
+            { name: "target", type: "integer", required: false, desc: "One-off target for the Album; never the sum of its Projects'" },
+            { name: "deadlines", type: "array", required: false, desc: "<code>[{date, number}]</code>, saved as the Album's manual targets" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Targets saved" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
+          ])}
+          ${endpointCard("DELETE", "/workflow_trackers/{id}/projects/{project_id}", "Remove a Workflow Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
           ])}
