@@ -1640,6 +1640,29 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Targets saved" },
             { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
           ])}
+          ${endpointCard("GET", "/cohort_trackers/{id}/projects/{project_id}/results", "Get a Cohort Tracker's result on a Project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default). Each is worked out afresh: Year to Date is not the sum of the periods" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on (default: the next Target Deadline, or today)" },
+            { name: "page", type: "integer", required: false, desc: "Page of Contacts" },
+            { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{count, eligible_count, target, starts_on, ends_on, page, page_size, page_count, total_count, data: [{id, name, qualifying_value}]}</code>. A Contact you can't read is <code>{restricted: true}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" },
+            { code: "404", cls: "response-4xx", desc: "The tracker isn't on the Project" },
+            { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
+          ])}
+          ${endpointCard("GET", "/cohort_trackers/{id}/albums/{bundle_id}/results", "Get a Cohort Tracker's result on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on" },
+            { name: "page", type: "integer", required: false, desc: "Page of Contacts" },
+            { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "As for a Project. Each Contact counts once across the Album's Projects, so the result is never the sum of the Projects'" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Album" },
+            { code: "404", cls: "response-4xx", desc: "No Project in the Album uses the tracker" }
+          ])}
           ${endpointCard("DELETE", "/cohort_trackers/{id}/projects/{project_id}", "Remove a Cohort Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
