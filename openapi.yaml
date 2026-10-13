@@ -144,6 +144,12 @@ tags:
       set of Contact Filter criteria, e.g. "Children attending 75%+". Placed in an
       Impact Scorecard column like other metrics, and targeted with a number of
       Contacts to reach.
+  - name: Filtered Metrics
+    description: |
+      Filtered versions of standard metrics: a Change (Activity or Engagement tracker) or an
+      Indicator (Choice, Achievement or Numerical tracker) counted again for only some responses
+      and Contacts, e.g. "Session attendances — Female, under 21". Each has its own row, name,
+      column and targets on a Project's or Album's Results Canvas.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
 
@@ -2643,6 +2649,326 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /projects/{project_id}/filtered_metrics:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricProjectId'
+    get:
+      tags: [Filtered Metrics]
+      summary: List a Project's filtered versions of metrics
+      description: |
+        The filtered versions on a Project's Results Canvas. Visible to the Project's or its
+        Organisation's managers (editors), changemakers (reporters) and analysts (observers): the
+        same people who can see the Results Canvas.
+      operationId: listProjectFilteredMetrics
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of filtered versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFilteredMetrics'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Filtered Metrics]
+      summary: Add a filtered version of a metric to a Project
+      description: |
+        Edit Project Metrics > Add filtered version. The metric being filtered must already be on the
+        Project: a Change in one of its columns, or an Indicator under one of its Outcomes. A Change's
+        filtered version goes directly after it in its column (or at the end of `column` if given); an
+        Indicator's sits under the same Outcome, directly after it. Albums show every filtered version on
+        their Projects.
+
+        `response_criteria` filters the responses (stories) the metric was recorded in, as a Progress
+        Board's "Filter responses/stories by" does: `story_category_ids` (Surveys), `wave_ids`
+        (Intervals), `date_range` ("dd/mm/yyyy - dd/mm/yyyy", Date Happened, either end optional),
+        `label_ids` and `author_ids`. Project and Album keys are refused: the responses always come from
+        the Project or Album it is on.
+
+        `contact_criteria` filters the Contacts tagged in them, in the Contact Filters format (see
+        `POST /cohort_trackers/preview`). Age (`age_from` / `age_to`) is worked out at the date of each
+        response; other Bio fields use the Contact's current value; the other sections are judged at the
+        end of each reporting period. Either may be sent as a JSON string. Requires the right to edit the
+        Project's metrics.
+      operationId: createFilteredMetric
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilteredMetricRequest'
+            example:
+              filtered_metric:
+                parent_type: "Change"
+                parent_id: 4021
+                display_name: "Session attendances — Female, under 21"
+                response_criteria:
+                  wave_ids: ["12"]
+                contact_criteria:
+                  sub_ratio_ids: ["881"]
+                  age_to: {year: "20", month: "11", day: "30"}
+      responses:
+        "201":
+          description: Filtered version added to the Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit the Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects/{project_id}/filtered_metrics/preview:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricProjectId'
+    post:
+      tags: [Filtered Metrics]
+      summary: Preview a filtered version
+      description: |
+        The Add filtered version dialog's "N of M session attendances in this project currently match",
+        before it is added: `count` is how many of the metric's tagged responses on the Project pass
+        the filters to date (a Numerical tracker's total), `total` how many there are with no filters.
+        Takes the same body as adding one; `display_name` is optional.
+      operationId: previewFilteredMetric
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilteredMetricRequest'
+            example:
+              filtered_metric:
+                parent_type: "Change"
+                parent_id: 4021
+                contact_criteria:
+                  sub_ratio_ids: ["881"]
+      responses:
+        "200":
+          description: The count and the unfiltered total
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: number
+                  total:
+                    type: number
+              example:
+                count: 262
+                total: 1540
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit the Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects/{project_id}/filtered_metrics/{id}:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricProjectId'
+      - $ref: '#/components/parameters/FilteredMetricId'
+    get:
+      tags: [Filtered Metrics]
+      summary: Get a filtered version on a Project
+      operationId: getProjectFilteredMetric
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The filtered version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Filtered Metrics]
+      summary: Update a filtered version
+      description: |
+        Renames it or replaces its filters: `response_criteria` and `contact_criteria`, when sent,
+        replace the stored ones (`{}` clears them). The metric it filters and its placement can't be
+        changed. The change applies wherever it is used. Requires the right to edit the Project's metrics.
+      operationId: updateFilteredMetric
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilteredMetricRequest'
+            example:
+              filtered_metric:
+                display_name: "Session attendances — Female"
+                contact_criteria:
+                  sub_ratio_ids: ["881"]
+      responses:
+        "200":
+          description: Filtered version updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit the Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Filtered Metrics]
+      summary: Remove a filtered version from a Project
+      description: |
+        Removes it from the Project and its Albums. It is deleted once it is on no other Project or
+        Scorecard Template. Requires the right to edit the Project's metrics.
+      operationId: removeFilteredMetric
+      security: [{tokenAuth: []}]
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit the Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects/{project_id}/filtered_metrics/{id}/results:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricProjectId'
+      - $ref: '#/components/parameters/FilteredMetricId'
+    get:
+      tags: [Filtered Metrics]
+      summary: Get a filtered version's result on a Project
+      description: |
+        The filtered result the Results Canvas shows, for one timeframe ending at `as_of`. Counts only
+        the responses the user may read, as the canvas does.
+      operationId: getProjectFilteredMetricResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/FilteredMetricTimeframe'
+        - $ref: '#/components/parameters/FilteredMetricAsOf'
+      responses:
+        "200":
+          description: The result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetricResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /albums/{bundle_id}/filtered_metrics:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricBundleId'
+    get:
+      tags: [Filtered Metrics]
+      summary: List an Album's filtered versions of metrics
+      description: Every filtered version on any of the Album's Projects. Visible to anyone who can see the Album.
+      operationId: listAlbumFilteredMetrics
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of filtered versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFilteredMetrics'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /albums/{bundle_id}/filtered_metrics/{id}:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricBundleId'
+      - $ref: '#/components/parameters/FilteredMetricId'
+    get:
+      tags: [Filtered Metrics]
+      summary: Get a filtered version on an Album
+      operationId: getAlbumFilteredMetric
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The filtered version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /albums/{bundle_id}/filtered_metrics/{id}/results:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricBundleId'
+      - $ref: '#/components/parameters/FilteredMetricId'
+    get:
+      tags: [Filtered Metrics]
+      summary: Get a filtered version's result on an Album
+      description: The filtered result for the Album's open Projects together, as its Results Canvas shows it.
+      operationId: getAlbumFilteredMetricResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/FilteredMetricTimeframe'
+        - $ref: '#/components/parameters/FilteredMetricAsOf'
+      responses:
+        "200":
+          description: The result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetricResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /media_items:
     get:
       tags: [Media Gallery]
@@ -2878,6 +3204,44 @@ components:
         type: string
         example: "2023-07-30 08:48:55.781228"
       description: ISO 8601 datetime — returns only records updated after this value
+    FilteredMetricProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Project ID
+    FilteredMetricBundleId:
+      name: bundle_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Album (Bundle) ID
+    FilteredMetricId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The filtered version's ID
+    FilteredMetricTimeframe:
+      name: timeframe
+      in: query
+      schema:
+        type: string
+        enum: [period, year_to_date, all_time]
+        default: all_time
+      description: |
+        `period`: from the day after the previous Target Deadline; `year_to_date`: from the Year
+        Start; `all_time`: everything. Each ends at `as_of`.
+    FilteredMetricAsOf:
+      name: as_of
+      in: query
+      schema:
+        type: string
+        format: date
+      description: The date the timeframe ends (YYYY-MM-DD). Defaults to the next Target Deadline, or today.
     IncludePublicLibrary:
       name: include_public_library
       in: query
@@ -4882,3 +5246,94 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/CohortTracker'
+    FilteredMetric:
+      type: object
+      description: A filtered version of a Change or Indicator
+      properties:
+        id:
+          type: integer
+        display_name:
+          type: string
+          example: "Session attendances — Female, under 21"
+        parent_type:
+          type: string
+          enum: [Change, Indicator]
+          description: Change (Activity or Engagement tracker) or Indicator (Choice, Achievement or Numerical tracker)
+        parent_id:
+          type: integer
+        parent_name:
+          type: string
+        outcome_id:
+          type: integer
+          nullable: true
+          description: The Outcome an Indicator's filtered version sits under; null for a Change's
+        response_criteria:
+          type: object
+          description: Response Filters (Progress Board "Filter responses/stories by" keys)
+        contact_criteria:
+          type: object
+          description: Contact Filters, in the shape a Saved Filter uses
+        charity_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    FilteredMetricRequest:
+      type: object
+      properties:
+        filtered_metric:
+          type: object
+          properties:
+            parent_type:
+              type: string
+              enum: [Change, Indicator]
+              description: Creating only
+            parent_id:
+              type: integer
+              description: Creating only
+            display_name:
+              type: string
+            column:
+              type: string
+              enum: [activities, engagement, potential, behaviour, growth]
+              description: Creating a Change's filtered version only; defaults to the parent's column
+            response_criteria:
+              type: object
+            contact_criteria:
+              type: object
+    FilteredMetricResult:
+      type: object
+      properties:
+        filtered_metric_id:
+          type: integer
+        timeframe:
+          type: string
+          enum: [period, year_to_date, all_time]
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+        number:
+          type: number
+          description: Matching attendances (or answers); a Numerical tracker's total
+        unit:
+          type: string
+          example: count
+    PaginatedFilteredMetrics:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FilteredMetric'

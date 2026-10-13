@@ -896,6 +896,7 @@ function buildDocsPage() {
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
+        <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Filtered Metrics</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Events</div>
@@ -1643,6 +1644,88 @@ function buildDocsPage() {
           ${endpointCard("DELETE", "/cohort_trackers/{id}/projects/{project_id}", "Remove a Cohort Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Filtered Metrics -->
+      <section class="section" id="filtered-metrics">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Filtered Metrics</h2>
+        <div class="section-desc">
+          <p>A filtered version counts a standard metric again for only some responses and Contacts, e.g. "Session attendances — Female, under 21". The metric is a Change (Activity or Engagement tracker) or an Indicator (Choice, Achievement or Numerical tracker) already on the Project. It counts attendances or answers, not Contacts: to count Contacts, use a Cohort Tracker. It has its own row, name, column and targets on the Results Canvas, and Albums show every filtered version on their Projects.</p>
+          <p><code>response_criteria</code> filters the responses, as a Progress Board's "Filter responses/stories by" does: <code>story_category_ids</code> (Surveys), <code>wave_ids</code> (Intervals), <code>date_range</code> (Date Happened, <code>"dd/mm/yyyy - dd/mm/yyyy"</code>), <code>label_ids</code> and <code>author_ids</code>. <code>contact_criteria</code> filters the Contacts tagged in them, in the Contact Filters format. Age is worked out at the date of each response; other Bio fields use the Contact's current value; the other sections are judged at the end of each reporting period.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Check the filters with <code>POST /projects/{project_id}/filtered_metrics/preview</code>, then add the filtered version with <code>POST /projects/{project_id}/filtered_metrics</code>. Read its figure with <code>GET .../filtered_metrics/{id}/results</code>.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/projects/{project_id}/filtered_metrics", "List a Project's filtered versions", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of filtered versions" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" }
+          ])}
+          ${endpointCard("POST", "/projects/{project_id}/filtered_metrics/preview", "Preview a filtered version", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{count, total}</code>: how many of the metric's tagged responses pass the filters, and how many there are" },
+            { code: "422", cls: "response-4xx", desc: "The metric isn't on the Project, or a filter can't be applied" }
+          ], "Body: <code>filtered_metric: {parent_type, parent_id, response_criteria, contact_criteria}</code>.")}
+          ${endpointCard("POST", "/projects/{project_id}/filtered_metrics", "Add a filtered version to a Project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Added" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" },
+            { code: "422", cls: "response-4xx", desc: "The metric isn't on the Project, or validation failed" }
+          ], "Body: <code>filtered_metric: {parent_type: \"Change\"|\"Indicator\", parent_id, display_name, column, response_criteria, contact_criteria}</code>. A Change's version goes after it in its column unless <code>column</code> is given; an Indicator's sits under its Outcome.")}
+          ${endpointCard("GET", "/projects/{project_id}/filtered_metrics/{id}", "Get a filtered version", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Filtered version ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The filtered version" },
+            { code: "404", cls: "response-4xx", desc: "Not on the Project" }
+          ])}
+          ${endpointCard("PATCH", "/projects/{project_id}/filtered_metrics/{id}", "Update a filtered version", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Filtered version ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Updated" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Body: <code>filtered_metric: {display_name, response_criteria, contact_criteria}</code>. Criteria sent replace the stored ones.")}
+          ${endpointCard("DELETE", "/projects/{project_id}/filtered_metrics/{id}", "Remove a filtered version from a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Filtered version ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Removed; deleted once it is on no other Project or Scorecard Template" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" }
+          ])}
+          ${endpointCard("GET", "/projects/{project_id}/filtered_metrics/{id}/results", "Get a filtered version's result on a Project", true, [
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "string", required: false, desc: "YYYY-MM-DD the timeframe ends; defaults to the next Target Deadline, or today" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{filtered_metric_id, timeframe, start_date, end_date, number, unit}</code>" },
+            { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
+          ])}
+          ${endpointCard("GET", "/albums/{bundle_id}/filtered_metrics", "List an Album's filtered versions", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list: every filtered version on the Album's Projects" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Album" }
+          ])}
+          ${endpointCard("GET", "/albums/{bundle_id}/filtered_metrics/{id}", "Get a filtered version on an Album", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Filtered version ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The filtered version" },
+            { code: "404", cls: "response-4xx", desc: "Not on any of the Album's Projects" }
+          ])}
+          ${endpointCard("GET", "/albums/{bundle_id}/filtered_metrics/{id}/results", "Get a filtered version's result on an Album", true, [
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "string", required: false, desc: "YYYY-MM-DD" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The result across the Album's open Projects" }
           ])}
         </div>
       </section>
