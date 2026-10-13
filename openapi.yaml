@@ -2649,6 +2649,63 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /cohort_trackers/{id}/projects/{project_id}/results:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker's result on a Project
+      description: |
+        A Cohort Tracker's result on a Project's Results Canvas, with the Contacts behind it. Only data saved
+        in the Project counts. The tracker must be on the Project.
+
+        The result is the number of distinct Contacts who meet the tracker's membership setting and all
+        its criteria, counting only stories, events and survey responses saved in scope and dated in the
+        window. Results are worked out afresh for each window, so a Year to Date result is not the sum
+        of the period results. `target` is the tracker's deadline target on the window's last day, or
+        else its one-off target; targets are never summed across deadlines.
+
+        `data` lists the Contacts in the cohort alphabetically, with `qualifying_value` (named by
+        `qualifying_value_label`, e.g. an attendance rate as a percentage) where the criteria have one.
+        A Contact the user may not read is listed as `{restricted: true}` with no details, so the
+        list always adds up to `count`. Requires the same rights as viewing that Results Canvas.
+      operationId: getCohortTrackerProjectResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the Contacts behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerResult'
+              example:
+                cohort_tracker_id: 12
+                name: Children attending 75%+
+                project_id: 34
+                timeframe: year_to_date
+                starts_on: "2026-04-01"
+                ends_on: "2026-06-30"
+                count: 42
+                eligible_count: 60
+                target: { number: 50, date: "2026-06-30" }
+                qualifying_value_label: Attendance rate
+                page: 1
+                page_size: 2
+                page_count: 21
+                total_count: 42
+                data:
+                  - { restricted: false, id: 101, name: Aisha Dlamini, qualifying_value: 82.5 }
+                  - { restricted: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Results Canvas
+
   /projects/{project_id}/filtered_metrics:
     parameters:
       - $ref: '#/components/parameters/FilteredMetricProjectId'
@@ -2781,6 +2838,64 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/{id}/albums/{bundle_id}/results:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker's result on an Album
+      description: |
+        A Cohort Tracker's result on an Album's Results Canvas, with the Contacts behind it. The Album's
+        Projects are counted together and each Contact once, so the result is never the sum of the
+        Projects' results. The tracker must be on one of the Album's Projects.
+
+        The result is the number of distinct Contacts who meet the tracker's membership setting and all
+        its criteria, counting only stories, events and survey responses saved in scope and dated in the
+        window. Results are worked out afresh for each window, so a Year to Date result is not the sum
+        of the period results. `target` is the tracker's deadline target on the window's last day, or
+        else its one-off target; targets are never summed across deadlines.
+
+        `data` lists the Contacts in the cohort alphabetically, with `qualifying_value` (named by
+        `qualifying_value_label`, e.g. an attendance rate as a percentage) where the criteria have one.
+        A Contact the user may not read is listed as `{restricted: true}` with no details, so the
+        list always adds up to `count`. Requires the same rights as viewing that Results Canvas.
+      operationId: getCohortTrackerAlbumResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the Contacts behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerResult'
+              example:
+                cohort_tracker_id: 12
+                name: Children attending 75%+
+                album_id: 34
+                timeframe: year_to_date
+                starts_on: "2026-04-01"
+                ends_on: "2026-06-30"
+                count: 42
+                eligible_count: 60
+                target: { number: 50, date: "2026-06-30" }
+                qualifying_value_label: Attendance rate
+                page: 1
+                page_size: 2
+                page_count: 21
+                total_count: 42
+                data:
+                  - { restricted: false, id: 101, name: Aisha Dlamini, qualifying_value: 82.5 }
+                  - { restricted: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Results Canvas
 
   /projects/{project_id}/filtered_metrics/{id}:
     parameters:
@@ -3181,6 +3296,25 @@ components:
       schema:
         type: integer
       description: The Project ID
+    CohortTrackerTimeframe:
+      name: timeframe
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [period, year_to_date, all_time]
+        default: all_time
+      description: |
+        period: the day after the previous Target Deadline up to the deadline. year_to_date: the
+        start of the Project's or Album's year up to the deadline. all_time: everything up to the deadline.
+    CohortTrackerAsOf:
+      name: as_of
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+      description: The deadline the window ends on. Defaults to the next Target Deadline, or today when there is none.
     Page:
       name: page
       in: query
@@ -5236,6 +5370,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    CohortTrackerResult:
+      type: object
+      properties:
+        cohort_tracker_id:
+          type: integer
+        name:
+          type: string
+        project_id:
+          type: integer
+          description: Present for a Project's result
+        album_id:
+          type: integer
+          description: Present for an Album's result
+        timeframe:
+          type: string
+          enum: [period, year_to_date, all_time]
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+          description: null when the window runs from the start
+        ends_on:
+          type: string
+          format: date
+        count:
+          type: integer
+          description: The result, a number of distinct Contacts
+        eligible_count:
+          type: integer
+          description: Members the criteria could judge (who have the data the criteria need)
+        target:
+          type: object
+          nullable: true
+          properties:
+            number:
+              type: integer
+            date:
+              type: string
+              format: date
+              nullable: true
+              description: null for the one-off target
+        qualifying_value_label:
+          type: string
+          nullable: true
+          example: Attendance rate
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              restricted:
+                type: boolean
+                description: true for a Contact the user may not read; no other fields are given
+              id:
+                type: integer
+              name:
+                type: string
+              qualifying_value:
+                type: number
+                nullable: true
 
     PaginatedCohortTrackers:
       allOf:
