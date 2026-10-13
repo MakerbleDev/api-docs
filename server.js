@@ -1558,7 +1558,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">Cohort Trackers</h2>
         <div class="section-desc">
-          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
+          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. With <code>result_type: percentage</code> it shows the result as a percentage of its <code>denominator</code>: <code>members</code> (Contacts in this Project / Album) or <code>enough_data</code> (Contacts with enough data to be judged on every criterion), e.g. "84% Children attending 75%+" with "42 of 50 contacts with enough data". Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -1588,14 +1588,14 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "Cohort Tracker created" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria}</code>.")}
+          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria, result_type, denominator}</code>. <code>result_type</code> is <code>number</code> (default) or <code>percentage</code>; a percentage's <code>denominator</code> is <code>members</code> (default) or <code>enough_data</code>.")}
           ${endpointCard("PATCH", "/cohort_trackers/{id}", "Update a Cohort Tracker", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Cohort Tracker updated" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation editor or the reporter who created it" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Only the fields sent change. Changes apply everywhere the tracker is used.")}
+            { code: "422", cls: "response-4xx", desc: "Validation failed, or a result_type switch that would clear targets without <code>confirm_clear_targets</code>" }
+          ], "Only the fields sent change. Changes apply everywhere the tracker is used. Switching <code>result_type</code> clears the tracker's targets on every Project and Album, so while it has targets it is refused unless the body also has <code>confirm_clear_targets: true</code>.")}
           ${endpointCard("DELETE", "/cohort_trackers/{id}", "Delete a Cohort Tracker", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
           ], [
@@ -1620,12 +1620,12 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" }
           ])}
           ${endpointCard("PATCH", "/cohort_trackers/{id}/projects/{project_id}", "Set a Cohort Tracker's targets on a Project", true, [
-            { name: "target", type: "integer", required: false, desc: "One-off target: a number of Contacts to reach, not a total that adds up across periods" },
+            { name: "target", type: "integer", required: false, desc: "One-off target: a number of Contacts to reach (0-100 for a percentage tracker), not a total that adds up across periods" },
             { name: "deadlines", type: "array", required: false, desc: "<code>[{date: \"YYYY-MM-DD\", number}]</code>, replacing this tracker's deadline targets; <code>[]</code> clears them" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Targets saved" },
             { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" },
-            { code: "422", cls: "response-4xx", desc: "Bad deadlines, or neither field sent" }
+            { code: "422", cls: "response-4xx", desc: "Bad deadlines, a percentage outside 0-100, or neither field sent" }
           ])}
           ${endpointCard("GET", "/cohort_trackers/{id}/albums/{bundle_id}", "Get a Cohort Tracker's targets on an Album", true, [
             { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" }
@@ -1644,10 +1644,11 @@ function buildDocsPage() {
             { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
             { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default). Each is worked out afresh: Year to Date is not the sum of the periods" },
             { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on (default: the next Target Deadline, or today)" },
+            { name: "cohort", type: "string", required: false, desc: "<code>in</code> (default) lists the cohort; for a percentage, <code>not_in</code> lists the rest of the denominator" },
             { name: "page", type: "integer", required: false, desc: "Page of Contacts" },
             { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "<code>{count, eligible_count, target, starts_on, ends_on, page, page_size, page_count, total_count, data: [{id, name, qualifying_value}]}</code>. A Contact you can't read is <code>{restricted: true}</code>" },
+            { code: "200", cls: "response-2xx", desc: "<code>{count, eligible_count, result_type, denominator, denominator_count, percentage, target, starts_on, ends_on, cohort, page, page_size, page_count, total_count, data: [{id, name, qualifying_value}]}</code>. A Contact you can't read is <code>{restricted: true}</code>. <code>percentage</code> is null for a number, or when nobody is in the denominator" },
             { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" },
             { code: "404", cls: "response-4xx", desc: "The tracker isn't on the Project" },
             { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
@@ -1656,6 +1657,7 @@ function buildDocsPage() {
             { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" },
             { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
             { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on" },
+            { name: "cohort", type: "string", required: false, desc: "<code>in</code> (default) or, for a percentage, <code>not_in</code>" },
             { name: "page", type: "integer", required: false, desc: "Page of Contacts" },
             { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
           ], [
