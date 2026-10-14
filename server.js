@@ -895,6 +895,7 @@ function buildDocsPage() {
         <a href="#versions"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Versions</a>
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
+        <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
         <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Filtered Metrics</a>
       </div>
@@ -1551,6 +1552,52 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Outcome record" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
+        </div>
+      </section>
+
+      <!-- Framework Sets -->
+      <section class="section" id="framework-sets">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Framework Sets</h2>
+        <div class="section-desc">
+          <p>A Framework Set groups Impact Frameworks (<code>template</code> in the API) into one thing an organisation reports its contribution towards. For example, the 17 SDG Impact Frameworks form the set "UN Sustainable Development Goals"; others are TOMs, a funder's outcomes framework or an organisation's own strategy. Each set names its two levels, e.g. Goal &rsaquo; Target: level 1 is an Impact Framework and level 2 an Outcome inside it.</p>
+          <p><code>availability</code> decides who can use a set: <code>platform</code> (every organisation; created by System Access users), <code>network</code> (every organisation in a Network; created by that Network's admins) or <code>charity</code> (one organisation; created by its organisation admins).</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> List the sets an organisation can already use before creating one. A set whose <code>value_source</code> is <code>set_values</code> uses the Financial Value it defines for each Outcome (<code>financial_values</code>) instead of the organisation's own.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/framework_sets", "List the Framework Sets an organisation can use", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated live sets available to the organisation, plus drafts the user can edit" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't belong to the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Unknown Organisation" }
+          ])}
+          ${endpointCard("GET", "/framework_sets/{id}", "Get a Framework Set", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The set, with <code>frameworks</code> in order and <code>financial_values</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" }
+          ])}
+          ${endpointCard("POST", "/framework_sets", "Create a Framework Set", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Framework Set created" },
+            { code: "403", cls: "response-4xx", desc: "The user may not create a set with this <code>availability</code>" },
+            { code: "404", cls: "response-4xx", desc: "Unknown Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no name or no Impact Frameworks" }
+          ], "Body: <code>charity_id</code>, <code>name</code>, <code>availability</code>, <code>network_id</code>, <code>level1_singular</code>, <code>level1_plural</code>, <code>level2_singular</code>, <code>level2_plural</code>, <code>value_source</code>, <code>version_label</code>, <code>supersedes_id</code>, <code>status</code>, <code>frameworks: [{template_id, short_code, colour, text_colour}]</code> in order, and <code>new_frameworks: [name]</code> to create new Impact Frameworks.")}
+          ${endpointCard("PATCH", "/framework_sets/{id}", "Update a Framework Set", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Framework Set updated" },
+            { code: "403", cls: "response-4xx", desc: "The user can't edit this set" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Same body as create. <code>frameworks</code> replaces the ordered list; <code>financial_values: [{outcome_id, financial_value_id}]</code> replaces the Financial Value chosen for each Outcome.")}
         </div>
       </section>
 
