@@ -1603,7 +1603,7 @@ function buildDocsPage() {
             { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
             { name: "project_id", type: "integer", required: false, desc: "Only count Stories in this project" },
             { name: "bundle_id", type: "integer", required: false, desc: "Only count Stories in the projects of this Album" },
-            { name: "period", type: "string", required: false, desc: "<code>all_time</code> (default), <code>last_12_months</code>, <code>financial_year</code> (from 1 April) or <code>custom</code>" },
+            { name: "period", type: "string", required: false, desc: "<code>all_time</code> (default), <code>last_12_months</code>, <code>financial_year</code> (from 5 April) or <code>custom</code>" },
             { name: "from", type: "string", required: false, desc: "First day of a custom period (YYYY-MM-DD)" },
             { name: "to", type: "string", required: false, desc: "Last day of a custom period (YYYY-MM-DD)" }
           ], [
