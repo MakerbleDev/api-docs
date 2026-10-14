@@ -123,6 +123,8 @@ tags:
     description: Impact outcomes that Indicators are grouped under
   - name: Outcome Indicators
     description: Join table linking Outcomes to Indicators
+  - name: Framework Sets
+    description: Groups of Impact Frameworks (e.g. the SDGs) that organisations report their contribution towards
   - name: Ratio Sets
     description: Dropdown / List field definitions
   - name: Sub Ratios
@@ -1926,6 +1928,149 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /framework_sets:
+    get:
+      tags: [Framework Sets]
+      summary: List the Framework Sets an organisation can use
+      description: |
+        A Framework Set groups Impact Frameworks (backend: templates) into one thing an organisation
+        reports its contribution towards, e.g. the 17 SDG Impact Frameworks form "UN Sustainable
+        Development Goals". Returns the live sets available to the organisation (platform sets, sets of
+        Networks it belongs to, and its own sets), plus the draft sets the user can edit.
+      operationId: listFrameworkSets
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The organisation (Charity) whose available sets to list. The user must belong to it.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Framework Sets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFrameworkSets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Framework Sets]
+      summary: Create a Framework Set
+      description: |
+        Creates a Framework Set from existing Impact Frameworks (and, optionally, new ones named in
+        `new_frameworks`). Who can use it is set by `availability`: `platform` (every organisation,
+        System Access users only), `network` (organisations in `network_id`, that Network's admins) or
+        `charity` (the organisation in `charity_id` only, its organisation admins).
+      operationId: createFrameworkSet
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FrameworkSetInput'
+            example:
+              charity_id: 913
+              name: Our strategy 2027
+              level1_singular: Objective
+              level1_plural: objectives
+              level2_singular: Key result
+              level2_plural: key results
+              availability: charity
+              status: live
+              frameworks:
+                - template_id: 1475
+                  short_code: O1
+                  colour: "#C5192D"
+                  text_colour: "#FFFFFF"
+      responses:
+        "201":
+          description: The created Framework Set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkSet'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /framework_sets/{id}:
+    get:
+      tags: [Framework Sets]
+      summary: Get a Framework Set
+      description: A Framework Set with its Impact Frameworks in order, and the Financial Values it defines per Outcome.
+      operationId: getFrameworkSet
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Framework Set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkSet'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Framework Sets]
+      summary: Update a Framework Set
+      description: |
+        Updates a Framework Set the user can edit. Send `frameworks` to replace the list of Impact
+        Frameworks (in order), and `financial_values` to replace the Financial Value defined for each
+        Outcome. `charity_id` is the organisation the user is acting for.
+      operationId: updateFrameworkSet
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FrameworkSetInput'
+            example:
+              charity_id: 913
+              name: Our strategy 2027 (revised)
+              availability: charity
+              value_source: set_values
+              frameworks:
+                - template_id: 1475
+              financial_values:
+                - outcome_id: 5521
+                  financial_value_id: 88
+      responses:
+        "200":
+          description: The updated Framework Set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkSet'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /ratio_sets:
     get:
       tags: [Ratio Sets]
@@ -3422,6 +3567,27 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    UnprocessableEntityList:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+                items:
+                  type: string
+          example:
+            errors: ["Name can't be blank"]
+    ForbiddenError:
+      description: The user may not do this
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: forbidden
 
   schemas:
 
@@ -4797,6 +4963,159 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Outcome'
+
+    FrameworkSet:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 12
+            name:
+              type: string
+              example: UN Sustainable Development Goals
+            availability:
+              type: string
+              enum: [platform, network, charity]
+              description: Who can use the set — every organisation, organisations in a Network, or one organisation
+            network_id:
+              type: integer
+              nullable: true
+            charity_id:
+              type: integer
+              nullable: true
+              description: The owning organisation when availability is charity
+            level1_singular:
+              type: string
+              example: Goal
+            level1_plural:
+              type: string
+              example: goals
+            level2_singular:
+              type: string
+              example: Target
+            level2_plural:
+              type: string
+              example: targets
+            value_source:
+              type: string
+              enum: [organisation_values, set_values]
+            version_label:
+              type: string
+              nullable: true
+            supersedes_id:
+              type: integer
+              nullable: true
+              description: The Framework Set this version replaces
+            status:
+              type: string
+              enum: [draft, live]
+            frameworks:
+              type: array
+              items:
+                type: object
+                properties:
+                  template_id:
+                    type: integer
+                    description: The Impact Framework (template)
+                  name:
+                    type: string
+                  position:
+                    type: integer
+                  short_code:
+                    type: string
+                    nullable: true
+                  colour:
+                    type: string
+                    nullable: true
+                  text_colour:
+                    type: string
+                    nullable: true
+            financial_values:
+              type: array
+              items:
+                type: object
+                properties:
+                  outcome_id:
+                    type: integer
+                  financial_value_id:
+                    type: integer
+
+    PaginatedFrameworkSets:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FrameworkSet'
+
+    FrameworkSetInput:
+      type: object
+      required: [charity_id]
+      properties:
+        charity_id:
+          type: integer
+          description: The organisation the user is acting for
+        name:
+          type: string
+        availability:
+          type: string
+          enum: [platform, network, charity]
+        network_id:
+          type: integer
+        level1_singular:
+          type: string
+        level1_plural:
+          type: string
+        level2_singular:
+          type: string
+        level2_plural:
+          type: string
+        value_source:
+          type: string
+          enum: [organisation_values, set_values]
+        version_label:
+          type: string
+        supersedes_id:
+          type: integer
+        status:
+          type: string
+          enum: [draft, live]
+        frameworks:
+          type: array
+          description: Impact Frameworks in order. Replaces the current list.
+          items:
+            type: object
+            required: [template_id]
+            properties:
+              template_id:
+                type: integer
+              short_code:
+                type: string
+              colour:
+                type: string
+                example: "#C5192D"
+              text_colour:
+                type: string
+                example: "#FFFFFF"
+        new_frameworks:
+          type: array
+          description: Names of new Impact Frameworks to create and add at the end
+          items:
+            type: string
+        financial_values:
+          type: array
+          description: The Financial Value for each Outcome, used when value_source is set_values. Replaces the current list.
+          items:
+            type: object
+            properties:
+              outcome_id:
+                type: integer
+              financial_value_id:
+                type: integer
 
     PaginatedOutcomeIndicators:
       allOf:
