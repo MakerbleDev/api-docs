@@ -1598,6 +1598,26 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
           ], "Same body as create; only the fields sent change. <code>frameworks</code> (when sent) replaces the ordered list; <code>financial_values: [{outcome_id, financial_value_id}]</code> replaces the Financial Value chosen for each Outcome.")}
+          ${endpointCard("GET", "/framework_sets/{id}/contribution", "Get an organisation's contribution to a Framework Set", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
+            { name: "project_id", type: "integer", required: false, desc: "Only count Stories in this project" },
+            { name: "bundle_id", type: "integer", required: false, desc: "Only count Stories in the projects of this Album" },
+            { name: "period", type: "string", required: false, desc: "<code>all_time</code> (default), <code>last_12_months</code>, <code>financial_year</code> (from 1 April) or <code>custom</code>" },
+            { name: "from", type: "string", required: false, desc: "First day of a custom period (YYYY-MM-DD)" },
+            { name: "to", type: "string", required: false, desc: "Last day of a custom period (YYYY-MM-DD)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>summary</code> (frameworks contributed to, Stories, Contacts reached, entries, financial value, each counted once for the whole set) and <code>frameworks</code>, each with the Outcomes it has a contribution to and their Core and Linked indicators" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't belong to the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "The set isn't available to the Organisation, or the project or Album isn't the Organisation's" }
+          ], "The figures on the Contribution page. A Story counts towards an Outcome when it records a value against a Core indicator inside it, or against one of the Organisation's Linked indicators in a project the link covers. Framework and Outcome figures overlap, so never add them up into a total; use <code>summary</code>.")}
+          ${endpointCard("POST", "/framework_sets/{id}/migrate_links", "Copy Linked indicators onto a new version of a Framework Set", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The new version's Framework Set ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>carried</code> and <code>not_carried</code> links" },
+            { code: "403", cls: "response-4xx", desc: "Not an organisation admin, or the set replaces no older version" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not available to the Organisation" }
+          ], "Body: <code>charity_id</code>. Copies the Organisation's links from the version this set replaces (<code>supersedes_id</code>) wherever the same Outcome, or one with the same title, is in this version. The old links stay, so past reports don't change.")}
           ${endpointCard("GET", "/framework_links", "List an organisation's Linked indicators", true, [
             { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
