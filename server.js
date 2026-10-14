@@ -1565,7 +1565,7 @@ function buildDocsPage() {
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
-          <span><strong>Workflow tip:</strong> List the sets an organisation can already use before creating one. A set whose <code>value_source</code> is <code>set_values</code> uses the Financial Value it defines for each Outcome (<code>financial_values</code>) instead of the organisation's own.</span>
+          <span><strong>Workflow tip:</strong> List the sets an organisation can already use before creating one. To make an organisation's own Indicators count towards a set, link them to its Outcomes with <code>POST /framework_links</code>. A set whose <code>value_source</code> is <code>set_values</code> uses the Financial Value it defines for each Outcome (<code>financial_values</code>) instead of the organisation's own.</span>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/framework_sets", "List the Framework Sets an organisation can use", true, [
@@ -1597,7 +1597,29 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user can't edit this set" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Same body as create. <code>frameworks</code> replaces the ordered list; <code>financial_values: [{outcome_id, financial_value_id}]</code> replaces the Financial Value chosen for each Outcome.")}
+          ], "Same body as create; only the fields sent change. <code>frameworks</code> (when sent) replaces the ordered list; <code>financial_values: [{outcome_id, financial_value_id}]</code> replaces the Financial Value chosen for each Outcome.")}
+          ${endpointCard("GET", "/framework_links", "List an organisation's Linked indicators", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated links with <code>indicator_name</code>, <code>outcome_title</code>, <code>project_ids</code> and <code>all_projects</code>" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't belong to the Organisation" }
+          ])}
+          ${endpointCard("POST", "/framework_links", "Link an Indicator to an Outcome in a Framework Set", true, [], [
+            { code: "201", cls: "response-2xx", desc: "The Linked indicator" },
+            { code: "403", cls: "response-4xx", desc: "Not an organisation admin" },
+            { code: "422", cls: "response-4xx", desc: "Not one of the organisation's Indicators or projects, an Outcome outside the sets it can use, or already linked" }
+          ], "Body: <code>charity_id</code>, <code>indicator_id</code>, <code>outcome_id</code>, <code>project_ids</code> (empty: every project). Linking again with more projects adds them to the existing link.")}
+          ${endpointCard("DELETE", "/framework_links/{id}", "Remove a Linked indicator", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Linked indicator ID" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Removed" },
+            { code: "403", cls: "response-4xx", desc: "Not an organisation admin" },
+            { code: "404", cls: "response-4xx", desc: "Not one of the organisation's links" }
+          ])}
         </div>
       </section>
 
