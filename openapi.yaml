@@ -2071,6 +2071,112 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /framework_links:
+    get:
+      tags: [Framework Sets]
+      summary: List an organisation's Linked indicators
+      description: |
+        A Linked indicator is one of the organisation's own Indicators linked to an Outcome (e.g. an SDG
+        Target) in a Framework Set it can use. Every Story recorded against the Indicator then counts
+        towards that Outcome, in every project or only in the projects listed.
+      operationId: listFrameworkLinks
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The organisation (Charity) whose links to list. The user must belong to it.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Linked indicators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFrameworkLinks'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Framework Sets]
+      summary: Link an Indicator to an Outcome in a Framework Set
+      description: |
+        Links one of the organisation's Indicators (one it owns or one used in its projects) to an
+        Outcome in a Framework Set available to it. Leave `project_ids` empty to count it in every
+        project. If the link already exists for some projects, the new projects are added to it.
+        Requires an organisation admin.
+      operationId: createFrameworkLink
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, indicator_id, outcome_id]
+              properties:
+                charity_id:
+                  type: integer
+                indicator_id:
+                  type: integer
+                outcome_id:
+                  type: integer
+                project_ids:
+                  type: array
+                  items:
+                    type: integer
+            example:
+              charity_id: 913
+              indicator_id: 2201
+              outcome_id: 5521
+              project_ids: [3104]
+      responses:
+        "201":
+          description: The Linked indicator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkLink'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /framework_links/{id}:
+    delete:
+      tags: [Framework Sets]
+      summary: Remove a Linked indicator
+      description: Requires an organisation admin of the organisation in `charity_id`.
+      operationId: deleteFrameworkLink
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /ratio_sets:
     get:
       tags: [Ratio Sets]
@@ -5116,6 +5222,43 @@ components:
                 type: integer
               financial_value_id:
                 type: integer
+
+    FrameworkLink:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            charity_id:
+              type: integer
+            indicator_id:
+              type: integer
+            indicator_name:
+              type: string
+              example: Bootcamp completions
+            outcome_id:
+              type: integer
+            outcome_title:
+              type: string
+              example: "4.4 Increase the number of youth and adults who have relevant skills"
+            project_ids:
+              type: array
+              items:
+                type: integer
+              description: The projects the link counts in; empty when it counts in every project
+            all_projects:
+              type: boolean
+
+    PaginatedFrameworkLinks:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FrameworkLink'
 
     PaginatedOutcomeIndicators:
       allOf:
