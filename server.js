@@ -907,6 +907,10 @@ function buildDocsPage() {
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Case Forms</a>
       </div>
+      <div class="nav-section">
+        <div class="nav-section-label">Service</div>
+        <a href="#health"          class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Health</a>
+      </div>
     </nav>
 
     <!-- Main content -->
@@ -1812,6 +1816,20 @@ function buildDocsPage() {
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [{ code: "200", cls: "response-2xx", desc: "Case Form schemas with field definition IDs and types" }])}
+        </div>
+      </section>
+
+      <!-- Health -->
+      <section class="section" id="health">
+        <div class="section-eyebrow">Service</div>
+        <h2 class="section-title">Health</h2>
+        <div class="section-desc">
+          <p>Checks that the service and its database are answering, and reports which build is running. No sign-in is needed. After a release, <code>commit</code> changes to the new build's commit and <code>uptime_seconds</code> starts again from a small number, so you can tell when the new version is live.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/health", "Check the service is up and which build is running", false, [], [
+            { code: "200", cls: "response-2xx", desc: "status, database (true/false), uptime_seconds, commit (git SHA or null), built_at (ISO 8601 UTC or null) and environment" }
+          ])}
         </div>
       </section>
 
