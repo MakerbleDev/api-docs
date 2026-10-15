@@ -893,6 +893,7 @@ function buildDocsPage() {
         <div class="nav-section-label">Impact framework</div>
         <a href="#changes"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Changes</a>
         <a href="#versions"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Versions</a>
+        <a href="#access-logs"     class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Access Logs</a>
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
@@ -1504,6 +1505,31 @@ function buildDocsPage() {
             { name: "id", in: "path", type: "integer", required: true, desc: "Version ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The Version, including full_object — every field as saved at that moment" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Access Logs -->
+      <section class="section" id="access-logs">
+        <div class="section-eyebrow">Audit &amp; compliance</div>
+        <h2 class="section-title">Access Logs</h2>
+        <div class="section-desc">
+          <p>Access Logs are the audit trail of <em>views</em>, on the <strong>Access Logs</strong> tab beside Versions on the Manage Versions page: who opened a Contact in Makerble or fetched it through the API, when, and how many times. Views by the same colleague less than 30 minutes apart are one entry with a <code>view_count</code>. <code>source</code> is <code>web</code>, <code>api</code> or <code>mcp</code>. Only Contacts are available so far.</p>
+          <p>Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one of their Projects). Anything else returns <code>404</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/access_logs", "List who viewed a Contact (Access Logs)", true, [
+            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> (the only type for now)" },
+            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID" },
+            { name: "from", type: "string", required: false, desc: "YYYY-MM-DD — only entries on or after this date" },
+            { name: "to", type: "string", required: false, desc: "YYYY-MM-DD — only entries on or before this date" },
+            { name: "user_id", type: "integer", required: false, desc: "Only this colleague's views" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 — only entries last viewed after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Access Log entries, newest first, plus the record's name and whether it has been deleted" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
           ])}
         </div>
