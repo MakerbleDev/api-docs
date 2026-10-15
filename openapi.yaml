@@ -146,6 +146,11 @@ tags:
       set of Contact Filter criteria, e.g. "Children attending 75%+". Placed in an
       Impact Scorecard column like other metrics, and targeted with a number of
       Contacts to reach.
+  - name: Workflow Trackers
+    description: |
+      Metrics that count records Makerble's own features create, e.g. Signpostings made or
+      Contacts referred to another Project, rather than Contacts tagged in updates. Placed in an
+      Impact Scorecard column like other metrics.
   - name: Filtered Metrics
     description: |
       Filtered versions of standard metrics: a Change (Activity or Engagement tracker) or an
@@ -3114,6 +3119,403 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CohortTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers:
+    get:
+      tags: [Workflow Trackers]
+      summary: List an Organisation's Workflow Trackers
+      description: |
+        The Workflow Trackers of an Organisation (Charity). Visible to the Organisation's editors and
+        reporters, and to managers (editors) of its Projects.
+      operationId: listWorkflowTrackers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Workflow Trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWorkflowTrackers'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user has no editor or reporter role in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Workflow Trackers]
+      summary: Create a Workflow Tracker
+      description: |
+        Creates a Workflow Tracker (Create a metric > Workflow Tracker): a metric that counts records
+        Makerble's own features create, rather than Contacts tagged in updates. `source` says what it counts:
+
+        - `signpostings`: Signpostings made from the Project (or an Album's Projects) it is placed on.
+          A signposting counts once whether it names the Organisation signposted to, the Person, or
+          both. Signpostings saved without a Project aren't counted on any Project or Album.
+        - `internal_referrals`: Contacts in the Project who are added to another of the Organisation's
+          Projects, dated by the Status in Projects history. Moving between states of the same Project
+          isn't a referral. `settings` choose which Projects count: `{destinations: any}`,
+          `{destinations: only, project_ids: [...]}` or `{destinations: except, project_ids: [...]}`
+          (the default, with none listed).
+
+        `count_mode` is `items` (default: each signposting or referral; adds up across periods) or
+        `contacts` (each Contact once; a snapshot). Requires an editor or reporter of the Organisation.
+      operationId: createWorkflowTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowTrackerRequest'
+            example:
+              workflow_tracker:
+                charity_id: 913
+                name: "Internal referrals"
+                source: "internal_referrals"
+                count_mode: "items"
+                settings:
+                  destinations: "except"
+                  project_ids: [4512, 4513]
+      responses:
+        "201":
+          description: Workflow Tracker created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Workflow Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers/preview:
+    post:
+      tags: [Workflow Trackers]
+      summary: Preview a Workflow Tracker
+      description: |
+        What a Workflow Tracker with these settings gives on one of the Organisation's Projects, before
+        it is saved: the result for the current Period (ending at the Project's next deadline, or today
+        when it has none ahead), Year to Date and All-time, and the latest records counted.
+      operationId: previewWorkflowTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, project_id]
+              properties:
+                charity_id:
+                  type: integer
+                project_id:
+                  type: integer
+                workflow_tracker:
+                  $ref: '#/components/schemas/WorkflowTrackerAttributes'
+            example:
+              charity_id: 913
+              project_id: 4510
+              workflow_tracker:
+                source: "signpostings"
+                count_mode: "items"
+      responses:
+        "200":
+          description: The results and the latest records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerPreview'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Workflow Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers/{id}:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker
+      description: A Workflow Tracker with where it is used.
+      operationId: getWorkflowTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Workflow Tracker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Workflow Trackers]
+      summary: Update a Workflow Tracker
+      description: |
+        Updates the fields sent. Changes apply everywhere the tracker is used. Requires an
+        Organisation editor, or the reporter who created it.
+      operationId: updateWorkflowTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowTrackerRequest'
+            example:
+              workflow_tracker:
+                count_mode: "contacts"
+      responses:
+        "200":
+          description: Workflow Tracker updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Workflow Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Workflow Trackers]
+      summary: Delete a Workflow Tracker
+      description: Refused (422) while the tracker is used on any Project, Album or Scorecard Template.
+      operationId: deleteWorkflowTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't delete this Workflow Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers/{id}/projects/{project_id}:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker's targets on a Project
+      description: The one-off target and deadline targets (the Project's Set Targets page). Requires rights to edit the Project's targets.
+      operationId: getWorkflowTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Workflow Trackers]
+      summary: Add a Workflow Tracker to a Project
+      description: |
+        Places the tracker in a column of the Project's Impact Scorecard (Edit Project Metrics),
+        optionally with a one-off target. The Project's Albums pick it up automatically. The tracker
+        and Project must belong to the same Organisation, and the user needs rights to edit the
+        Project's metrics.
+      operationId: addWorkflowTrackerToProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [column]
+              properties:
+                column:
+                  type: string
+                  enum: [activities, engagement, potential, behaviour, growth]
+                target:
+                  type: integer
+            example:
+              column: activities
+              target: 40
+      responses:
+        "201":
+          description: Placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    patch:
+      tags: [Workflow Trackers]
+      summary: Set a Workflow Tracker's targets on a Project
+      description: |
+        Sets the one-off target and/or replaces this tracker's deadline targets on the Project (Set
+        Targets). A tracker counting items adds its targets up across deadlines; one counting each
+        Contact once uses each deadline's target on its own. `deadlines: []` clears the deadline
+        targets. Requires rights to edit the Project's targets.
+      operationId: setWorkflowTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 40
+              deadlines:
+                - { date: "2026-06-30", number: 20 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Workflow Trackers]
+      summary: Remove a Workflow Tracker from a Project
+      operationId: removeWorkflowTrackerFromProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /workflow_trackers/{id}/albums/{bundle_id}:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker's targets on an Album
+      description: |
+        An Album inherits the Workflow Trackers on its Projects. Returns the Album's one-off and
+        deadline targets for the tracker, and `album_target_type`: the Album's Set Targets page shows
+        Workflow Tracker targets under manual targets. Requires rights to edit the Album's targets.
+      operationId: getWorkflowTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Workflow Trackers]
+      summary: Set a Workflow Tracker's targets on an Album
+      description: |
+        Sets the Album's one-off target and/or replaces its deadline targets (saved as manual targets)
+        for the tracker. An Album counts each record once across its Projects, so its target is never
+        the sum of its Projects'. Requires rights to edit the Album's targets.
+      operationId: setWorkflowTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 120
+              deadlines:
+                - { date: "2026-12-31", number: 100 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerAlbumTargets'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -6300,6 +6702,178 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/CohortTracker'
+
+    WorkflowTrackerAttributes:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        source:
+          type: string
+          enum: [signpostings, internal_referrals]
+          description: What it counts
+        count_mode:
+          type: string
+          enum: [items, contacts]
+          description: "items: each signposting or referral (adds up across periods); contacts: each Contact once (a snapshot)"
+        settings:
+          type: object
+          description: "internal_referrals only: which Projects count as a referral. signpostings has none."
+          properties:
+            destinations:
+              type: string
+              enum: [any, only, except]
+            project_ids:
+              type: array
+              items:
+                type: integer
+
+    WorkflowTracker:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "Signpostings made"
+        description:
+          type: string
+          nullable: true
+        charity_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        source:
+          type: string
+          enum: [signpostings, internal_referrals]
+        count_mode:
+          type: string
+          enum: [items, contacts]
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+          description: additive adds up across periods; snapshot works each timeframe out on its own
+        settings:
+          type: object
+          example:
+            destinations: "except"
+            project_ids: [4512]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WorkflowTrackerDetail:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowTracker'
+        - type: object
+          properties:
+            usage:
+              type: object
+              properties:
+                projects:
+                  type: integer
+                albums:
+                  type: integer
+                templates:
+                  type: integer
+
+    WorkflowTrackerRequest:
+      type: object
+      properties:
+        workflow_tracker:
+          allOf:
+            - $ref: '#/components/schemas/WorkflowTrackerAttributes'
+            - type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: Required when creating
+
+    WorkflowTrackerPreview:
+      type: object
+      properties:
+        project_id:
+          type: integer
+        period_end:
+          type: string
+          format: date
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+        results:
+          type: object
+          properties:
+            period:
+              type: integer
+            year_to_date:
+              type: integer
+            all_time:
+              type: integer
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              contact_name:
+                type: string
+              detail:
+                type: string
+                description: Who they were signposted to, or the Project they were referred to
+              happened_at:
+                type: string
+                format: date-time
+
+    WorkflowTrackerPlacement:
+      type: object
+      properties:
+        workflow_tracker_id:
+          type: integer
+        project_id:
+          type: integer
+        column:
+          type: string
+          enum: [activities, engagement, potential, behaviour, growth]
+        target:
+          type: integer
+          example: 40
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    WorkflowTrackerAlbumTargets:
+      type: object
+      properties:
+        workflow_tracker_id:
+          type: integer
+        album_id:
+          type: integer
+        album_target_type:
+          type: string
+          enum: [manual_target, automatic_target]
+        target:
+          type: integer
+          example: 120
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    PaginatedWorkflowTrackers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkflowTracker'
     FilteredMetric:
       type: object
       description: A filtered version of a Change or Indicator
