@@ -158,6 +158,8 @@ tags:
     description: Activity and Participation custom KPIs tracked across Projects
   - name: Versions
     description: Audit trail — who created or edited a Contact, when, and what it looked like at the time
+  - name: Access Logs
+    description: Audit trail of views — who opened or fetched a Contact, when, and how many times
   - name: Indicators
     description: Scale, Binary, and Value progress trackers linked to Outcomes
   - name: Outcomes
@@ -1912,6 +1914,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /access_logs:
+    get:
+      tags: [Access Logs]
+      summary: List who viewed a record (Access Logs)
+      description: |
+        Returns the Access Log of one record, newest first: each time a colleague opened it in Makerble or fetched it
+        through the API, who it was, when, and how many times. This is the **Access Logs** tab beside Versions on the
+        Manage Versions page. Changes are in `GET /versions` instead.
+        Only Contacts (Beneficiaries) are available so far, so `record_type` must be `Contact`.
+
+        Views by the same colleague, through the same route, less than 30 minutes apart are one entry with a
+        `view_count`. `source` is `web` (opened in Makerble), `api` (fetched with `GET /beneficiaries/{id}`) or `mcp`
+        (fetched through the Makerble MCP server).
+
+        Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one
+        of their Projects). Anything the caller may not see returns `404`, so the endpoint never confirms that
+        another Organisation's record exists.
+      operationId: listAccessLogs
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: record_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [Contact]
+          description: Type of record. Only `Contact` for now.
+        - name: record_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Contact (Beneficiary) ID
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Only entries on or after this date (YYYY-MM-DD)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Only entries on or before this date (YYYY-MM-DD)
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Only this colleague's views
+        - $ref: '#/components/parameters/Page'
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 200
+          description: Records per page (default 10, max 200)
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Access Log entries for the record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAccessLogs'
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                record: { record_type: Contact, record_id: 185170, charity_id: 304, name: Bella Thornton, deleted: false }
+                data:
+                  - { id: 912, record_type: Contact, record_id: 185170, charity_id: 304, action: "Viewed ×1", view_count: 1, source: mcp, user_id: 190, user_name: Sam Ahmed, first_viewed_at: "2026-10-02T14:05:00.000+01:00", last_viewed_at: "2026-10-02T14:05:00.000+01:00" }
+                  - { id: 877, record_type: Contact, record_id: 185170, charity_id: 304, action: "Viewed ×3", view_count: 3, source: web, user_id: 212, user_name: Jane Smith, first_viewed_at: "2026-10-01T09:20:00.000+01:00", last_viewed_at: "2026-10-01T09:30:00.000+01:00" }
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -5851,6 +5933,62 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Version'
+
+    AccessLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        record_type:
+          type: string
+          example: Contact
+        record_id:
+          type: integer
+        charity_id:
+          type: integer
+        action:
+          type: string
+          description: '"Viewed ×N", as shown on the Access Logs tab'
+        view_count:
+          type: integer
+          description: Views in this entry (views less than 30 minutes apart are counted together)
+        source:
+          type: string
+          enum: [web, api, mcp]
+          description: Opened in Makerble, fetched through the API, or fetched through the Makerble MCP server
+        user_id:
+          type: integer
+        user_name:
+          type: string
+        first_viewed_at:
+          type: string
+          format: date-time
+        last_viewed_at:
+          type: string
+          format: date-time
+
+    PaginatedAccessLogs:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            record:
+              type: object
+              properties:
+                record_type:
+                  type: string
+                record_id:
+                  type: integer
+                charity_id:
+                  type: integer
+                name:
+                  type: string
+                deleted:
+                  type: boolean
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/AccessLog'
 
     PaginatedBeneficiaries:
       allOf:
