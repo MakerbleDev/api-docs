@@ -78,14 +78,26 @@ info:
     | Event | Sent when | `data` |
     |---|---|---|
     | `contact.created` | A Contact is created | Same as `GET /beneficiaries/{id}` |
-    | `contact.updated` | A Contact is edited (not when only counts Makerble keeps up to date change) | Same, plus `changed_fields` on the envelope |
+    | `contact.updated` | A Contact is edited, including its Contact Type or a dropdown answer (not when only counts Makerble keeps up to date change) | Same, plus `changed_fields` on the envelope. A changed dropdown is listed as `custom_fields.<dropdown title>` |
+    | `contact.deleted` | A Contact is deleted (archived), or removed for good without being archived first | `id`, `deleted_at`. No name or other personal data |
+    | `contact.merged` | A Contact is merged into another Contact. No `contact.deleted` is sent for it | `kept_contact_id`, `merged_contact_ids`, `merged_at` |
+    | `contact.restored` | A deleted Contact is restored, or a merge is undone | Same as `GET /beneficiaries/{id}` |
     | `story.created` | A Story is posted, about 30 seconds later so its survey answers are included (not drafts) | Same as `GET /stories/{id}` |
     | `story.updated` | A Story is edited, including a draft being published | Same |
-    | `project.created` / `project.updated` | A Project is created / edited | Same as `GET /projects/{id}` |
+    | `story.deleted` | A Story is deleted (not drafts) | `id`, `project_id`, `contact_ids`, `deleted_at` |
+    | `project.created` / `project.updated` | A Project is created / edited. Closing (archiving) or reopening a Project is an edit | Same as `GET /projects/{id}` |
+    | `project.deleted` | A Project is deleted | `id`, `name`, `deleted_at` |
+    | `project.contact_added` / `project.contact_removed` | A Contact joins / leaves a Project (not when the Contact is being deleted, and not from imports) | `project_id`, `project_name`, `contact_id`, `contact_state` (the Contact's state in the Project, e.g. `Enrolled`) |
     | `import.completed` | A spreadsheet import has processed every row. Rows of an import send no events of their own | `import_id`, `import_type`, `kind`, `status`, `counts`, `charity_id` |
     | `webhook.test` | Someone sends a test event | `{ "test": true, "message": "This is a test event from Makerble." }` |
 
     `*.updated` events are sent about 10 seconds after the change, so several saves of one change (publishing a draft Story saves it more than once) arrive as one event showing the latest state.
+
+    The `data` of `contact.deleted`, `contact.merged`, `story.deleted`, `project.deleted` and the `project.contact_*` events is recorded when the event happens, as the record may be gone by the time it is sent.
+
+    A webhook created before an event existed doesn't receive it until an admin ticks it under **Send a message when**. New webhooks receive every event unless unticked.
+
+    Bulk actions (merging many Contacts, adding many Contacts to a Project, undoing an import) still send one event per record. Once an endpoint has 100 events waiting, further ones are spaced out at 5 a second, so a bulk action on thousands of records may take some minutes to arrive in full.
 
     Every request has this body:
     ```json
@@ -7657,7 +7669,7 @@ components:
 
     WebhookEvent:
       type: string
-      enum: [contact.created, contact.updated, story.created, story.updated, project.created, project.updated, import.completed]
+      enum: [contact.created, contact.updated, contact.deleted, contact.merged, contact.restored, story.created, story.updated, story.deleted, project.created, project.updated, project.deleted, project.contact_added, project.contact_removed, import.completed]
 
     WebhookEndpointRequest:
       type: object
