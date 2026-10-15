@@ -1895,6 +1895,29 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Targets saved" },
             { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
           ])}
+          ${endpointCard("GET", "/workflow_trackers/{id}/projects/{project_id}/results", "Get a Workflow Tracker's result on a Project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default). Counting each item adds up across periods; counting each Contact once is a snapshot, worked out for each window on its own" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on (default: the next Target Deadline, or today)" },
+            { name: "page", type: "integer", required: false, desc: "Page of items" },
+            { name: "per_page", type: "integer", required: false, desc: "Items per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{number, target, result_kind, as_of, starts_on, ends_on, page, page_size, page_count, total_count, hidden_count, data: [{contact_id, contact_name, detail, project_id, happened_at}]}</code>, newest first. Items you may not see are counted in <code>hidden_count</code>, never listed" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" },
+            { code: "404", cls: "response-4xx", desc: "The tracker isn't on the Project" },
+            { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
+          ])}
+          ${endpointCard("GET", "/workflow_trackers/{id}/albums/{bundle_id}/results", "Get a Workflow Tracker's result on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on" },
+            { name: "page", type: "integer", required: false, desc: "Page of items" },
+            { name: "per_page", type: "integer", required: false, desc: "Items per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "As for a Project. Each item, or each Contact, counts once across the Album's Projects, so the result is never the sum of the Projects'" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Album" },
+            { code: "404", cls: "response-4xx", desc: "No Project in the Album uses the tracker" }
+          ])}
           ${endpointCard("DELETE", "/workflow_trackers/{id}/projects/{project_id}", "Remove a Workflow Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
