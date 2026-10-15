@@ -2929,6 +2929,7 @@ paths:
         - `project_beneficiary_states`: `{project_id: {state_id: {enabled: "true", added_from_date, removed_from_date}}}`, dates as `dd/mm/yyyy - dd/mm/yyyy`, matched against status History
         - `project_story_category_ids` (Survey Campaigns completed) with `project_story_category_filter_data: {id: {story_date_from}}`
         - `attendance_rate`: `{change_id, from, to, event_scope}`
+        - `same_day_rate` (Same-day rate): `{change_id, event_scope, event_filter_params, qualifying_change_ids, match: all|any, qualifying_event_scope, qualifying_event_filter_params, from, to}`. On the days the `change_id` Engagement Tracker was recorded for a Contact at an event, the percentage of those days on which the `qualifying_change_ids` Engagement Trackers (all of them, or any one) were also recorded for them at an event on the same date, in the Organisation's time zone. A day with no matching record counts as not met; Contacts with no such days never match. E.g. children who received all four meals on every day they attended class: `from: "100", to: "100"`
         - `distance_travelled`: `{trackers: [{indicator_id, directions: [improved|no_change|worsened]}], same_project}`
         - `indicator_comparisons`: `{indicator_id: {response: any|latest, op, sub_ratio_ids, values}}`
         - `indicator_sub_ratios_hash`: `{indicator_id: [sub_ratio_id]}`
