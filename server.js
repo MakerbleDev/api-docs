@@ -905,6 +905,10 @@ function buildDocsPage() {
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-DELETE" style="background:rgba(255,63,69,0.1);color:#c92d33;border-color:rgba(255,63,69,0.2)">DEL</span>Event Formats</a>
       </div>
       <div class="nav-section">
+        <div class="nav-section-label">Integrations</div>
+        <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Webhooks</a>
+      </div>
+      <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Case Forms</a>
@@ -1969,6 +1973,87 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "Has events or is added to projects — error gives the reason and counts" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Webhooks -->
+      <section class="section" id="webhooks">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Webhooks</h2>
+        <div class="section-desc">
+          <p>Instead of polling, an Organisation's admins can register webhook endpoints: HTTPS URLs that Makerble sends a signed JSON <code>POST</code> to when records change. Only the Organisation's admins can manage them, and only once an admin has ticked <strong>Turn on Webhooks</strong> in the Organisation's Settings (Preferences) page; until then these endpoints answer <code>403</code>.</p>
+          <p><strong>Events:</strong> <code>contact.created</code>, <code>contact.updated</code> (with <code>changed_fields</code>), <code>story.created</code> (about 30 seconds after the Story is posted, so survey answers are included; drafts are not sent), <code>story.updated</code> (including a draft being published), <code>project.created</code>, <code>project.updated</code> (update events are sent about 10 seconds after the change, so several saves of one change arrive as one event), <code>import.completed</code> (once per finished spreadsheet import; its rows send no events of their own) and <code>webhook.test</code>. The <code>data</code> of a Contact, Story or Project event is the same JSON as <code>GET /beneficiaries/{id}</code>, <code>GET /stories/{id}</code> or <code>GET /projects/{id}</code>, as the record is when the request is sent.</p>
+          <p><strong>Envelope:</strong> <code>{ "id": "evt_…", "event": "contact.updated", "occurred_at": "2026-10-04T09:15:00Z", "charity_id": 123, "changed_fields": ["name"], "data": { … } }</code>. Headers: <code>X-Makerble-Event</code>, <code>X-Makerble-Delivery</code> (the <code>id</code>), <code>User-Agent: Makerble-Webhooks/1</code> and <code>X-Makerble-Signature: t=&lt;unix time&gt;,v1=&lt;signature&gt;</code>.</p>
+          <p><strong>Verifying the signature:</strong> <code>v1</code> is the hex HMAC-SHA256 of <code>"&lt;t&gt;.&lt;raw request body&gt;"</code>, keyed with the endpoint's secret (shown once, when the endpoint is created or its secret rotated). Compare in constant time and reject timestamps more than 5 minutes old.</p>
+          <p><strong>Retries:</strong> respond with any 2xx within 10 seconds. Anything else, a timeout or a refused connection is retried 8 more times over about 25 hours. Redirects are not followed. After 10 deliveries in a row fail, or 7 days without a success, the endpoint is switched off and the Organisation's admins are emailed. Delivery is at least once and unordered: de-duplicate on <code>id</code>.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Create the endpoint and store the <code>secret</code> it returns, send a test event with <code>POST /webhook_endpoints/{id}/test</code>, then check the result in <code>GET /webhook_endpoints/{id}/deliveries</code>.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/webhook_endpoints", "List an Organisation's webhook endpoints", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of endpoints, without secrets" },
+            { code: "403", cls: "response-4xx", desc: "Webhooks are not turned on for this Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation" }
+          ])}
+          ${endpointCard("POST", "/webhook_endpoints", "Register a webhook endpoint", true, [
+            { name: "webhook_endpoint[charity_id]", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "webhook_endpoint[url]", in: "body", type: "string", required: true, desc: "HTTPS URL of the receiver" },
+            { name: "webhook_endpoint[description]", in: "body", type: "string", required: false, desc: "What it is for" },
+            { name: "webhook_endpoint[event_types]", in: "body", type: "array", required: false, desc: "Events to send (default: all)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created — includes the secret, shown only this once" },
+            { code: "422", cls: "response-4xx", desc: "Invalid URL or events, or the Organisation already has 10 endpoints" }
+          ])}
+          ${endpointCard("GET", "/webhook_endpoints/{id}", "Get a webhook endpoint", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The endpoint, without its secret" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not an admin of its Organisation" }
+          ])}
+          ${endpointCard("PATCH", "/webhook_endpoints/{id}", "Change, pause or resume a webhook endpoint", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" },
+            { name: "webhook_endpoint[active]", in: "body", type: "boolean", required: false, desc: "false pauses; true resumes and turns back on an endpoint that was switched off" },
+            { name: "webhook_endpoint[url] / [description] / [event_types]", in: "body", type: "string", required: false, desc: "Fields to change" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The updated endpoint" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ])}
+          ${endpointCard("DELETE", "/webhook_endpoints/{id}", "Delete a webhook endpoint", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Deleted, with its delivery log" }
+          ])}
+          ${endpointCard("POST", "/webhook_endpoints/{id}/rotate_secret", "Rotate a webhook endpoint's secret", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The endpoint with its new secret, shown only this once" }
+          ])}
+          ${endpointCard("POST", "/webhook_endpoints/{id}/test", "Send a test event", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "The queued webhook.test delivery" }
+          ])}
+          ${endpointCard("GET", "/webhook_endpoints/{id}/deliveries", "List a webhook endpoint's deliveries", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated delivery log, newest first, kept for 30 days" }
+          ])}
+          ${endpointCard("POST", "/webhook_endpoints/{id}/deliveries/{delivery_id}/replay", "Send a delivery again", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" },
+            { name: "delivery_id", in: "path", type: "integer", required: true, desc: "Delivery ID" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "Queued again, with the same event id" },
+            { code: "404", cls: "response-4xx", desc: "No such delivery for this endpoint" }
           ])}
         </div>
       </section>
