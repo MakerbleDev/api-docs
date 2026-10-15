@@ -895,8 +895,10 @@ function buildDocsPage() {
         <a href="#versions"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Versions</a>
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
+        <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
         <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Workflow Trackers</a>
+        <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Filtered Metrics</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Events</div>
@@ -1201,6 +1203,22 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Contact created" },
             { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required)" }
           ], "Required fields: <code>beneficiary.name</code>, <code>beneficiary.owner_id</code> (User ID of the record owner). Submit custom field values as <code>custom_fields: {\"field_id\": \"value\"}</code>.")}
+          ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/summary", "Get the AI summary of a Contact (SummaryMaker)", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>status</code> (ready, stale, pending, failed or empty), <code>new_story_count</code> and the <code>summary</code>: sections Who, Progress and Watch for, each sentence with its sources (<code>bio</code>, <code>story_ids</code>)" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "SummaryMaker is not turned on in this organisation's preferences" },
+            { code: "404", cls: "response-4xx", desc: "Contact not found, or you can't view it" }
+          ], "The summary shown in the Summary tile on the Contact profile, written by SummaryMaker from the Contact's bio and the Stories you are allowed to see. It never uses a Story you can't see. The organisation must turn on SummaryMaker in its preferences (it is off by default). If <code>status</code> is <code>pending</code>, SummaryMaker is still writing it: call again in a few seconds.")}
+          ${endpointCard("POST", "/beneficiaries/{beneficiary_id}/summary", "Update the AI summary of a Contact (SummaryMaker)", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "Update started; <code>status</code> is <code>pending</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "SummaryMaker is not turned on in this organisation's preferences" },
+            { code: "404", cls: "response-4xx", desc: "Contact not found, or you can't view it" }
+          ], "Makes a fresh summary from the latest bio and Stories, like the <b>Update summary</b> button. Poll the GET endpoint until <code>status</code> is <code>ready</code>.")}
           ${endpointCard("GET", "/beneficiaries/impact_box_data", "Get Impact Box data (Progress Trackers per Contact)", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
@@ -1554,6 +1572,94 @@ function buildDocsPage() {
         </div>
       </section>
 
+      <!-- Framework Sets -->
+      <section class="section" id="framework-sets">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Framework Sets</h2>
+        <div class="section-desc">
+          <p>A Framework Set groups Impact Frameworks (<code>template</code> in the API) into one thing an organisation reports its contribution towards. For example, the 17 SDG Impact Frameworks form the set "UN Sustainable Development Goals"; others are TOMs, a funder's outcomes framework or an organisation's own strategy. Each set names its two levels, e.g. Goal &rsaquo; Target: level 1 is an Impact Framework and level 2 an Outcome inside it.</p>
+          <p><code>availability</code> decides who can use a set: <code>platform</code> (every organisation; created by System Access users), <code>network</code> (every organisation in a Network; created by that Network's admins) or <code>charity</code> (one organisation; created by its organisation admins).</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> List the sets an organisation can already use before creating one. To make an organisation's own Indicators count towards a set, link them to its Outcomes with <code>POST /framework_links</code>. A set whose <code>value_source</code> is <code>set_values</code> uses the Financial Value it defines for each Outcome (<code>financial_values</code>) instead of the organisation's own.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/framework_sets", "List the Framework Sets an organisation can use", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated live sets available to the organisation, plus drafts the user can edit" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't belong to the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Unknown Organisation" }
+          ])}
+          ${endpointCard("GET", "/framework_sets/{id}", "Get a Framework Set", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The set, with <code>frameworks</code> in order and <code>financial_values</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" }
+          ])}
+          ${endpointCard("POST", "/framework_sets", "Create a Framework Set", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Framework Set created" },
+            { code: "403", cls: "response-4xx", desc: "The user may not create a set with this <code>availability</code>" },
+            { code: "404", cls: "response-4xx", desc: "Unknown Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no name or no Impact Frameworks" }
+          ], "Body: <code>charity_id</code>, <code>name</code>, <code>availability</code>, <code>network_id</code>, <code>level1_singular</code>, <code>level1_plural</code>, <code>level2_singular</code>, <code>level2_plural</code>, <code>value_source</code>, <code>version_label</code>, <code>supersedes_id</code>, <code>status</code>, <code>frameworks: [{template_id, short_code, colour, text_colour}]</code> in order, and <code>new_frameworks: [name]</code> to create new Impact Frameworks.")}
+          ${endpointCard("PATCH", "/framework_sets/{id}", "Update a Framework Set", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Framework Set updated" },
+            { code: "403", cls: "response-4xx", desc: "The user can't edit this set" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Same body as create; only the fields sent change. <code>frameworks</code> (when sent) replaces the ordered list; <code>financial_values: [{outcome_id, financial_value_id}]</code> replaces the Financial Value chosen for each Outcome.")}
+          ${endpointCard("GET", "/framework_sets/{id}/contribution", "Get an organisation's contribution to a Framework Set", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
+            { name: "project_id", type: "integer", required: false, desc: "Only count Stories in this project" },
+            { name: "bundle_id", type: "integer", required: false, desc: "Only count Stories in the projects of this Album" },
+            { name: "period", type: "string", required: false, desc: "<code>all_time</code> (default), <code>last_12_months</code>, <code>financial_year</code> (from 5 April) or <code>custom</code>" },
+            { name: "from", type: "string", required: false, desc: "First day of a custom period (YYYY-MM-DD)" },
+            { name: "to", type: "string", required: false, desc: "Last day of a custom period (YYYY-MM-DD)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>summary</code> (frameworks contributed to, Stories, Contacts reached, entries, financial value, each counted once for the whole set) and <code>frameworks</code>, each with the Outcomes it has a contribution to and their Core and Linked indicators" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't belong to the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "The set isn't available to the Organisation, or the project or Album isn't the Organisation's" }
+          ], "The figures on the Contribution page. A Story counts towards an Outcome when it records a value against a Core indicator inside it, or against one of the Organisation's Linked indicators in a project the link covers. Framework and Outcome figures overlap, so never add them up into a total; use <code>summary</code>.")}
+          ${endpointCard("POST", "/framework_sets/{id}/migrate_links", "Copy Linked indicators onto a new version of a Framework Set", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The new version's Framework Set ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>carried</code> and <code>not_carried</code> links" },
+            { code: "403", cls: "response-4xx", desc: "Not an organisation admin, or the set replaces no older version" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not available to the Organisation" }
+          ], "Body: <code>charity_id</code>. Copies the Organisation's links from the version this set replaces (<code>supersedes_id</code>) wherever the same Outcome, or one with the same title, is in this version. The old links stay, so past reports don't change.")}
+          ${endpointCard("GET", "/framework_links", "List an organisation's Linked indicators", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated links with <code>indicator_name</code>, <code>outcome_title</code>, <code>project_ids</code> and <code>all_projects</code>" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't belong to the Organisation" }
+          ])}
+          ${endpointCard("POST", "/framework_links", "Link an Indicator to an Outcome in a Framework Set", true, [], [
+            { code: "201", cls: "response-2xx", desc: "The Linked indicator" },
+            { code: "403", cls: "response-4xx", desc: "Not an organisation admin" },
+            { code: "422", cls: "response-4xx", desc: "Not one of the organisation's Indicators or projects, an Outcome outside the sets it can use, or already linked" }
+          ], "Body: <code>charity_id</code>, <code>indicator_id</code>, <code>outcome_id</code>, <code>project_ids</code> (empty: every project). Linking again with more projects adds them to the existing link.")}
+          ${endpointCard("DELETE", "/framework_links/{id}", "Remove a Linked indicator", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Linked indicator ID" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Removed" },
+            { code: "403", cls: "response-4xx", desc: "Not an organisation admin" },
+            { code: "404", cls: "response-4xx", desc: "Not one of the organisation's links" }
+          ])}
+        </div>
+      </section>
+
       <!-- Cohort Trackers -->
       <section class="section" id="cohort-trackers">
         <div class="section-eyebrow">Impact framework</div>
@@ -1640,6 +1746,29 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Targets saved" },
             { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
+          ])}
+          ${endpointCard("GET", "/cohort_trackers/{id}/projects/{project_id}/results", "Get a Cohort Tracker's result on a Project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default). Each is worked out afresh: Year to Date is not the sum of the periods" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on (default: the next Target Deadline, or today)" },
+            { name: "page", type: "integer", required: false, desc: "Page of Contacts" },
+            { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{count, eligible_count, target, starts_on, ends_on, page, page_size, page_count, total_count, data: [{id, name, qualifying_value}]}</code>. A Contact you can't read is <code>{restricted: true}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" },
+            { code: "404", cls: "response-4xx", desc: "The tracker isn't on the Project" },
+            { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
+          ])}
+          ${endpointCard("GET", "/cohort_trackers/{id}/albums/{bundle_id}/results", "Get a Cohort Tracker's result on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on" },
+            { name: "page", type: "integer", required: false, desc: "Page of Contacts" },
+            { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "As for a Project. Each Contact counts once across the Album's Projects, so the result is never the sum of the Projects'" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Album" },
+            { code: "404", cls: "response-4xx", desc: "No Project in the Album uses the tracker" }
           ])}
           ${endpointCard("DELETE", "/cohort_trackers/{id}/projects/{project_id}", "Remove a Cohort Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
@@ -1739,6 +1868,88 @@ function buildDocsPage() {
           ${endpointCard("DELETE", "/workflow_trackers/{id}/projects/{project_id}", "Remove a Workflow Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Filtered Metrics -->
+      <section class="section" id="filtered-metrics">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Filtered Metrics</h2>
+        <div class="section-desc">
+          <p>A filtered version counts a standard metric again for only some responses and Contacts, e.g. "Session attendances — Female, under 21". The metric is a Change (Activity or Engagement tracker) or an Indicator (Choice, Achievement or Numerical tracker) already on the Project. It counts attendances or answers, not Contacts: to count Contacts, use a Cohort Tracker. It has its own row, name, column and targets on the Results Canvas, and Albums show every filtered version on their Projects.</p>
+          <p><code>response_criteria</code> filters the responses, as a Progress Board's "Filter responses/stories by" does: <code>story_category_ids</code> (Surveys), <code>wave_ids</code> (Intervals), <code>date_range</code> (Date Happened, <code>"dd/mm/yyyy - dd/mm/yyyy"</code>), <code>label_ids</code> and <code>author_ids</code>. <code>contact_criteria</code> filters the Contacts tagged in them, in the Contact Filters format. Age is worked out at the date of each response; other Bio fields use the Contact's current value; the other sections are judged at the end of each reporting period.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Check the filters with <code>POST /projects/{project_id}/filtered_metrics/preview</code>, then add the filtered version with <code>POST /projects/{project_id}/filtered_metrics</code>. Read its figure with <code>GET .../filtered_metrics/{id}/results</code>.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/projects/{project_id}/filtered_metrics", "List a Project's filtered versions", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of filtered versions" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" }
+          ])}
+          ${endpointCard("POST", "/projects/{project_id}/filtered_metrics/preview", "Preview a filtered version", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{count, total}</code>: how many of the metric's tagged responses pass the filters, and how many there are" },
+            { code: "422", cls: "response-4xx", desc: "The metric isn't on the Project, or a filter can't be applied" }
+          ], "Body: <code>filtered_metric: {parent_type, parent_id, response_criteria, contact_criteria}</code>.")}
+          ${endpointCard("POST", "/projects/{project_id}/filtered_metrics", "Add a filtered version to a Project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Added" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" },
+            { code: "422", cls: "response-4xx", desc: "The metric isn't on the Project, or validation failed" }
+          ], "Body: <code>filtered_metric: {parent_type: \"Change\"|\"Indicator\", parent_id, display_name, column, response_criteria, contact_criteria}</code>. A Change's version goes after it in its column unless <code>column</code> is given; an Indicator's sits under its Outcome.")}
+          ${endpointCard("GET", "/projects/{project_id}/filtered_metrics/{id}", "Get a filtered version", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Filtered version ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The filtered version" },
+            { code: "404", cls: "response-4xx", desc: "Not on the Project" }
+          ])}
+          ${endpointCard("PATCH", "/projects/{project_id}/filtered_metrics/{id}", "Update a filtered version", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Filtered version ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Updated" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Body: <code>filtered_metric: {display_name, response_criteria, contact_criteria}</code>. Criteria sent replace the stored ones.")}
+          ${endpointCard("DELETE", "/projects/{project_id}/filtered_metrics/{id}", "Remove a filtered version from a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Filtered version ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Removed; deleted once it is on no other Project or Scorecard Template" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" }
+          ])}
+          ${endpointCard("GET", "/projects/{project_id}/filtered_metrics/{id}/results", "Get a filtered version's result on a Project", true, [
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "string", required: false, desc: "YYYY-MM-DD the timeframe ends; defaults to the next Target Deadline, or today" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{filtered_metric_id, timeframe, start_date, end_date, number, unit}</code>" },
+            { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
+          ])}
+          ${endpointCard("GET", "/albums/{bundle_id}/filtered_metrics", "List an Album's filtered versions", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list: every filtered version on the Album's Projects" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Album" }
+          ])}
+          ${endpointCard("GET", "/albums/{bundle_id}/filtered_metrics/{id}", "Get a filtered version on an Album", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Filtered version ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The filtered version" },
+            { code: "404", cls: "response-4xx", desc: "Not on any of the Album's Projects" }
+          ])}
+          ${endpointCard("GET", "/albums/{bundle_id}/filtered_metrics/{id}/results", "Get a filtered version's result on an Album", true, [
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "string", required: false, desc: "YYYY-MM-DD" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The result across the Album's open Projects" }
           ])}
         </div>
       </section>
