@@ -2071,6 +2071,118 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /framework_sets/{id}/contribution:
+    get:
+      tags: [Framework Sets]
+      summary: Get an organisation's contribution to a Framework Set
+      description: |
+        The figures on the Contribution page: which Impact Frameworks (e.g. SDG Goals) and Outcomes (e.g.
+        SDG Targets) in the set the organisation's Stories contribute to. A Story counts when it records
+        a value against an Indicator inside an Outcome as a Core indicator, or as one of the
+        organisation's Linked indicators whose project scope includes the Story's project. Draft
+        Stories never count.
+
+        `summary` counts each Story, Contact (person or organisation reached) and indicator entry once
+        for the whole set. `financial_value` is the value the counted entries generate, worked out the
+        way each project's Financial Calculator works it out, or from the set's own Financial Values
+        when the set defines them. The per-framework and per-Outcome figures overlap (an entry linked
+        to two Outcomes appears under both), so never add them up into a total. Core indicators that
+        no Story records are listed with zero Stories.
+      operationId: getFrameworkSetContribution
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The organisation (Charity) whose contribution to report. The user must belong to it.
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: Only count Stories in this project of the organisation.
+        - name: bundle_id
+          in: query
+          schema:
+            type: integer
+          description: Only count Stories in the projects of this Album (Bundle) of the organisation.
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [all_time, last_12_months, financial_year, custom]
+            default: all_time
+          description: "`financial_year` starts on 5 April. `custom` uses `from` and `to`."
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: First day of a custom period
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Last day of a custom period
+      responses:
+        "200":
+          description: The contribution figures
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkContribution'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /framework_sets/{id}/migrate_links:
+    post:
+      tags: [Framework Sets]
+      summary: Copy Linked indicators onto a new version of a Framework Set
+      description: |
+        For a Framework Set that replaces an older version (`supersedes_id`), copies the organisation's
+        Linked indicators from the older version onto this one, wherever the same Outcome is in this
+        version, either as the same Outcome or as one with the same title. Project scopes are kept.
+        The links on the older version stay, so its reports don't change. Returns the links carried
+        across and those that couldn't be, because this version has no matching Outcome. Needs an
+        organisation admin.
+      operationId: migrateFrameworkLinks
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose links to copy. The user must be one of its admins.
+            example:
+              charity_id: 913
+      responses:
+        "200":
+          description: The links carried across, and those that could not be
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkLinkMigration'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /framework_links:
     get:
       tags: [Framework Sets]
@@ -5222,6 +5334,111 @@ components:
                 type: integer
               financial_value_id:
                 type: integer
+
+    FrameworkContribution:
+      type: object
+      properties:
+        framework_set_id:
+          type: integer
+        charity_id:
+          type: integer
+        project_id:
+          type: integer
+          nullable: true
+        bundle_id:
+          type: integer
+          nullable: true
+        period:
+          type: string
+          example: all_time
+        summary:
+          type: object
+          description: Each Story, Contact and entry counted once for the whole set
+          properties:
+            frameworks_contributed:
+              type: integer
+              description: How many of the set's Impact Frameworks (e.g. SDG Goals) at least one Story contributes to
+            frameworks_total:
+              type: integer
+            stories:
+              type: integer
+            reached:
+              type: integer
+              description: Distinct Contacts (people and organisations) tagged on the counted entries
+            entries:
+              type: integer
+            financial_value:
+              type: number
+        frameworks:
+          type: array
+          description: Every Impact Framework in the set, in order. Figures overlap, so never add them up.
+          items:
+            type: object
+            properties:
+              template_id:
+                type: integer
+              name:
+                type: string
+                example: Quality education
+              short_code:
+                type: string
+                nullable: true
+                example: "4"
+              position:
+                type: integer
+              stories:
+                type: integer
+              outcomes:
+                type: array
+                description: The Outcomes (e.g. SDG Targets) with a contribution
+                items:
+                  type: object
+                  properties:
+                    outcome_id:
+                      type: integer
+                    title:
+                      type: string
+                    indicators:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          indicator_id:
+                            type: integer
+                          name:
+                            type: string
+                          membership:
+                            type: string
+                            enum: [core, linked]
+                            description: "`core`: part of the framework itself; `linked`: one of the organisation's own Indicators"
+                          stories:
+                            type: integer
+                          reached:
+                            type: integer
+                          financial_value:
+                            type: number
+
+    FrameworkLinkMigration:
+      type: object
+      properties:
+        carried:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrameworkLinkReference'
+        not_carried:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrameworkLinkReference'
+
+    FrameworkLinkReference:
+      type: object
+      properties:
+        id:
+          type: integer
+        indicator_id:
+          type: integer
+        outcome_id:
+          type: integer
 
     FrameworkLink:
       allOf:
