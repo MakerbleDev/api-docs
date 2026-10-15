@@ -156,12 +156,16 @@ tags:
     description: Per-story metric records (Story Changes, Story Indicators, Story Beneficiaries)
   - name: Changes
     description: Activity and Participation custom KPIs tracked across Projects
+  - name: Versions
+    description: Audit trail — who created or edited a Contact, when, and what it looked like at the time
   - name: Indicators
     description: Scale, Binary, and Value progress trackers linked to Outcomes
   - name: Outcomes
     description: Impact outcomes that Indicators are grouped under
   - name: Outcome Indicators
     description: Join table linking Outcomes to Indicators
+  - name: Framework Sets
+    description: Groups of Impact Frameworks (e.g. the SDGs) that organisations report their contribution towards
   - name: Ratio Sets
     description: Dropdown / List field definitions
   - name: Sub Ratios
@@ -183,6 +187,17 @@ tags:
       set of Contact Filter criteria, e.g. "Children attending 75%+". Placed in an
       Impact Scorecard column like other metrics, and targeted with a number of
       Contacts to reach.
+  - name: Workflow Trackers
+    description: |
+      Metrics that count records Makerble's own features create, e.g. Signpostings made or
+      Contacts referred to another Project, rather than Contacts tagged in updates. Placed in an
+      Impact Scorecard column like other metrics.
+  - name: Filtered Metrics
+    description: |
+      Filtered versions of standard metrics: a Change (Activity or Engagement tracker) or an
+      Indicator (Choice, Achievement or Numerical tracker) counted again for only some responses
+      and Contacts, e.g. "Session attendances — Female, under 21". Each has its own row, name,
+      column and targets on a Project's or Album's Results Canvas.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
   - name: Webhooks
@@ -722,6 +737,117 @@ paths:
                 $ref: '#/components/schemas/Beneficiary'
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /beneficiaries/{beneficiary_id}/summary:
+    parameters:
+      - name: beneficiary_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Contact (Beneficiary) ID
+    get:
+      tags: [Beneficiaries]
+      summary: Get the AI summary of a Contact (SummaryMaker)
+      description: |
+        Returns the SummaryMaker summary of a Contact, as shown in the Summary tile on the
+        Contact profile: three sections (**Who**, **Progress**, **Watch for**) written from the
+        Contact's bio and the Stories the signed-in user is allowed to see. Every sentence
+        lists its sources: `bio` (true if it came from the bio) and `story_ids`.
+
+        A summary is never made from, and never returns, a Story or bio field the user can't
+        see. Users with the same access share one summary, and it is only remade when the bio
+        or Stories change, so repeated calls return the same text.
+
+        `status` is one of:
+        - `ready`: the summary is current.
+        - `stale`: an older summary made only from Stories you can see; `new_story_count`
+          Stories have been added since. POST to make a fresh one.
+        - `pending`: SummaryMaker is writing it in the background. `summary` is null, or the
+          previous version while an update is made. Call again in a few seconds.
+        - `failed`: it could not be made. POST to try again.
+        - `empty`: the Contact has no bio or Stories you can see.
+
+        Only available to organisations that have turned on SummaryMaker in their
+        preferences (off by default).
+      operationId: getBeneficiarySummary
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Contact summary and its status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactSummaryResponse'
+              example:
+                status: ready
+                new_story_count: 0
+                summary:
+                  id: 812
+                  generated_at: "2026-09-29T10:14:03Z"
+                  model: claude-haiku-4-5-20251001
+                  source_story_ids: [5521, 5530, 5544]
+                  sections:
+                    - heading: Who
+                      text: Amira joined the programme in June and is looking for warehouse work.
+                      bio: true
+                      story_ids: []
+                      sentences:
+                        - text: Amira joined the programme in June and is looking for warehouse work.
+                          bio: true
+                          story_ids: []
+                    - heading: Progress
+                      text: Amira updated her CV and has started interview practice.
+                      bio: false
+                      story_ids: [5530, 5544]
+                      sentences:
+                        - text: Amira updated her CV and has started interview practice.
+                          bio: false
+                          story_ids: [5530, 5544]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: SummaryMaker is not turned on for this organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: SummaryMaker is not enabled for this organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Beneficiaries]
+      summary: Update the AI summary of a Contact (SummaryMaker)
+      description: |
+        Makes a fresh summary from the latest bio and Stories the signed-in user can see, like
+        the **Update summary** button on the Contact profile. Returns `202` with status
+        `pending`; call the GET endpoint until the status is `ready`. No request body.
+      operationId: updateBeneficiarySummary
+      security: [{tokenAuth: []}]
+      responses:
+        "202":
+          description: Summary update started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactSummaryResponse'
+              example:
+                status: pending
+                new_story_count: 0
+                summary: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: SummaryMaker is not turned on for this organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: SummaryMaker is not enabled for this organisation
         "404":
           $ref: '#/components/responses/NotFound'
 
@@ -1706,6 +1832,91 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /versions:
+    get:
+      tags: [Versions]
+      summary: List a record's Versions (audit trail)
+      description: |
+        Returns every Version of one record, newest first: each time it was created or edited, who did it and when.
+        Only Contacts (Beneficiaries) are versioned so far, so `record_type` must be `Contact`.
+
+        Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one
+        of their Projects). Anything the caller may not see returns `404`, so the endpoint never confirms that
+        another Organisation's record exists.
+
+        `user_name` is `System` when no signed-in user made the change (e.g. a CSV import run in the background).
+        One Save can write several Versions a fraction of a second apart. Use `GET /versions/{id}` to see the full
+        record as it was saved in a Version.
+      operationId: listVersions
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: record_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [Contact]
+          description: Type of record. Only `Contact` for now.
+        - name: record_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Contact (Beneficiary) ID
+        - $ref: '#/components/parameters/Page'
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 200
+          description: Records per page (default 10, max 200)
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of the record's Versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVersions'
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                record: { record_type: Contact, record_id: 185170, charity_id: 304, name: Bella Thornton, deleted: false }
+                data:
+                  - { id: 76, record_type: Contact, record_id: 185170, charity_id: 304, event: update, action: Edited, user_id: 190, user_name: Sam Ahmed, created_at: "2026-09-29T07:50:02.709Z" }
+                  - { id: 74, record_type: Contact, record_id: 185170, charity_id: 304, event: create, action: Created, user_id: 190, user_name: Sam Ahmed, created_at: "2026-09-29T07:50:02.319Z" }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /versions/{id}:
+    get:
+      tags: [Versions]
+      summary: Get a single Version, with the full record snapshot
+      description: |
+        Returns one Version including `full_object`: every field of the record exactly as it was saved at that
+        moment, not just the fields that changed. Compare two Versions' `full_object` to see what changed.
+        Same permissions as `GET /versions`.
+      operationId: getVersion
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Version with full_object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /changes:
     get:
       tags: [Changes]
@@ -1877,6 +2088,367 @@ paths:
                 $ref: '#/components/schemas/PaginatedOutcomeIndicators'
         "401":
           $ref: '#/components/responses/Unauthorized'
+
+  /framework_sets:
+    get:
+      tags: [Framework Sets]
+      summary: List the Framework Sets an organisation can use
+      description: |
+        A Framework Set groups Impact Frameworks (backend: templates) into one thing an organisation
+        reports its contribution towards, e.g. the 17 SDG Impact Frameworks form "UN Sustainable
+        Development Goals". Returns the live sets available to the organisation (platform sets, sets of
+        Networks it belongs to, and its own sets), plus the draft sets the user can edit.
+      operationId: listFrameworkSets
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The organisation (Charity) whose available sets to list. The user must belong to it.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Framework Sets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFrameworkSets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Framework Sets]
+      summary: Create a Framework Set
+      description: |
+        Creates a Framework Set from existing Impact Frameworks (and, optionally, new ones named in
+        `new_frameworks`). Who can use it is set by `availability`: `platform` (every organisation,
+        System Access users only), `network` (organisations in `network_id`, that Network's admins) or
+        `charity` (the organisation in `charity_id` only, its organisation admins).
+      operationId: createFrameworkSet
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FrameworkSetInput'
+            example:
+              charity_id: 913
+              name: Our strategy 2027
+              level1_singular: Objective
+              level1_plural: objectives
+              level2_singular: Key result
+              level2_plural: key results
+              availability: charity
+              status: live
+              frameworks:
+                - template_id: 1475
+                  short_code: O1
+                  colour: "#C5192D"
+                  text_colour: "#FFFFFF"
+      responses:
+        "201":
+          description: The created Framework Set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkSet'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /framework_sets/{id}:
+    get:
+      tags: [Framework Sets]
+      summary: Get a Framework Set
+      description: A Framework Set with its Impact Frameworks in order, and the Financial Values it defines per Outcome.
+      operationId: getFrameworkSet
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Framework Set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkSet'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Framework Sets]
+      summary: Update a Framework Set
+      description: |
+        Updates a Framework Set the user can edit. Send `frameworks` to replace the list of Impact
+        Frameworks (in order), and `financial_values` to replace the Financial Value defined for each
+        Outcome. `charity_id` is the organisation the user is acting for.
+      operationId: updateFrameworkSet
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FrameworkSetInput'
+            example:
+              charity_id: 913
+              name: Our strategy 2027 (revised)
+              availability: charity
+              value_source: set_values
+              frameworks:
+                - template_id: 1475
+              financial_values:
+                - outcome_id: 5521
+                  financial_value_id: 88
+      responses:
+        "200":
+          description: The updated Framework Set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkSet'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /framework_sets/{id}/contribution:
+    get:
+      tags: [Framework Sets]
+      summary: Get an organisation's contribution to a Framework Set
+      description: |
+        The figures on the Contribution page: which Impact Frameworks (e.g. SDG Goals) and Outcomes (e.g.
+        SDG Targets) in the set the organisation's Stories contribute to. A Story counts when it records
+        a value against an Indicator inside an Outcome as a Core indicator, or as one of the
+        organisation's Linked indicators whose project scope includes the Story's project. Draft
+        Stories never count.
+
+        `summary` counts each Story, Contact (person or organisation reached) and indicator entry once
+        for the whole set. `financial_value` is the value the counted entries generate, worked out the
+        way each project's Financial Calculator works it out, or from the set's own Financial Values
+        when the set defines them. The per-framework and per-Outcome figures overlap (an entry linked
+        to two Outcomes appears under both), so never add them up into a total. Core indicators that
+        no Story records are listed with zero Stories.
+      operationId: getFrameworkSetContribution
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The organisation (Charity) whose contribution to report. The user must belong to it.
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: Only count Stories in this project of the organisation.
+        - name: bundle_id
+          in: query
+          schema:
+            type: integer
+          description: Only count Stories in the projects of this Album (Bundle) of the organisation.
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [all_time, last_12_months, financial_year, custom]
+            default: all_time
+          description: "`financial_year` starts on 5 April. `custom` uses `from` and `to`."
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: First day of a custom period
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Last day of a custom period
+      responses:
+        "200":
+          description: The contribution figures
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkContribution'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /framework_sets/{id}/migrate_links:
+    post:
+      tags: [Framework Sets]
+      summary: Copy Linked indicators onto a new version of a Framework Set
+      description: |
+        For a Framework Set that replaces an older version (`supersedes_id`), copies the organisation's
+        Linked indicators from the older version onto this one, wherever the same Outcome is in this
+        version, either as the same Outcome or as one with the same title. Project scopes are kept.
+        The links on the older version stay, so its reports don't change. Returns the links carried
+        across and those that couldn't be, because this version has no matching Outcome. Needs an
+        organisation admin.
+      operationId: migrateFrameworkLinks
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose links to copy. The user must be one of its admins.
+            example:
+              charity_id: 913
+      responses:
+        "200":
+          description: The links carried across, and those that could not be
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkLinkMigration'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /framework_links:
+    get:
+      tags: [Framework Sets]
+      summary: List an organisation's Linked indicators
+      description: |
+        A Linked indicator is one of the organisation's own Indicators linked to an Outcome (e.g. an SDG
+        Target) in a Framework Set it can use. Every Story recorded against the Indicator then counts
+        towards that Outcome, in every project or only in the projects listed.
+      operationId: listFrameworkLinks
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The organisation (Charity) whose links to list. The user must belong to it.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Linked indicators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFrameworkLinks'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Framework Sets]
+      summary: Link an Indicator to an Outcome in a Framework Set
+      description: |
+        Links one of the organisation's Indicators (one it owns or one used in its projects) to an
+        Outcome in a Framework Set available to it. Leave `project_ids` empty to count it in every
+        project. If the link already exists for some projects, the new projects are added to it.
+        Requires an organisation admin.
+      operationId: createFrameworkLink
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, indicator_id, outcome_id]
+              properties:
+                charity_id:
+                  type: integer
+                indicator_id:
+                  type: integer
+                outcome_id:
+                  type: integer
+                project_ids:
+                  type: array
+                  items:
+                    type: integer
+            example:
+              charity_id: 913
+              indicator_id: 2201
+              outcome_id: 5521
+              project_ids: [3104]
+      responses:
+        "201":
+          description: The Linked indicator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkLink'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /framework_links/{id}:
+    delete:
+      tags: [Framework Sets]
+      summary: Remove a Linked indicator
+      description: Requires an organisation admin of the organisation in `charity_id`.
+      operationId: deleteFrameworkLink
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /ratio_sets:
     get:
@@ -2601,6 +3173,838 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /workflow_trackers:
+    get:
+      tags: [Workflow Trackers]
+      summary: List an Organisation's Workflow Trackers
+      description: |
+        The Workflow Trackers of an Organisation (Charity). Visible to the Organisation's editors and
+        reporters, and to managers (editors) of its Projects.
+      operationId: listWorkflowTrackers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Workflow Trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWorkflowTrackers'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user has no editor or reporter role in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Workflow Trackers]
+      summary: Create a Workflow Tracker
+      description: |
+        Creates a Workflow Tracker (Create a metric > Workflow Tracker): a metric that counts records
+        Makerble's own features create, rather than Contacts tagged in updates. `source` says what it counts:
+
+        - `signpostings`: Signpostings made from the Project (or an Album's Projects) it is placed on.
+          A signposting counts once whether it names the Organisation signposted to, the Person, or
+          both. Signpostings saved without a Project aren't counted on any Project or Album.
+        - `internal_referrals`: Contacts in the Project who are added to another of the Organisation's
+          Projects, dated by the Status in Projects history. Moving between states of the same Project
+          isn't a referral. `settings` choose which Projects count: `{destinations: any}`,
+          `{destinations: only, project_ids: [...]}` or `{destinations: except, project_ids: [...]}`
+          (the default, with none listed).
+
+        `count_mode` is `items` (default: each signposting or referral; adds up across periods) or
+        `contacts` (each Contact once; a snapshot). Requires an editor or reporter of the Organisation.
+      operationId: createWorkflowTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowTrackerRequest'
+            example:
+              workflow_tracker:
+                charity_id: 913
+                name: "Internal referrals"
+                source: "internal_referrals"
+                count_mode: "items"
+                settings:
+                  destinations: "except"
+                  project_ids: [4512, 4513]
+      responses:
+        "201":
+          description: Workflow Tracker created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Workflow Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers/preview:
+    post:
+      tags: [Workflow Trackers]
+      summary: Preview a Workflow Tracker
+      description: |
+        What a Workflow Tracker with these settings gives on one of the Organisation's Projects, before
+        it is saved: the result for the current Period (ending at the Project's next deadline, or today
+        when it has none ahead), Year to Date and All-time, and the latest records counted.
+      operationId: previewWorkflowTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, project_id]
+              properties:
+                charity_id:
+                  type: integer
+                project_id:
+                  type: integer
+                workflow_tracker:
+                  $ref: '#/components/schemas/WorkflowTrackerAttributes'
+            example:
+              charity_id: 913
+              project_id: 4510
+              workflow_tracker:
+                source: "signpostings"
+                count_mode: "items"
+      responses:
+        "200":
+          description: The results and the latest records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerPreview'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Workflow Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers/{id}:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker
+      description: A Workflow Tracker with where it is used.
+      operationId: getWorkflowTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Workflow Tracker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Workflow Trackers]
+      summary: Update a Workflow Tracker
+      description: |
+        Updates the fields sent. Changes apply everywhere the tracker is used. Requires an
+        Organisation editor, or the reporter who created it.
+      operationId: updateWorkflowTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowTrackerRequest'
+            example:
+              workflow_tracker:
+                count_mode: "contacts"
+      responses:
+        "200":
+          description: Workflow Tracker updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Workflow Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Workflow Trackers]
+      summary: Delete a Workflow Tracker
+      description: Refused (422) while the tracker is used on any Project, Album or Scorecard Template.
+      operationId: deleteWorkflowTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't delete this Workflow Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers/{id}/projects/{project_id}:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker's targets on a Project
+      description: The one-off target and deadline targets (the Project's Set Targets page). Requires rights to edit the Project's targets.
+      operationId: getWorkflowTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Workflow Trackers]
+      summary: Add a Workflow Tracker to a Project
+      description: |
+        Places the tracker in a column of the Project's Impact Scorecard (Edit Project Metrics),
+        optionally with a one-off target. The Project's Albums pick it up automatically. The tracker
+        and Project must belong to the same Organisation, and the user needs rights to edit the
+        Project's metrics.
+      operationId: addWorkflowTrackerToProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [column]
+              properties:
+                column:
+                  type: string
+                  enum: [activities, engagement, potential, behaviour, growth]
+                target:
+                  type: integer
+            example:
+              column: activities
+              target: 40
+      responses:
+        "201":
+          description: Placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    patch:
+      tags: [Workflow Trackers]
+      summary: Set a Workflow Tracker's targets on a Project
+      description: |
+        Sets the one-off target and/or replaces this tracker's deadline targets on the Project (Set
+        Targets). A tracker counting items adds its targets up across deadlines; one counting each
+        Contact once uses each deadline's target on its own. `deadlines: []` clears the deadline
+        targets. Requires rights to edit the Project's targets.
+      operationId: setWorkflowTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 40
+              deadlines:
+                - { date: "2026-06-30", number: 20 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Workflow Trackers]
+      summary: Remove a Workflow Tracker from a Project
+      operationId: removeWorkflowTrackerFromProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /workflow_trackers/{id}/albums/{bundle_id}:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker's targets on an Album
+      description: |
+        An Album inherits the Workflow Trackers on its Projects. Returns the Album's one-off and
+        deadline targets for the tracker, and `album_target_type`: the Album's Set Targets page shows
+        Workflow Tracker targets under manual targets. Requires rights to edit the Album's targets.
+      operationId: getWorkflowTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Workflow Trackers]
+      summary: Set a Workflow Tracker's targets on an Album
+      description: |
+        Sets the Album's one-off target and/or replaces its deadline targets (saved as manual targets)
+        for the tracker. An Album counts each record once across its Projects, so its target is never
+        the sum of its Projects'. Requires rights to edit the Album's targets.
+      operationId: setWorkflowTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 120
+              deadlines:
+                - { date: "2026-12-31", number: 100 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/{id}/projects/{project_id}/results:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker's result on a Project
+      description: |
+        A Cohort Tracker's result on a Project's Results Canvas, with the Contacts behind it. Only data saved
+        in the Project counts. The tracker must be on the Project.
+
+        The result is the number of distinct Contacts who meet the tracker's membership setting and all
+        its criteria, counting only stories, events and survey responses saved in scope and dated in the
+        window. Results are worked out afresh for each window, so a Year to Date result is not the sum
+        of the period results. `target` is the tracker's deadline target on the window's last day, or
+        else its one-off target; targets are never summed across deadlines.
+
+        `data` lists the Contacts in the cohort alphabetically, with `qualifying_value` (named by
+        `qualifying_value_label`, e.g. an attendance rate as a percentage) where the criteria have one.
+        A Contact the user may not read is listed as `{restricted: true}` with no details, so the
+        list always adds up to `count`. Requires the same rights as viewing that Results Canvas.
+      operationId: getCohortTrackerProjectResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the Contacts behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerResult'
+              example:
+                cohort_tracker_id: 12
+                name: Children attending 75%+
+                project_id: 34
+                timeframe: year_to_date
+                starts_on: "2026-04-01"
+                ends_on: "2026-06-30"
+                count: 42
+                eligible_count: 60
+                target: { number: 50, date: "2026-06-30" }
+                qualifying_value_label: Attendance rate
+                page: 1
+                page_size: 2
+                page_count: 21
+                total_count: 42
+                data:
+                  - { restricted: false, id: 101, name: Aisha Dlamini, qualifying_value: 82.5 }
+                  - { restricted: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Results Canvas
+
+  /projects/{project_id}/filtered_metrics:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricProjectId'
+    get:
+      tags: [Filtered Metrics]
+      summary: List a Project's filtered versions of metrics
+      description: |
+        The filtered versions on a Project's Results Canvas. Visible to the Project's or its
+        Organisation's managers (editors), changemakers (reporters) and analysts (observers): the
+        same people who can see the Results Canvas.
+      operationId: listProjectFilteredMetrics
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of filtered versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFilteredMetrics'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Filtered Metrics]
+      summary: Add a filtered version of a metric to a Project
+      description: |
+        Edit Project Metrics > Add filtered version. The metric being filtered must already be on the
+        Project: a Change in one of its columns, or an Indicator under one of its Outcomes. A Change's
+        filtered version goes directly after it in its column (or at the end of `column` if given); an
+        Indicator's sits under the same Outcome, directly after it. Albums show every filtered version on
+        their Projects.
+
+        `response_criteria` filters the responses (stories) the metric was recorded in, as a Progress
+        Board's "Filter responses/stories by" does: `story_category_ids` (Surveys), `wave_ids`
+        (Intervals), `date_range` ("dd/mm/yyyy - dd/mm/yyyy", Date Happened, either end optional),
+        `label_ids` and `author_ids`. Project and Album keys are refused: the responses always come from
+        the Project or Album it is on.
+
+        `contact_criteria` filters the Contacts tagged in them, in the Contact Filters format (see
+        `POST /cohort_trackers/preview`). Age (`age_from` / `age_to`) is worked out at the date of each
+        response; other Bio fields use the Contact's current value; the other sections are judged at the
+        end of each reporting period. Either may be sent as a JSON string. Requires the right to edit the
+        Project's metrics.
+      operationId: createFilteredMetric
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilteredMetricRequest'
+            example:
+              filtered_metric:
+                parent_type: "Change"
+                parent_id: 4021
+                display_name: "Session attendances — Female, under 21"
+                response_criteria:
+                  wave_ids: ["12"]
+                contact_criteria:
+                  sub_ratio_ids: ["881"]
+                  age_to: {year: "20", month: "11", day: "30"}
+      responses:
+        "201":
+          description: Filtered version added to the Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit the Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects/{project_id}/filtered_metrics/preview:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricProjectId'
+    post:
+      tags: [Filtered Metrics]
+      summary: Preview a filtered version
+      description: |
+        The Add filtered version dialog's "N of M session attendances in this project currently match",
+        before it is added: `count` is how many of the metric's tagged responses on the Project pass
+        the filters to date (a Numerical tracker's total), `total` how many there are with no filters.
+        Takes the same body as adding one; `display_name` is optional.
+      operationId: previewFilteredMetric
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilteredMetricRequest'
+            example:
+              filtered_metric:
+                parent_type: "Change"
+                parent_id: 4021
+                contact_criteria:
+                  sub_ratio_ids: ["881"]
+      responses:
+        "200":
+          description: The count and the unfiltered total
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: number
+                  total:
+                    type: number
+              example:
+                count: 262
+                total: 1540
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit the Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /cohort_trackers/{id}/albums/{bundle_id}/results:
+    get:
+      tags: [Cohort Trackers]
+      summary: Get a Cohort Tracker's result on an Album
+      description: |
+        A Cohort Tracker's result on an Album's Results Canvas, with the Contacts behind it. The Album's
+        Projects are counted together and each Contact once, so the result is never the sum of the
+        Projects' results. The tracker must be on one of the Album's Projects.
+
+        The result is the number of distinct Contacts who meet the tracker's membership setting and all
+        its criteria, counting only stories, events and survey responses saved in scope and dated in the
+        window. Results are worked out afresh for each window, so a Year to Date result is not the sum
+        of the period results. `target` is the tracker's deadline target on the window's last day, or
+        else its one-off target; targets are never summed across deadlines.
+
+        `data` lists the Contacts in the cohort alphabetically, with `qualifying_value` (named by
+        `qualifying_value_label`, e.g. an attendance rate as a percentage) where the criteria have one.
+        A Contact the user may not read is listed as `{restricted: true}` with no details, so the
+        list always adds up to `count`. Requires the same rights as viewing that Results Canvas.
+      operationId: getCohortTrackerAlbumResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the Contacts behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortTrackerResult'
+              example:
+                cohort_tracker_id: 12
+                name: Children attending 75%+
+                album_id: 34
+                timeframe: year_to_date
+                starts_on: "2026-04-01"
+                ends_on: "2026-06-30"
+                count: 42
+                eligible_count: 60
+                target: { number: 50, date: "2026-06-30" }
+                qualifying_value_label: Attendance rate
+                page: 1
+                page_size: 2
+                page_count: 21
+                total_count: 42
+                data:
+                  - { restricted: false, id: 101, name: Aisha Dlamini, qualifying_value: 82.5 }
+                  - { restricted: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Results Canvas
+
+  /projects/{project_id}/filtered_metrics/{id}:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricProjectId'
+      - $ref: '#/components/parameters/FilteredMetricId'
+    get:
+      tags: [Filtered Metrics]
+      summary: Get a filtered version on a Project
+      operationId: getProjectFilteredMetric
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The filtered version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Filtered Metrics]
+      summary: Update a filtered version
+      description: |
+        Renames it or replaces its filters: `response_criteria` and `contact_criteria`, when sent,
+        replace the stored ones (`{}` clears them). The metric it filters and its placement can't be
+        changed. The change applies wherever it is used. Requires the right to edit the Project's metrics.
+      operationId: updateFilteredMetric
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilteredMetricRequest'
+            example:
+              filtered_metric:
+                display_name: "Session attendances — Female"
+                contact_criteria:
+                  sub_ratio_ids: ["881"]
+      responses:
+        "200":
+          description: Filtered version updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit the Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Filtered Metrics]
+      summary: Remove a filtered version from a Project
+      description: |
+        Removes it from the Project and its Albums. It is deleted once it is on no other Project or
+        Scorecard Template. Requires the right to edit the Project's metrics.
+      operationId: removeFilteredMetric
+      security: [{tokenAuth: []}]
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit the Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects/{project_id}/filtered_metrics/{id}/results:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricProjectId'
+      - $ref: '#/components/parameters/FilteredMetricId'
+    get:
+      tags: [Filtered Metrics]
+      summary: Get a filtered version's result on a Project
+      description: |
+        The filtered result the Results Canvas shows, for one timeframe ending at `as_of`. Counts only
+        the responses the user may read, as the canvas does.
+      operationId: getProjectFilteredMetricResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/FilteredMetricTimeframe'
+        - $ref: '#/components/parameters/FilteredMetricAsOf'
+      responses:
+        "200":
+          description: The result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetricResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /albums/{bundle_id}/filtered_metrics:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricBundleId'
+    get:
+      tags: [Filtered Metrics]
+      summary: List an Album's filtered versions of metrics
+      description: Every filtered version on any of the Album's Projects. Visible to anyone who can see the Album.
+      operationId: listAlbumFilteredMetrics
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of filtered versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFilteredMetrics'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /albums/{bundle_id}/filtered_metrics/{id}:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricBundleId'
+      - $ref: '#/components/parameters/FilteredMetricId'
+    get:
+      tags: [Filtered Metrics]
+      summary: Get a filtered version on an Album
+      operationId: getAlbumFilteredMetric
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The filtered version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetric'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /albums/{bundle_id}/filtered_metrics/{id}/results:
+    parameters:
+      - $ref: '#/components/parameters/FilteredMetricBundleId'
+      - $ref: '#/components/parameters/FilteredMetricId'
+    get:
+      tags: [Filtered Metrics]
+      summary: Get a filtered version's result on an Album
+      description: The filtered result for the Album's open Projects together, as its Results Canvas shows it.
+      operationId: getAlbumFilteredMetricResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/FilteredMetricTimeframe'
+        - $ref: '#/components/parameters/FilteredMetricAsOf'
+      responses:
+        "200":
+          description: The result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredMetricResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see the Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /media_items:
     get:
       tags: [Media Gallery]
@@ -3063,6 +4467,25 @@ components:
       schema:
         type: integer
       description: The Project ID
+    CohortTrackerTimeframe:
+      name: timeframe
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [period, year_to_date, all_time]
+        default: all_time
+      description: |
+        period: the day after the previous Target Deadline up to the deadline. year_to_date: the
+        start of the Project's or Album's year up to the deadline. all_time: everything up to the deadline.
+    CohortTrackerAsOf:
+      name: as_of
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+      description: The deadline the window ends on. Defaults to the next Target Deadline, or today when there is none.
     Page:
       name: page
       in: query
@@ -3086,6 +4509,44 @@ components:
         type: string
         example: "2023-07-30 08:48:55.781228"
       description: ISO 8601 datetime — returns only records updated after this value
+    FilteredMetricProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Project ID
+    FilteredMetricBundleId:
+      name: bundle_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Album (Bundle) ID
+    FilteredMetricId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The filtered version's ID
+    FilteredMetricTimeframe:
+      name: timeframe
+      in: query
+      schema:
+        type: string
+        enum: [period, year_to_date, all_time]
+        default: all_time
+      description: |
+        `period`: from the day after the previous Target Deadline; `year_to_date`: from the Year
+        Start; `all_time`: everything. Each ends at `as_of`.
+    FilteredMetricAsOf:
+      name: as_of
+      in: query
+      schema:
+        type: string
+        format: date
+      description: The date the timeframe ends (YYYY-MM-DD). Defaults to the next Target Deadline, or today.
     IncludePublicLibrary:
       name: include_public_library
       in: query
@@ -3132,6 +4593,27 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    UnprocessableEntityList:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+                items:
+                  type: string
+          example:
+            errors: ["Name can't be blank"]
+    ForbiddenError:
+      description: The user may not do this
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: forbidden
     WebhooksNotTurnedOn:
       description: Webhooks are not turned on for this Organisation yet
       content:
@@ -3142,6 +4624,67 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+
+    ContactSummaryResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, stale, pending, failed, empty]
+        new_story_count:
+          type: integer
+          description: Stories you can see that were added since this summary was made
+        summary:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ContactSummary'
+
+    ContactSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        generated_at:
+          type: string
+          format: date-time
+        model:
+          type: string
+          example: claude-haiku-4-5-20251001
+        source_story_ids:
+          type: array
+          items:
+            type: integer
+          description: The Stories the summary was made from
+        sections:
+          type: array
+          items:
+            type: object
+            properties:
+              heading:
+                type: string
+                enum: [Who, Progress, Watch for]
+              text:
+                type: string
+              bio:
+                type: boolean
+                description: True if any sentence in the section came from the bio
+              story_ids:
+                type: array
+                items:
+                  type: integer
+              sentences:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    text:
+                      type: string
+                    bio:
+                      type: boolean
+                    story_ids:
+                      type: array
+                      items:
+                        type: integer
 
     Error:
       type: object
@@ -4243,6 +5786,72 @@ components:
               items:
                 $ref: '#/components/schemas/User'
 
+    Version:
+      type: object
+      properties:
+        id:
+          type: integer
+        record_type:
+          type: string
+          example: Contact
+        record_id:
+          type: integer
+          description: The Contact (Beneficiary) ID
+        charity_id:
+          type: integer
+        event:
+          type: string
+          enum: [create, update, destroy]
+        action:
+          type: string
+          enum: [Created, Edited, Destroyed]
+          description: Type of access, as worded on the Manage Versions page
+        user_id:
+          type: integer
+          nullable: true
+          description: Who did it. Null when no signed-in user made the change.
+        user_name:
+          type: string
+          description: Who did it — `System` when no signed-in user made the change, `Unknown user` if that user no longer exists
+        created_at:
+          type: string
+          format: date-time
+
+    VersionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Version'
+        - type: object
+          properties:
+            full_object:
+              type: object
+              additionalProperties: true
+              description: Snapshot of every field of the record as saved in this Version
+
+    PaginatedVersions:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            record:
+              type: object
+              properties:
+                record_type:
+                  type: string
+                record_id:
+                  type: integer
+                charity_id:
+                  type: integer
+                name:
+                  type: string
+                  description: The Contact's name (anonymised for Vault Contacts the caller can't see), or its last saved name once hard-deleted
+                deleted:
+                  type: boolean
+                  description: True once the record has been permanently deleted; its Versions remain
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Version'
+
     PaginatedBeneficiaries:
       allOf:
         - $ref: '#/components/schemas/PaginationEnvelope'
@@ -4449,6 +6058,301 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Outcome'
+
+    FrameworkSet:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 12
+            name:
+              type: string
+              example: UN Sustainable Development Goals
+            availability:
+              type: string
+              enum: [platform, network, charity]
+              description: Who can use the set — every organisation, organisations in a Network, or one organisation
+            network_id:
+              type: integer
+              nullable: true
+            charity_id:
+              type: integer
+              nullable: true
+              description: The owning organisation when availability is charity
+            level1_singular:
+              type: string
+              example: Goal
+            level1_plural:
+              type: string
+              example: goals
+            level2_singular:
+              type: string
+              example: Target
+            level2_plural:
+              type: string
+              example: targets
+            value_source:
+              type: string
+              enum: [organisation_values, set_values]
+            version_label:
+              type: string
+              nullable: true
+            supersedes_id:
+              type: integer
+              nullable: true
+              description: The Framework Set this version replaces
+            status:
+              type: string
+              enum: [draft, live]
+            frameworks:
+              type: array
+              items:
+                type: object
+                properties:
+                  template_id:
+                    type: integer
+                    description: The Impact Framework (template)
+                  name:
+                    type: string
+                  position:
+                    type: integer
+                  short_code:
+                    type: string
+                    nullable: true
+                  colour:
+                    type: string
+                    nullable: true
+                  text_colour:
+                    type: string
+                    nullable: true
+            financial_values:
+              type: array
+              items:
+                type: object
+                properties:
+                  outcome_id:
+                    type: integer
+                  financial_value_id:
+                    type: integer
+
+    PaginatedFrameworkSets:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FrameworkSet'
+
+    FrameworkSetInput:
+      type: object
+      required: [charity_id]
+      properties:
+        charity_id:
+          type: integer
+          description: The organisation the user is acting for
+        name:
+          type: string
+        availability:
+          type: string
+          enum: [platform, network, charity]
+        network_id:
+          type: integer
+        level1_singular:
+          type: string
+        level1_plural:
+          type: string
+        level2_singular:
+          type: string
+        level2_plural:
+          type: string
+        value_source:
+          type: string
+          enum: [organisation_values, set_values]
+        version_label:
+          type: string
+        supersedes_id:
+          type: integer
+        status:
+          type: string
+          enum: [draft, live]
+        frameworks:
+          type: array
+          description: Impact Frameworks in order. Replaces the current list.
+          items:
+            type: object
+            required: [template_id]
+            properties:
+              template_id:
+                type: integer
+              short_code:
+                type: string
+              colour:
+                type: string
+                example: "#C5192D"
+              text_colour:
+                type: string
+                example: "#FFFFFF"
+        new_frameworks:
+          type: array
+          description: Names of new Impact Frameworks to create and add at the end
+          items:
+            type: string
+        financial_values:
+          type: array
+          description: The Financial Value for each Outcome, used when value_source is set_values. Replaces the current list.
+          items:
+            type: object
+            properties:
+              outcome_id:
+                type: integer
+              financial_value_id:
+                type: integer
+
+    FrameworkContribution:
+      type: object
+      properties:
+        framework_set_id:
+          type: integer
+        charity_id:
+          type: integer
+        project_id:
+          type: integer
+          nullable: true
+        bundle_id:
+          type: integer
+          nullable: true
+        period:
+          type: string
+          example: all_time
+        summary:
+          type: object
+          description: Each Story, Contact and entry counted once for the whole set
+          properties:
+            frameworks_contributed:
+              type: integer
+              description: How many of the set's Impact Frameworks (e.g. SDG Goals) at least one Story contributes to
+            frameworks_total:
+              type: integer
+            stories:
+              type: integer
+            reached:
+              type: integer
+              description: Distinct Contacts (people and organisations) tagged on the counted entries
+            entries:
+              type: integer
+            financial_value:
+              type: number
+        frameworks:
+          type: array
+          description: Every Impact Framework in the set, in order. Figures overlap, so never add them up.
+          items:
+            type: object
+            properties:
+              template_id:
+                type: integer
+              name:
+                type: string
+                example: Quality education
+              short_code:
+                type: string
+                nullable: true
+                example: "4"
+              position:
+                type: integer
+              stories:
+                type: integer
+              outcomes:
+                type: array
+                description: The Outcomes (e.g. SDG Targets) with a contribution
+                items:
+                  type: object
+                  properties:
+                    outcome_id:
+                      type: integer
+                    title:
+                      type: string
+                    indicators:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          indicator_id:
+                            type: integer
+                          name:
+                            type: string
+                          membership:
+                            type: string
+                            enum: [core, linked]
+                            description: "`core`: part of the framework itself; `linked`: one of the organisation's own Indicators"
+                          stories:
+                            type: integer
+                          reached:
+                            type: integer
+                          financial_value:
+                            type: number
+
+    FrameworkLinkMigration:
+      type: object
+      properties:
+        carried:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrameworkLinkReference'
+        not_carried:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrameworkLinkReference'
+
+    FrameworkLinkReference:
+      type: object
+      properties:
+        id:
+          type: integer
+        indicator_id:
+          type: integer
+        outcome_id:
+          type: integer
+
+    FrameworkLink:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            id:
+              type: integer
+            charity_id:
+              type: integer
+            indicator_id:
+              type: integer
+            indicator_name:
+              type: string
+              example: Bootcamp completions
+            outcome_id:
+              type: integer
+            outcome_title:
+              type: string
+              example: "4.4 Increase the number of youth and adults who have relevant skills"
+            project_ids:
+              type: array
+              items:
+                type: integer
+              description: The projects the link counts in; empty when it counts in every project
+            all_projects:
+              type: boolean
+
+    PaginatedFrameworkLinks:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FrameworkLink'
 
     PaginatedOutcomeIndicators:
       allOf:
@@ -5023,6 +6927,75 @@ components:
           items:
             $ref: '#/components/schemas/CohortTrackerDeadline'
 
+    CohortTrackerResult:
+      type: object
+      properties:
+        cohort_tracker_id:
+          type: integer
+        name:
+          type: string
+        project_id:
+          type: integer
+          description: Present for a Project's result
+        album_id:
+          type: integer
+          description: Present for an Album's result
+        timeframe:
+          type: string
+          enum: [period, year_to_date, all_time]
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+          description: null when the window runs from the start
+        ends_on:
+          type: string
+          format: date
+        count:
+          type: integer
+          description: The result, a number of distinct Contacts
+        eligible_count:
+          type: integer
+          description: Members the criteria could judge (who have the data the criteria need)
+        target:
+          type: object
+          nullable: true
+          properties:
+            number:
+              type: integer
+            date:
+              type: string
+              format: date
+              nullable: true
+              description: null for the one-off target
+        qualifying_value_label:
+          type: string
+          nullable: true
+          example: Attendance rate
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              restricted:
+                type: boolean
+                description: true for a Contact the user may not read; no other fields are given
+              id:
+                type: integer
+              name:
+                type: string
+              qualifying_value:
+                type: number
+                nullable: true
+
     PaginatedCohortTrackers:
       allOf:
         - $ref: '#/components/schemas/PaginationEnvelope'
@@ -5032,6 +7005,269 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/CohortTracker'
+
+    WorkflowTrackerAttributes:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        source:
+          type: string
+          enum: [signpostings, internal_referrals]
+          description: What it counts
+        count_mode:
+          type: string
+          enum: [items, contacts]
+          description: "items: each signposting or referral (adds up across periods); contacts: each Contact once (a snapshot)"
+        settings:
+          type: object
+          description: "internal_referrals only: which Projects count as a referral. signpostings has none."
+          properties:
+            destinations:
+              type: string
+              enum: [any, only, except]
+            project_ids:
+              type: array
+              items:
+                type: integer
+
+    WorkflowTracker:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "Signpostings made"
+        description:
+          type: string
+          nullable: true
+        charity_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        source:
+          type: string
+          enum: [signpostings, internal_referrals]
+        count_mode:
+          type: string
+          enum: [items, contacts]
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+          description: additive adds up across periods; snapshot works each timeframe out on its own
+        settings:
+          type: object
+          example:
+            destinations: "except"
+            project_ids: [4512]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WorkflowTrackerDetail:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowTracker'
+        - type: object
+          properties:
+            usage:
+              type: object
+              properties:
+                projects:
+                  type: integer
+                albums:
+                  type: integer
+                templates:
+                  type: integer
+
+    WorkflowTrackerRequest:
+      type: object
+      properties:
+        workflow_tracker:
+          allOf:
+            - $ref: '#/components/schemas/WorkflowTrackerAttributes'
+            - type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: Required when creating
+
+    WorkflowTrackerPreview:
+      type: object
+      properties:
+        project_id:
+          type: integer
+        period_end:
+          type: string
+          format: date
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+        results:
+          type: object
+          properties:
+            period:
+              type: integer
+            year_to_date:
+              type: integer
+            all_time:
+              type: integer
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              contact_name:
+                type: string
+              detail:
+                type: string
+                description: Who they were signposted to, or the Project they were referred to
+              happened_at:
+                type: string
+                format: date-time
+
+    WorkflowTrackerPlacement:
+      type: object
+      properties:
+        workflow_tracker_id:
+          type: integer
+        project_id:
+          type: integer
+        column:
+          type: string
+          enum: [activities, engagement, potential, behaviour, growth]
+        target:
+          type: integer
+          example: 40
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    WorkflowTrackerAlbumTargets:
+      type: object
+      properties:
+        workflow_tracker_id:
+          type: integer
+        album_id:
+          type: integer
+        album_target_type:
+          type: string
+          enum: [manual_target, automatic_target]
+        target:
+          type: integer
+          example: 120
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    PaginatedWorkflowTrackers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkflowTracker'
+    FilteredMetric:
+      type: object
+      description: A filtered version of a Change or Indicator
+      properties:
+        id:
+          type: integer
+        display_name:
+          type: string
+          example: "Session attendances — Female, under 21"
+        parent_type:
+          type: string
+          enum: [Change, Indicator]
+          description: Change (Activity or Engagement tracker) or Indicator (Choice, Achievement or Numerical tracker)
+        parent_id:
+          type: integer
+        parent_name:
+          type: string
+        outcome_id:
+          type: integer
+          nullable: true
+          description: The Outcome an Indicator's filtered version sits under; null for a Change's
+        response_criteria:
+          type: object
+          description: Response Filters (Progress Board "Filter responses/stories by" keys)
+        contact_criteria:
+          type: object
+          description: Contact Filters, in the shape a Saved Filter uses
+        charity_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    FilteredMetricRequest:
+      type: object
+      properties:
+        filtered_metric:
+          type: object
+          properties:
+            parent_type:
+              type: string
+              enum: [Change, Indicator]
+              description: Creating only
+            parent_id:
+              type: integer
+              description: Creating only
+            display_name:
+              type: string
+            column:
+              type: string
+              enum: [activities, engagement, potential, behaviour, growth]
+              description: Creating a Change's filtered version only; defaults to the parent's column
+            response_criteria:
+              type: object
+            contact_criteria:
+              type: object
+    FilteredMetricResult:
+      type: object
+      properties:
+        filtered_metric_id:
+          type: integer
+        timeframe:
+          type: string
+          enum: [period, year_to_date, all_time]
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+        number:
+          type: number
+          description: Matching attendances (or answers); a Numerical tracker's total
+        unit:
+          type: string
+          example: count
+    PaginatedFilteredMetrics:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FilteredMetric'
 
     WebhookEvent:
       type: string
