@@ -3309,9 +3309,20 @@ paths:
           isn't a referral. `settings` choose which Projects count: `{destinations: any}`,
           `{destinations: only, project_ids: [...]}` or `{destinations: except, project_ids: [...]}`
           (the default, with none listed).
+        - `cases_created`: Cases (Cases App) created on the Project, or on any of an Album's Projects,
+          each Case counted once.
+        - `cases_closed`: each time one of those Cases is closed. A Case closed, reopened and closed
+          again counts twice, or once when counting each Contact once.
+        - `cases_open`: the Cases open at the end of each timeframe (or today, while that is still to
+          come). Always a snapshot.
 
-        `count_mode` is `items` (default: each signposting or referral; adds up across periods) or
-        `contacts` (each Contact once; a snapshot). Requires an editor or reporter of the Organisation.
+        For the three Cases sources, `settings` can name one Case Form, `{case_form_id: ...}`, to count
+        only the Cases created with it; leave it out or send null for any Case Form. Confidential Cases
+        are counted, but only listed to people who can see them.
+
+        `count_mode` is `items` (default: each signposting, referral, Case or closing; adds up across
+        periods, except for `cases_open`) or `contacts` (each Contact once; a snapshot). Requires an
+        editor or reporter of the Organisation.
       operationId: createWorkflowTracker
       security: [{tokenAuth: []}]
       requestBody:
@@ -3320,15 +3331,28 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/WorkflowTrackerRequest'
-            example:
-              workflow_tracker:
-                charity_id: 913
-                name: "Internal referrals"
-                source: "internal_referrals"
-                count_mode: "items"
-                settings:
-                  destinations: "except"
-                  project_ids: [4512, 4513]
+            examples:
+              internalReferrals:
+                summary: Internal referrals to any Project but two
+                value:
+                  workflow_tracker:
+                    charity_id: 913
+                    name: "Internal referrals"
+                    source: "internal_referrals"
+                    count_mode: "items"
+                    settings:
+                      destinations: "except"
+                      project_ids: [4512, 4513]
+              casesOpen:
+                summary: Cases open, for one Case Form
+                value:
+                  workflow_tracker:
+                    charity_id: 913
+                    name: "Safeguarding cases open"
+                    source: "cases_open"
+                    count_mode: "items"
+                    settings:
+                      case_form_id: 2207
       responses:
         "201":
           description: Workflow Tracker created
@@ -7330,15 +7354,15 @@ components:
           type: string
         source:
           type: string
-          enum: [signpostings, internal_referrals]
+          enum: [signpostings, internal_referrals, cases_created, cases_closed, cases_open]
           description: What it counts
         count_mode:
           type: string
           enum: [items, contacts]
-          description: "items: each signposting or referral (adds up across periods); contacts: each Contact once (a snapshot)"
+          description: "items: each signposting, referral, Case or Case closing (adds up across periods, except cases_open); contacts: each Contact once (a snapshot)"
         settings:
           type: object
-          description: "internal_referrals only: which Projects count as a referral. signpostings has none."
+          description: "internal_referrals: which Projects count as a referral. The Cases sources: the Case Form to count (null for any). signpostings has none."
           properties:
             destinations:
               type: string
@@ -7347,6 +7371,10 @@ components:
               type: array
               items:
                 type: integer
+            case_form_id:
+              type: integer
+              nullable: true
+              description: "Cases sources only: count only the Cases created with this one of the Organisation's Case Forms"
 
     WorkflowTracker:
       type: object
@@ -7366,14 +7394,14 @@ components:
           nullable: true
         source:
           type: string
-          enum: [signpostings, internal_referrals]
+          enum: [signpostings, internal_referrals, cases_created, cases_closed, cases_open]
         count_mode:
           type: string
           enum: [items, contacts]
         result_kind:
           type: string
           enum: [additive, snapshot]
-          description: additive adds up across periods; snapshot works each timeframe out on its own
+          description: additive adds up across periods; snapshot (counting each Contact once, or cases_open) works each timeframe out on its own
         settings:
           type: object
           example:
@@ -7433,8 +7461,12 @@ components:
               type: integer
             all_time:
               type: integer
+        hidden_count:
+          type: integer
+          description: Latest records counted but not listed, because the user may not see them (e.g. a confidential Case)
         records:
           type: array
+          description: The latest records counted that the user may see
           items:
             type: object
             properties:
@@ -7442,7 +7474,7 @@ components:
                 type: string
               detail:
                 type: string
-                description: Who they were signposted to, or the Project they were referred to
+                description: Who they were signposted to, the Project they were referred to, or the Case's title
               happened_at:
                 type: string
                 format: date-time
@@ -7545,11 +7577,15 @@ components:
               detail:
                 type: string
                 nullable: true
-                description: Who the Contact was signposted to, or the Project they were referred to
+                description: Who the Contact was signposted to, the Project they were referred to, or the Case's title
               project_id:
                 type: integer
                 nullable: true
                 description: A referral's destination Project
+              case_id:
+                type: integer
+                nullable: true
+                description: The Case, for the Cases sources
               happened_at:
                 type: string
                 format: date-time
