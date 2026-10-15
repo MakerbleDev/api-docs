@@ -3016,6 +3016,11 @@ paths:
       description: |
         Updates the fields sent. Changes apply everywhere the tracker is used. Requires an
         Organisation editor, or the reporter who created it.
+
+        Switching `result_type` between a number of Contacts and a percentage clears the tracker's
+        targets on every Project and Album, because the two aren't comparable. While it has targets,
+        the switch is refused (422, "Switching result type clears this tracker's N targets. Confirm to
+        continue.") unless `confirm_clear_targets` is true.
       operationId: updateCohortTracker
       security: [{tokenAuth: []}]
       parameters:
@@ -3767,6 +3772,11 @@ paths:
         `qualifying_value_label`, e.g. an attendance rate as a percentage) where the criteria have one.
         A Contact the user may not read is listed as `{restricted: true}` with no details, so the
         list always adds up to `count`. Requires the same rights as viewing that Results Canvas.
+
+        A percentage tracker also returns `denominator_count` and `percentage`, as the canvas shows
+        "84% Children attending 75%+" with "42 of 50 contacts with enough data". The cohort is always
+        within the denominator. `percentage` is a whole number, or null when `denominator_count` is 0
+        (the canvas shows "–"). `cohort=not_in` lists the rest of the denominator.
       operationId: getCohortTrackerProjectResults
       security: [{tokenAuth: []}]
       parameters:
@@ -3774,6 +3784,7 @@ paths:
         - $ref: '#/components/parameters/CohortTrackerProjectId'
         - $ref: '#/components/parameters/CohortTrackerTimeframe'
         - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/CohortTrackerCohort'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -3791,9 +3802,14 @@ paths:
                 starts_on: "2026-04-01"
                 ends_on: "2026-06-30"
                 count: 42
-                eligible_count: 60
-                target: { number: 50, date: "2026-06-30" }
+                eligible_count: 50
+                result_type: percentage
+                denominator: enough_data
+                denominator_count: 50
+                percentage: 84
+                target: { number: 75, date: "2026-06-30" }
                 qualifying_value_label: Attendance rate
+                cohort: in
                 page: 1
                 page_size: 2
                 page_count: 21
@@ -3958,6 +3974,11 @@ paths:
         `qualifying_value_label`, e.g. an attendance rate as a percentage) where the criteria have one.
         A Contact the user may not read is listed as `{restricted: true}` with no details, so the
         list always adds up to `count`. Requires the same rights as viewing that Results Canvas.
+
+        A percentage tracker also returns `denominator_count` and `percentage`, as the canvas shows
+        "84% Children attending 75%+" with "42 of 50 contacts with enough data". The cohort is always
+        within the denominator. `percentage` is a whole number, or null when `denominator_count` is 0
+        (the canvas shows "–"). `cohort=not_in` lists the rest of the denominator.
       operationId: getCohortTrackerAlbumResults
       security: [{tokenAuth: []}]
       parameters:
@@ -3965,6 +3986,7 @@ paths:
         - $ref: '#/components/parameters/CohortTrackerAlbumId'
         - $ref: '#/components/parameters/CohortTrackerTimeframe'
         - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/CohortTrackerCohort'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -3982,9 +4004,14 @@ paths:
                 starts_on: "2026-04-01"
                 ends_on: "2026-06-30"
                 count: 42
-                eligible_count: 60
-                target: { number: 50, date: "2026-06-30" }
+                eligible_count: 50
+                result_type: percentage
+                denominator: enough_data
+                denominator_count: 50
+                percentage: 84
+                target: { number: 75, date: "2026-06-30" }
                 qualifying_value_label: Attendance rate
+                cohort: in
                 page: 1
                 page_size: 2
                 page_count: 21
@@ -4657,6 +4684,15 @@ components:
       description: |
         period: the day after the previous Target Deadline up to the deadline. year_to_date: the
         start of the Project's or Album's year up to the deadline. all_time: everything up to the deadline.
+    CohortTrackerCohort:
+      name: cohort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [in, not_in]
+        default: in
+      description: Which Contacts `data` lists. `in` the cohort; for a percentage, `not_in` lists the Contacts in the denominator who aren't in the cohort (the popup's Not in cohort tab).
     CohortTrackerAsOf:
       name: as_of
       in: query
@@ -7054,7 +7090,17 @@ components:
           description: Membership of the Project or Album the tracker is placed on
         result_type:
           type: string
-          enum: [number]
+          enum: [number, percentage]
+          description: Show the result as a number of Contacts, or a percentage of the denominator
+        denominator:
+          type: string
+          enum: [members, enough_data]
+          nullable: true
+          description: |
+            For a percentage, what it is out of: `members` (Contacts in this Project / Album) or
+            `enough_data` (Contacts with enough data to be judged on every data-based criterion: invited
+            to an event in scope for Attendance Rate, two or more Choice Tracker responses for Distance
+            Travelled Direction, a response to the question for an answer-based criterion). null for a number.
         criteria:
           type: object
           description: Contact Filter criteria, in the shape a Saved Filter uses
@@ -7102,6 +7148,19 @@ components:
               enum: [ever_enrolled, currently_enrolled]
             criteria:
               type: object
+            result_type:
+              type: string
+              enum: [number, percentage]
+              description: Default number
+            denominator:
+              type: string
+              enum: [members, enough_data]
+              description: For a percentage. Defaults to members
+        confirm_clear_targets:
+          type: boolean
+          description: |
+            Update only. Switching result_type between number and percentage clears the tracker's
+            targets everywhere, so it is refused (422) while it has targets unless this is true.
 
     CohortTrackerDeadline:
       type: object
@@ -7116,7 +7175,9 @@ components:
 
     CohortTrackerTargetsRequest:
       type: object
-      description: Send target, deadlines or both. deadlines replaces the tracker's deadline targets.
+      description: |
+        Send target, deadlines or both. deadlines replaces the tracker's deadline targets. For a
+        percentage tracker, the target and each deadline number are a whole percentage from 0 to 100.
       properties:
         target:
           type: integer
@@ -7192,6 +7253,21 @@ components:
         eligible_count:
           type: integer
           description: Members the criteria could judge (who have the data the criteria need)
+        result_type:
+          type: string
+          enum: [number, percentage]
+        denominator:
+          type: string
+          enum: [members, enough_data]
+          nullable: true
+        denominator_count:
+          type: integer
+          nullable: true
+          description: For a percentage, how many Contacts it is out of. null for a number
+        percentage:
+          type: integer
+          nullable: true
+          description: count as a whole percentage of denominator_count. null for a number, or when denominator_count is 0
         target:
           type: object
           nullable: true
@@ -7207,6 +7283,10 @@ components:
           type: string
           nullable: true
           example: Attendance rate
+        cohort:
+          type: string
+          enum: [in, not_in]
+          description: Which Contacts data lists
         page:
           type: integer
         page_size:
