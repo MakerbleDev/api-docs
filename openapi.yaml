@@ -3652,6 +3652,102 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /workflow_trackers/{id}/projects/{project_id}/results:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker's result on a Project
+      description: |
+        A Workflow Tracker's result on a Project's Results Canvas, with the items behind it: what the
+        Workflow Tracker card shows, and the list its popup opens. The tracker must be on the Project.
+
+        `result_kind` `additive` (counting each signposting or referral) adds up across periods.
+        `snapshot` (counting each Contact once) is worked out for the window on its own and read as of
+        `as_of`: the window's last day, or today while that is still to come. `target` is the deadline
+        targets dated in the window, added up (for a snapshot, the one on its last day), or else the
+        one-off target, or null.
+
+        `data` lists one page of the items counted, newest first: the Contact, `detail` (who they were
+        signposted to, or the Project they were referred to), `project_id` (a referral's destination) and
+        when it happened. `total_count` counts every item, whatever the count mode. An item the user may
+        not see (a Contact they can't read, or a referral to a Project they can't see) is counted in
+        `hidden_count` for that page but never listed. Requires the same rights as viewing that Results
+        Canvas.
+      operationId: getWorkflowTrackerProjectResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the items behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerResult'
+              example:
+                workflow_tracker_id: 7
+                name: Signpostings made
+                project_id: 34
+                timeframe: period
+                starts_on: "2026-07-01"
+                ends_on: "2026-12-31"
+                result_kind: additive
+                as_of: null
+                number: 12
+                target: 20
+                page: 1
+                page_size: 9
+                page_count: 2
+                total_count: 12
+                hidden_count: 1
+                data:
+                  - { contact_id: 501, contact_name: Thandi Mokoena, detail: "Mfuleni Clinic · Nurse Dlamini", project_id: null, happened_at: "2026-09-01T09:00:00Z" }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers/{id}/albums/{bundle_id}/results:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker's result on an Album
+      description: |
+        As for a Project, across the Album's open Projects: an item, or in `contacts` mode a Contact,
+        counts once however many of its Projects it relates to, so the result is never the sum of the
+        Projects'. The tracker must be on one of the Album's Projects. Requires rights to see the Album.
+      operationId: getWorkflowTrackerAlbumResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the items behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /cohort_trackers/{id}/projects/{project_id}/results:
     get:
       tags: [Cohort Trackers]
@@ -7305,6 +7401,77 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    WorkflowTrackerResult:
+      type: object
+      properties:
+        workflow_tracker_id:
+          type: integer
+        name:
+          type: string
+        project_id:
+          type: integer
+          description: Present for a Project's result
+        album_id:
+          type: integer
+          description: Present for an Album's result
+        timeframe:
+          type: string
+          enum: [period, year_to_date, all_time]
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+          description: Null when the window runs from the start
+        ends_on:
+          type: string
+          format: date
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+        as_of:
+          type: string
+          format: date
+          nullable: true
+          description: For a snapshot, the date it is read at
+        number:
+          type: integer
+        target:
+          type: integer
+          nullable: true
+        page:
+          type: integer
+        page_size:
+          type: integer
+          description: Items listed on this page
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+          description: Every item counted, whatever the count mode
+        hidden_count:
+          type: integer
+          description: Items on this page counted but not listed, because the user may not see them
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              contact_id:
+                type: integer
+              contact_name:
+                type: string
+              detail:
+                type: string
+                nullable: true
+                description: Who the Contact was signposted to, or the Project they were referred to
+              project_id:
+                type: integer
+                nullable: true
+                description: A referral's destination Project
+              happened_at:
+                type: string
+                format: date-time
 
     PaginatedWorkflowTrackers:
       allOf:
