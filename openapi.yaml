@@ -83,7 +83,9 @@ info:
     | `story.updated` | A Story is edited, including a draft being published | Same |
     | `project.created` / `project.updated` | A Project is created / edited | Same as `GET /projects/{id}` |
     | `import.completed` | A spreadsheet import has processed every row. Rows of an import send no events of their own | `import_id`, `import_type`, `kind`, `status`, `counts`, `charity_id` |
-    | `webhook.test` | Someone sends a test event | `{ "test": true }` |
+    | `webhook.test` | Someone sends a test event | `{ "test": true, "message": "This is a test event from Makerble." }` |
+
+    `*.updated` events are sent about 10 seconds after the change, so several saves of one change (publishing a draft Story saves it more than once) arrive as one event showing the latest state.
 
     Every request has this body:
     ```json
@@ -2944,7 +2946,7 @@ paths:
       tags: [Webhooks]
       summary: Send a test event
       description: |
-        Queues a `webhook.test` event (`data: { "test": true }`) for the endpoint. Check the
+        Queues a `webhook.test` event (`data: { "test": true, "message": "This is a test event from Makerble." }`) for the endpoint. Check the
         delivery log a few seconds later for the result.
       operationId: sendWebhookTestEvent
       security: [{tokenAuth: []}]
