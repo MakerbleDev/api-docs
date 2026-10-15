@@ -1202,7 +1202,7 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Full Contact profile with all custom fields" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
-          ])}
+          ], "Opening a Contact this way is recorded in its <strong>Access Log</strong>, the audit trail of who has viewed it, under your name and marked as via the API (or via MCP when the Makerble MCP server sends <code>X-Makerble-Client: makerble-mcp</code>). Views less than 30 minutes apart are counted together. Use <code>GET /beneficiaries</code> when you only need to find or scan Contacts.")}
           ${endpointCard("POST", "/beneficiaries", "Create a Contact", true, [], [
             { code: "200", cls: "response-2xx", desc: "Contact created" },
             { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required)" }
@@ -1386,7 +1386,7 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Full Story with custom_fields, case_ids, story_indicator_beneficiaries, story_changes, verdict_scores" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
-          ])}
+          ], "Opening a Story this way is recorded in its <strong>Access Log</strong>, the audit trail of who has viewed it, under your name and marked as via the API (or via MCP when the Makerble MCP server sends <code>X-Makerble-Client: makerble-mcp</code>). Views less than 30 minutes apart are counted together. Use <code>GET /stories</code> when you only need to find or scan Stories.")}
           ${endpointCard("POST", "/stories", "Create a Story", true, [], [
             { code: "200", cls: "response-2xx", desc: "Story created" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }

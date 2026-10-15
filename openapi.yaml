@@ -723,7 +723,7 @@ paths:
     get:
       tags: [Beneficiaries]
       summary: Get a single Beneficiary (Contact)
-      description: Returns full profile including all custom fields.
+      description: "Returns a Contact's full profile including all custom fields. Opening a Contact this way is recorded in its Access Log, the audit trail of who has viewed it, under the caller's name and marked as via the API (or via MCP when the Makerble MCP server sends `X-Makerble-Client: makerble-mcp`). Views by the same caller less than 30 minutes apart are counted together. Use the list endpoint when you only need to find or scan Contacts."
       operationId: getBeneficiary
       security: [{tokenAuth: []}]
       parameters:
@@ -1223,7 +1223,7 @@ paths:
     get:
       tags: [Stories]
       summary: Get a single Story
-      description: Returns a Story with full detail — custom fields, beneficiary IDs, case IDs, indicator responses, change values, and verdict scores.
+      description: "Returns a Story with full detail — custom fields, beneficiary IDs, case IDs, indicator responses, change values, and verdict scores. Opening a Story this way is recorded in its Access Log, the audit trail of who has viewed it, under the caller's name and marked as via the API (or via MCP when the Makerble MCP server sends `X-Makerble-Client: makerble-mcp`). Views by the same caller less than 30 minutes apart are counted together. Use the list endpoint when you only need to find or scan Stories."
       operationId: getStory
       security: [{tokenAuth: []}]
       parameters:
