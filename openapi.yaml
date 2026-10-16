@@ -172,6 +172,8 @@ tags:
     description: Audit trail — who created or edited a Contact, when, and what it looked like at the time
   - name: Access Logs
     description: Audit trail of views — who opened or fetched a Contact, when, and how many times
+  - name: Audit Trail
+    description: Organisation-wide feed of changes (Versions) and views (Access Logs) across Contacts and Stories
   - name: Indicators
     description: Scale, Binary, and Value progress trackers linked to Outcomes
   - name: Outcomes
@@ -2008,6 +2010,82 @@ paths:
                 data:
                   - { id: 912, record_type: Contact, record_id: 185170, charity_id: 304, action: "Viewed ×1", view_count: 1, source: mcp, user_id: 190, user_name: Sam Ahmed, first_viewed_at: "2026-10-02T14:05:00.000+01:00", last_viewed_at: "2026-10-02T14:05:00.000+01:00", monthly_summary: false }
                   - { id: 877, record_type: Contact, record_id: 185170, charity_id: 304, action: "Viewed ×3", view_count: 3, source: web, user_id: 212, user_name: Jane Smith, first_viewed_at: "2026-10-01T09:20:00.000+01:00", last_viewed_at: "2026-10-01T09:30:00.000+01:00", monthly_summary: false }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /audit_trail:
+    get:
+      tags: [Audit Trail]
+      summary: List an Organisation's latest changes and views (Audit Trail)
+      description: |
+        Returns the Organisation's **Audit Trail**, newest first: the changes (Versions: Created, Edited, Destroyed) and
+        views (Access Logs: Viewed) across all its Contacts (Beneficiaries) and Stories (including Survey Responses).
+        This is the **Audit Trail** page, reached from Contacts → More Options → Audit trail. For one record's
+        complete history use `GET /versions` and `GET /access_logs` instead.
+
+        Views by the same colleague, through the same route, less than 30 minutes apart are one entry with a
+        `view_count`. Only views within the Organisation's retention period are listed; older views are monthly
+        summaries on `GET /access_logs`. Stories have views but no Versions yet.
+
+        Visible to Charity Editors (everything in their Organisation) and Project Editors (Contacts and Stories in
+        their Projects). An Organisation the caller may not audit returns `404`.
+      operationId: listAuditTrail
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - name: actions
+          in: query
+          schema:
+            type: string
+          example: created,edited
+          description: Comma-separated types of action to include, from `created`, `edited`, `destroyed`, `viewed` (default all)
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Only this colleague's actions
+        - name: record_type
+          in: query
+          schema:
+            type: string
+            enum: [Contact, Story]
+          description: Only Contacts, or only Stories
+        - name: record_id
+          in: query
+          schema:
+            type: integer
+          description: Only this record (needs `record_type`)
+        - $ref: '#/components/parameters/Page'
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 200
+          description: Records per page (default 10, max 200)
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Audit Trail entries for the Organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAuditTrail'
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - { entry_type: access_log, id: 912, action: Viewed, record_type: Contact, record_id: 185170, record_name: Bella Thornton, occurred_at: "2026-10-02T14:05:00.000+01:00", user_id: 190, who: Sam Ahmed (via MCP), view_count: 2, source: mcp }
+                  - { entry_type: version, id: 50211, action: Edited, record_type: Contact, record_id: 185170, record_name: Bella Thornton, occurred_at: "2026-10-01T09:30:00.000+01:00", user_id: 212, who: Jane Smith, view_count: null, source: null }
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -6141,6 +6219,55 @@ components:
           type: boolean
           description: True for a monthly summary entry, which totals one colleague's views of the record in that month once they passed the retention period
 
+    PaginatedAuditTrail:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditTrailEntry'
+    AuditTrailEntry:
+      type: object
+      properties:
+        entry_type:
+          type: string
+          enum: [version, access_log]
+          description: '`version` for a change (its `id` works with `GET /versions/{id}`), `access_log` for a view'
+        id:
+          type: integer
+        action:
+          type: string
+          enum: [Created, Edited, Destroyed, Viewed]
+        record_type:
+          type: string
+          enum: [Contact, Story]
+        record_id:
+          type: integer
+        record_name:
+          type: string
+          description: The Contact's name as shown in Makerble, or "<Survey> in <Project>, <date>" for a Story
+        occurred_at:
+          type: string
+          format: date-time
+          description: When the change was saved, or when the view session was last active
+        user_id:
+          type: integer
+          nullable: true
+          description: The colleague, or null for a change made by Makerble itself or an integration
+        who:
+          type: string
+          description: The colleague's name, with "(via API)" or "(via MCP)" for views through those routes, or System / the integration's name
+        view_count:
+          type: integer
+          nullable: true
+          description: Views in the session (views only)
+        source:
+          type: string
+          nullable: true
+          enum: [web, api, mcp, null]
+          description: How the record was viewed (views only)
     PaginatedAccessLogs:
       allOf:
         - $ref: '#/components/schemas/PaginationEnvelope'

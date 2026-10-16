@@ -894,6 +894,7 @@ function buildDocsPage() {
         <a href="#changes"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Changes</a>
         <a href="#versions"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Versions</a>
         <a href="#access-logs"     class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Access Logs</a>
+        <a href="#audit-trail"     class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Audit Trail</a>
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
@@ -1531,6 +1532,31 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated Access Log entries, newest first, plus the record's name and whether it has been deleted" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Audit Trail -->
+      <section class="section" id="audit-trail">
+        <div class="section-eyebrow">Audit &amp; compliance</div>
+        <h2 class="section-title">Audit Trail</h2>
+        <div class="section-desc">
+          <p>The Audit Trail is an Organisation's feed of changes (Versions: Created, Edited, Destroyed) and views (Access Logs: Viewed) across all its Contacts and Stories, newest first, as on the <strong>Audit Trail</strong> page (Contacts → More Options → Audit trail). Each entry has an <code>entry_type</code> of <code>version</code> or <code>access_log</code>. Only views within the Organisation's retention period are listed; older views are monthly summaries on <code>GET /access_logs</code>.</p>
+          <p>Visible to Charity Editors (everything in their Organisation) and Project Editors (Contacts and Stories in their Projects). Anything else returns <code>404</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/audit_trail", "List an Organisation's latest changes and views", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "Organisation (Charity) ID" },
+            { name: "actions", type: "string", required: false, desc: "Comma-separated, from <code>created</code>, <code>edited</code>, <code>destroyed</code>, <code>viewed</code> (default all)" },
+            { name: "user_id", type: "integer", required: false, desc: "Only this colleague's actions" },
+            { name: "record_type", type: "string", required: false, desc: "<code>Contact</code> or <code>Story</code>" },
+            { name: "record_id", type: "integer", required: false, desc: "Only this record (needs <code>record_type</code>)" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only entries after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Audit Trail entries, newest first" },
+            { code: "404", cls: "response-4xx", desc: "Organisation not found, or you can't audit it" }
           ])}
         </div>
       </section>
