@@ -2181,12 +2181,24 @@ function buildDocsPage() {
           ${endpointCard("PATCH", "/events/{id}", "Update an event", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
             { name: "(any create field)", type: "", required: false, desc: "Only the fields you give change" },
-            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or all_events_in_series, for a master event" }
+            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or all_events_in_series, for a master event" },
+            { name: "recurring_schedule / recurring_end_date", type: "object / string", required: false, desc: "Master event only: a new schedule or end date for the whole series. Preview it first" },
+            { name: "keep_event_ids / delete_event_ids", type: "array", required: false, desc: "With a schedule change: every event that no longer fits, kept or deleted" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The updated event" },
             { code: "403", cls: "response-4xx", desc: "You may not edit this event" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
-            { code: "422", cls: "response-4xx", desc: "Every problem with the request, as errors; also a locked field such as the project" }
+            { code: "422", cls: "response-4xx", desc: "Every problem with the request, as errors; also a locked field such as the project, or an event that no longer fits and isn't kept or deleted" }
+          ])}
+          ${endpointCard("POST", "/events/{id}/series_schedule_preview", "Preview a series schedule change", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The master event (first of the series)" },
+            { name: "recurring_schedule", type: "object", required: false, desc: "{ frequency, interval, days_of_week, days_of_month }; leave out to keep it" },
+            { name: "recurring_end_date", type: "string", required: false, desc: "YYYY-MM-DD; leave out to keep it" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "required_dates (existing or to be created) and no_longer_fitting_events, with has_stories and has_timesheets. Nothing is changed" },
+            { code: "403", cls: "response-4xx", desc: "You may not edit this event" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "Not a master event, or a schedule or end date that can't be used" }
           ])}
         </div>
       </section>

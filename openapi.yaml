@@ -3217,8 +3217,14 @@ paths:
         and all future events" button. The default is `this_event`.
 
         Locked after creation, as on the Edit Event page: the project, a series' time zone, and
-        a master event's start and end (they set the times of the whole series). Changing a
-        series' Recurring Schedule or Recurring End Date isn't supported by this endpoint.
+        a master event's start and end (they set the times of the whole series).
+
+        To change a series' Recurring Schedule or Recurring End Date, as the Edit Event Series
+        page does, send `recurring_schedule` and/or `recurring_end_date` on the master event.
+        Call Preview a series schedule change first: it lists the events that would no longer
+        fit the new schedule. Each of those must be listed in `keep_event_ids` or
+        `delete_event_ids`, or nothing changes and you get `422`. Missing dates are created,
+        and the series is renumbered in date order.
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -3239,6 +3245,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /events/{id}/series_schedule_preview:
+    post:
+      tags: [Events]
+      summary: Preview a series schedule change
+      operationId: previewEventSeriesScheduleChange
+      description: |
+        Shows what a new Recurring Schedule or Recurring End Date would do to a recurring series,
+        without changing anything, as the Edit Event Series page does before you save. Send it to
+        the master event (the first event of the series). Leave out either field to keep its
+        current value.
+
+        `required_dates` lists every date the new schedule needs, with the event already on that
+        date or `exists: false` for one that would be created. `no_longer_fitting_events` lists
+        the events that don't fit the new schedule, and whether each has Stories or timesheets
+        recorded against it. Pass each of their ids in `keep_event_ids` or `delete_event_ids`
+        when you make the change with Update an event.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeriesScheduleChangeRequest'
+            example:
+              recurring_schedule: { frequency: weekly, interval: 2, days_of_week: [tuesday] }
+              recurring_end_date: "2030-02-05"
+      responses:
+        "200":
+          description: What the change would do
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesSchedulePreview'
+              example:
+                master_event_id: 9119
+                recurring_schedule: { frequency: weekly, interval: 2, days_of_week: [tuesday], days_of_month: [], description: "Every 2 weeks on Tuesdays" }
+                recurring_end_date: "2030-02-05"
+                required_dates:
+                  - { start_datetime: "2030-01-08T18:00:00.000Z", event_id: 9119, exists: true }
+                  - { start_datetime: "2030-01-22T18:00:00.000Z", event_id: 9121, exists: true }
+                  - { start_datetime: "2030-02-05T18:00:00.000Z", event_id: null, exists: false }
+                no_longer_fitting_events:
+                  - { id: 9120, name: "Youth Club 2", start_datetime: "2030-01-15T18:00:00.000Z", has_stories: false, has_timesheets: false }
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -6165,6 +6225,53 @@ components:
             listing_enabled: { type: boolean, description: "Needs a Signup Page" }
             description: { type: string, description: "HTML" }
         apply_to: { type: string, enum: [this_event, all_events_in_series], default: this_event }
+        recurring_schedule:
+          allOf: [{ $ref: '#/components/schemas/RecurringScheduleInput' }]
+          description: "Master event only: a new Recurring Schedule for the whole series"
+        recurring_end_date: { type: string, format: date, description: "Master event only: a new Recurring End Date for the whole series" }
+        keep_event_ids: { type: array, items: { type: integer }, description: "With a schedule change: events that no longer fit, to keep" }
+        delete_event_ids: { type: array, items: { type: integer }, description: "With a schedule change: events that no longer fit, to delete" }
+
+    SeriesScheduleChangeRequest:
+      type: object
+      properties:
+        recurring_schedule: { $ref: '#/components/schemas/RecurringScheduleInput' }
+        recurring_end_date: { type: string, format: date, example: "2030-02-05" }
+
+    SeriesSchedulePreview:
+      type: object
+      required: [master_event_id, recurring_schedule, recurring_end_date, required_dates, no_longer_fitting_events]
+      properties:
+        master_event_id: { type: integer }
+        recurring_schedule:
+          type: object
+          properties:
+            frequency: { type: string, enum: [daily, weekly, monthly, yearly] }
+            interval: { type: integer }
+            days_of_week: { type: array, items: { type: string } }
+            days_of_month: { type: array, items: { type: integer } }
+            description: { type: string, example: "Every 2 weeks on Tuesdays" }
+        recurring_end_date: { type: string, format: date }
+        required_dates:
+          type: array
+          items:
+            type: object
+            required: [start_datetime, event_id, exists]
+            properties:
+              start_datetime: { type: string, format: date-time }
+              event_id: { type: integer, nullable: true }
+              exists: { type: boolean }
+        no_longer_fitting_events:
+          type: array
+          items:
+            type: object
+            required: [id, name, start_datetime, has_stories, has_timesheets]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              start_datetime: { type: string, format: date-time }
+              has_stories: { type: boolean }
+              has_timesheets: { type: boolean }
 
     EventCreateRequest:
       allOf:
