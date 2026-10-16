@@ -905,7 +905,7 @@ function buildDocsPage() {
       <div class="nav-section">
         <div class="nav-section-label">Events</div>
         <a href="#events"          class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Events</a>
-        <a href="#event-formats"   class="nav-link"><span class="nav-method method-DELETE" style="background:rgba(255,63,69,0.1);color:#c92d33;border-color:rgba(255,63,69,0.2)">DEL</span>Event Formats</a>
+        <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Event Formats</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
@@ -2075,9 +2075,18 @@ function buildDocsPage() {
         <div class="section-eyebrow">Events</div>
         <h2 class="section-title">Event Formats</h2>
         <div class="section-desc">
-          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin of the organisation that owns an Event Format can delete it, and only once it has no events and is not added to any project. Default formats can be deleted under the same rules.</p>
+          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin can list an organisation's Event Formats or delete one. An Event Format can be deleted only once it has no events and is not added to any project; the list says which ones can be deleted and why not. Default formats can be deleted under the same rules.</p>
         </div>
         <div class="endpoint-list">
+          ${endpointCard("GET", "/event_categories", "List Event Formats", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only this Organisation's Event Formats" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list — each with events_count, projects_count, can_delete and delete_blocked_reason" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin (of charity_id, if given)" }
+          ])}
           ${endpointCard("DELETE", "/event_categories/{id}", "Delete an Event Format", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
           ], [

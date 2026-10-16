@@ -2810,6 +2810,76 @@ paths:
               example:
                 error: "unauthorized"
 
+  /event_categories:
+    get:
+      tags: [Event Formats]
+      summary: List Event Formats
+      operationId: listEventFormats
+      description: |
+        Lists the Event Formats (Event Categories in the API) of the organisations you are an
+        **Organisation Admin** of, as on the Manage Event Formats page. Use it to find the `id`
+        for **Delete an Event Format**, and to see beforehand whether deletion will be allowed.
+
+        - Pass `charity_id` to list one organisation's Event Formats.
+        - Only Organisation Admins can list Event Formats. Anyone else gets `403`, as does a
+          `charity_id` of an organisation you don't administer.
+        - `events_count` and `projects_count` say what is blocking deletion, and
+          `delete_blocked_reason` gives the same reason **Delete an Event Format** would return.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only this Organisation's (Charity's) Event Formats
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Event Formats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventFormats'
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - id: 4521
+                    name: "Workshops"
+                    is_default: true
+                    charity_id: 123
+                    created_at: "2026-03-02T10:15:00.000Z"
+                    updated_at: "2026-09-14T08:30:00.000Z"
+                    events_count: 3
+                    projects_count: 2
+                    can_delete: false
+                    delete_blocked_reason: "This Event Format can't be deleted because it has 3 events. Delete or move those events first. This Event Format can't be deleted because it is added to 2 projects. Remove it from those projects first."
+                  - id: 4530
+                    name: "Drop-in Sessions"
+                    is_default: false
+                    charity_id: 123
+                    created_at: "2026-10-01T12:00:00.000Z"
+                    updated_at: "2026-10-01T12:00:00.000Z"
+                    events_count: 0
+                    projects_count: 0
+                    can_delete: true
+                    delete_blocked_reason: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are not an Organisation Admin (of the organisation in `charity_id`, if given)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an Organisation Admin can list Event Formats."
+
   /event_categories/{id}:
     delete:
       tags: [Event Formats]
@@ -8289,6 +8359,50 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    EventFormat:
+      type: object
+      description: An Event Format (Event Category in the API), the template an organisation's events are created from.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        is_default:
+          type: boolean
+          description: One of the Event Formats every organisation starts with
+        charity_id:
+          type: integer
+          description: The Organisation (Charity) that owns it
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        events_count:
+          type: integer
+          description: Events using this Event Format
+        projects_count:
+          type: integer
+          description: Projects this Event Format is added to
+        can_delete:
+          type: boolean
+          description: Whether **Delete an Event Format** would succeed now
+        delete_blocked_reason:
+          type: string
+          nullable: true
+          description: Why it can't be deleted yet, or null
+
+    PaginatedEventFormats:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventFormat'
 
     PaginatedWebhookEndpoints:
       allOf:
