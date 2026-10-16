@@ -2157,6 +2157,37 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "You can't create events in this project, or edit this event" },
             { code: "404", cls: "response-4xx", desc: "The project or the Event Format isn't available to you" }
           ])}
+          ${endpointCard("POST", "/events", "Create an event", true, [
+            { name: "project_id", type: "integer", required: true, desc: "The project the event belongs to" },
+            { name: "event_category_id", type: "integer", required: true, desc: "One of the project's Event Formats" },
+            { name: "name", type: "string", required: true, desc: "Event name" },
+            { name: "start_datetime", type: "string", required: true, desc: "ISO 8601; without an offset it is local to timezone" },
+            { name: "end_datetime", type: "string", required: true, desc: "ISO 8601, after the start" },
+            { name: "timezone", type: "string", required: false, desc: "IANA time zone name; defaults to yours" },
+            { name: "custom_fields", type: "object", required: false, desc: "Custom field id => value" },
+            { name: "dropdowns", type: "object", required: false, desc: "Dropdown id => answer choice ids" },
+            { name: "manager_ids / worker_ids", type: "array", required: false, desc: "Event Managers and Workers; you are the manager by default" },
+            { name: "signup_page_id", type: "integer", required: false, desc: "One of the project's active Signup Pages" },
+            { name: "self_check_in", type: "object", required: false, desc: "{ project_story_category_id, wave_id }" },
+            { name: "capacity / listing", type: "object", required: false, desc: "Guest and worker limits, after-full settings, timesheets; event listing" },
+            { name: "recurring_schedule", type: "object", required: false, desc: "{ frequency, interval, days_of_week, days_of_month } for a series" },
+            { name: "recurring_end_date", type: "string", required: false, desc: "YYYY-MM-DD; required with recurring_schedule" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The new event; for a series, the master event" },
+            { code: "403", cls: "response-4xx", desc: "You can't create events in this project" },
+            { code: "404", cls: "response-4xx", desc: "The project belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "Every problem with the request, as errors" }
+          ])}
+          ${endpointCard("PATCH", "/events/{id}", "Update an event", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
+            { name: "(any create field)", type: "", required: false, desc: "Only the fields you give change" },
+            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or all_events_in_series, for a master event" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The updated event" },
+            { code: "403", cls: "response-4xx", desc: "You may not edit this event" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "Every problem with the request, as errors; also a locked field such as the project" }
+          ])}
         </div>
       </section>
 
