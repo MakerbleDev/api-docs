@@ -3043,6 +3043,72 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+    post:
+      tags: [Events]
+      summary: Create an event
+      operationId: createEvent
+      description: |
+        Creates a one-off event, or a recurring series when `recurring_schedule` and
+        `recurring_end_date` are given: the master event plus every subsequent event up to the
+        Recurring End Date, as the Create Event form does.
+
+        Work out the ids first: list the Event Formats you can use in the project
+        (`GET /projects/{id}/event_categories`), then get the form for the one you choose
+        (`GET /projects/{id}/event_form`). Every id in the request is checked against that form.
+        Problems are returned together as `422`.
+
+        Times are ISO 8601. A time without an offset is a local time in `timezone`, an IANA
+        time zone name that defaults to yours; daylight saving is worked out for you.
+        You become the Event Manager unless you give `manager_ids`.
+
+        Not handled by the API: an event image, and Event Steps (project automations).
+        To add a Contact as a guest, use the guests endpoints.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreateRequest'
+            examples:
+              recurringSeries:
+                summary: A weekly series with a Dropdown, a custom field and a Signup Page
+                value:
+                  project_id: 456
+                  event_category_id: 42
+                  name: "Youth Club"
+                  start_datetime: "2030-01-08T18:00"
+                  end_datetime: "2030-01-08T20:00"
+                  timezone: "Europe/London"
+                  location: "Main Hall"
+                  custom_fields: { "77": "B-114" }
+                  dropdowns: { "3012": [88101] }
+                  signup_page_id: 310
+                  guest_status_for_signup_id: 7
+                  capacity:
+                    guests: fixed
+                    max_guests: 20
+                    allow_signup_after_full: true
+                    guest_status_after_full_id: 8
+                    confirmation_message_after_full: "We're full, but we'll let you know if a place comes up."
+                  recurring_schedule: { frequency: weekly, interval: 1, days_of_week: [tuesday] }
+                  recurring_end_date: "2030-03-26"
+      responses:
+        "201":
+          description: The event, as Get an event returns it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /events/{id}:
     get:
       tags: [Events]
@@ -3137,6 +3203,50 @@ paths:
                 error: "You don't have permission to see this event."
         "404":
           $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Events]
+      summary: Update an event
+      operationId: updateEvent
+      description: |
+        Changes the fields you give and leaves the rest as they are; Dropdowns you don't mention
+        keep their answers. Anyone who can open the Edit Event page can update the event.
+
+        For a master event (the first in a recurring series), `apply_to: all_events_in_series`
+        also applies the change to every subsequent event, like the form's "Update this event
+        and all future events" button. The default is `this_event`.
+
+        Locked after creation, as on the Edit Event page: the project, a series' time zone, and
+        a master event's start and end (they set the times of the whole series). Changing a
+        series' Recurring Schedule or Recurring End Date isn't supported by this endpoint.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventUpdateRequest'
+            example:
+              name: "Evening Youth Club"
+              location: "Hall 3"
+              apply_to: all_events_in_series
+      responses:
+        "200":
+          description: The event, as Get an event returns it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
 
   /projects/{id}/event_categories:
     get:
@@ -5733,6 +5843,10 @@ components:
               properties:
                 rule: { type: object, description: "The IceCube rule" }
                 description: { type: string, example: "Weekly on Tuesdays" }
+                frequency: { type: string, enum: [daily, weekly, monthly, yearly] }
+                interval: { type: integer }
+                days_of_week: { type: array, items: { type: string } }
+                days_of_month: { type: array, items: { type: integer } }
             recurring_end_date: { type: string, format: date, nullable: true }
             series_events_count: { type: integer, nullable: true, description: "Events in this event's series, or null for a one-off event" }
             custom_fields:
@@ -5987,6 +6101,81 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/IdAndName'
+
+    RecurringScheduleInput:
+      type: object
+      required: [frequency]
+      description: How a recurring series repeats.
+      properties:
+        frequency: { type: string, enum: [daily, weekly, monthly, yearly] }
+        interval: { type: integer, minimum: 1, default: 1, description: "Every this many days, weeks, months or years" }
+        days_of_week:
+          type: array
+          description: Weekly series only
+          items: { type: string, enum: [sunday, monday, tuesday, wednesday, thursday, friday, saturday] }
+        days_of_month:
+          type: array
+          description: Monthly series only; -1 is the last day of the month
+          items: { type: integer }
+
+    EventUpdateRequest:
+      type: object
+      properties:
+        event_category_id: { type: integer, description: "The Event Format (event category); one of the project's" }
+        name: { type: string }
+        start_datetime: { type: string, example: "2030-01-08T18:00", description: "ISO 8601; without an offset it is local to timezone" }
+        end_datetime: { type: string, example: "2030-01-08T20:00" }
+        timezone: { type: string, example: "Europe/London", description: "IANA time zone name" }
+        location: { type: string }
+        custom_fields:
+          type: object
+          description: "Custom field id => value. Dates are YYYY-MM-DD, times HH:MM, tickboxes true or false."
+          additionalProperties: true
+        dropdowns:
+          type: object
+          description: "Dropdown (ratio set) id => answer choice (sub ratio) ids, within the Dropdown's choice rule"
+          additionalProperties: { type: array, items: { type: integer } }
+        manager_ids: { type: array, items: { type: integer }, description: "Event Managers: colleagues in the project or organisation; at least one" }
+        worker_ids: { type: array, items: { type: integer }, description: "Event Workers: colleagues in the project or organisation" }
+        signup_page_id: { type: integer, nullable: true, description: "One of the project's active Signup Pages (referral link details)" }
+        guest_status_for_signup_id: { type: integer, nullable: true, description: "Guest Status (event state) for people who sign up while there is space" }
+        self_check_in:
+          type: object
+          nullable: true
+          description: The Self Check-in (kiosk) Survey and Wave, when the Event Format has Self Check-in turned on
+          properties:
+            project_story_category_id: { type: integer }
+            wave_id: { type: integer, nullable: true }
+        capacity:
+          type: object
+          properties:
+            guests: { type: string, enum: [fixed, unlimited] }
+            max_guests: { type: integer, minimum: 0 }
+            allow_signup_after_full: { type: boolean }
+            guest_status_after_full_id: { type: integer, nullable: true }
+            confirmation_message_after_full: { type: string }
+            thank_you_message: { type: string }
+            workers: { type: string, enum: [fixed, unlimited] }
+            max_workers: { type: integer, minimum: 0 }
+            timesheets_for_workers: { type: boolean }
+            timesheets_for_guests: { type: boolean }
+        listing:
+          type: object
+          properties:
+            listing_enabled: { type: boolean, description: "Needs a Signup Page" }
+            description: { type: string, description: "HTML" }
+        apply_to: { type: string, enum: [this_event, all_events_in_series], default: this_event }
+
+    EventCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/EventUpdateRequest'
+        - type: object
+          required: [project_id, event_category_id, name, start_datetime, end_datetime]
+          properties:
+            project_id: { type: integer }
+            recurring_schedule:
+              $ref: '#/components/schemas/RecurringScheduleInput'
+            recurring_end_date: { type: string, format: date, description: "Last day of the series; required with recurring_schedule" }
 
     PaginationEnvelope:
       type: object
