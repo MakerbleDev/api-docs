@@ -197,6 +197,12 @@ tags:
       Referral Link Details — public-facing signup forms, including the
       Offline Collector endpoints that let a form be filled in with no
       network connection and synced back later.
+  - name: Checklists
+    description: |
+      An Organisation's lists of actions it expects to be done for each Contact (Beneficiary),
+      e.g. give them a Role, complete a Contact Form, invite them to an induction event. Projects
+      offer a Checklist by hand or add it to every Contact automatically, and each Contact's
+      profile shows which actions are done.
   - name: Cohort Trackers
     description: |
       Metrics that count the Contacts (Beneficiaries) in a Project or Album who meet a
@@ -2929,6 +2935,275 @@ paths:
                   value: { error: "unsupported-contact-form", detail: "..." }
                 invalidSubmission:
                   value: { error: "invalid-submission", detail: ["..."] }
+
+  /checklists:
+    get:
+      tags: [Checklists]
+      summary: List an Organisation's Checklists
+      description: |
+        The Checklists of an Organisation (Charity). Visible to the Organisation's editors and
+        reporters, and to managers (editors) of its Projects.
+      operationId: listChecklists
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Checklists, each with id, charity_id, name, description, created_by_id and actions_count
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user has no role in the Organisation that lets them see Checklists
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Checklists]
+      summary: Create a Checklist
+      description: |
+        Creates a Checklist (Create > Checklist). Each action has an `action_type` and, unless the
+        type has no criteria keys, `criteria` saying what counts as done; see
+        `GET /checklists/action_types`. Actions keep the order sent. Requires an editor or reporter
+        of the Organisation.
+      operationId: createChecklist
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              charity_id: 913
+              checklist:
+                name: "Induction"
+                description: "Steps for every new contact"
+                actions:
+                  - action_type: "add_role"
+                    title: "Give them a Role"
+                    criteria:
+                      beneficiary_role_ids: ["12", "14"]
+                  - action_type: "invite_to_event"
+                    title: "Invite them to an induction event"
+                    criteria:
+                      project_event_categories: ["301:7"]
+                  - action_type: "create_task"
+                    title: "Set a follow-up task"
+      responses:
+        "201":
+          description: The Checklist, with its actions, projects and contacts_count
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Checklists for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /checklists/action_types:
+    get:
+      tags: [Checklists]
+      summary: List the actions a Checklist can contain
+      description: |
+        Every action type with its name and the `criteria_keys` it stores. Criteria values are strings:
+        IDs, or pairs such as `project_states` "<project_id>:<beneficiary_state_id>",
+        `project_event_categories` "<project_id>:<event_category_id>", `relationship_sides`
+        "<relationship_category_id>:parent|child", and `survey_waves` "<Survey Campaign id>:<Wave id, or 0
+        for a campaign without Waves>". The "for a relative" types take `relatives: [{relationship_side,
+        beneficiary_category_ids | survey_waves}]`.
+      operationId: listChecklistActionTypes
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: "`{data: [{action_type, name, criteria_keys}]}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /checklists/{id}:
+    get:
+      tags: [Checklists]
+      summary: Get a Checklist
+      description: A Checklist with its ordered actions, the Projects that offer it and how many Contacts have it.
+      operationId: getChecklist
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The Checklist, with actions, projects ({project_id, project_name, assignment_mode}) and contacts_count
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          description: Not found, or another Organisation's
+
+    patch:
+      tags: [Checklists]
+      summary: Update a Checklist
+      description: |
+        Updates the name, description or actions. An action sent with its `id` is changed;
+        `{id, _destroy: true}` removes it; an action without an `id` is added. Requires an editor or
+        reporter of the Organisation.
+      operationId: updateChecklist
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              checklist:
+                name: "Induction (2027)"
+                actions:
+                  - id: 55
+                    action_type: "add_role"
+                    title: "Give them any Role"
+                    criteria:
+                      beneficiary_role_ids: ["12"]
+                  - id: 56
+                    _destroy: true
+      responses:
+        "200":
+          description: The updated Checklist
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Checklist
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /checklists/{id}/projects/{project_id}:
+    patch:
+      tags: [Checklists]
+      summary: Set how a Project offers a Checklist
+      description: |
+        The Add to Projects popup. `manual`: colleagues may add the Checklist to the Project's Contacts
+        by hand. `automatic`: every Contact now in the Project gets it (in the background), and so does
+        every Contact who later joins or is created in it. `none`: stop offering it; Contacts who
+        already have it keep it. Requires an Organisation editor, or a Project Manager of the Project.
+      operationId: setChecklistProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              mode: "automatic"
+      responses:
+        "200":
+          description: "`{project_id, assignment_mode}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't add Checklists to Projects in this Organisation
+        "404":
+          description: The Checklist or Project wasn't found, or the user can't edit the Project
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries/{beneficiary_id}/checklists:
+    get:
+      tags: [Checklists]
+      summary: Get a Contact's Checklists
+      description: |
+        The Checklists box on a Contact's profile: each Checklist with `done_count` of `actions_count`,
+        and every action with `done: true|false`. Only Contacts the user can see are returned.
+      operationId: listContactChecklists
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of the Contact's Checklists with their progress
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Checklists]
+      summary: Add a Checklist to a Contact
+      description: |
+        Add a Checklist on the Contact's profile. Only a Checklist that one of the Contact's Projects
+        lets the user add by hand is allowed; see `GET /beneficiaries/{beneficiary_id}/checklists/available`.
+      operationId: addContactChecklist
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              checklist_id: 42
+      responses:
+        "201":
+          description: "`{checklist_id, beneficiary_id, added_by_user_id, created_at}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries/{beneficiary_id}/checklists/available:
+    get:
+      tags: [Checklists]
+      summary: List the Checklists that can be added to a Contact
+      description: The Checklists the user may add to this Contact by hand, other than those it already has.
+      operationId: listAvailableContactChecklists
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "`{data: [{id, name}]}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /cohort_trackers:
     get:

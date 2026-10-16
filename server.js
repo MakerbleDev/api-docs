@@ -898,6 +898,7 @@ function buildDocsPage() {
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
+        <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
         <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Workflow Trackers</a>
         <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Filtered Metrics</a>
@@ -1712,6 +1713,76 @@ function buildDocsPage() {
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "403", cls: "response-4xx", desc: "Not an organisation admin" },
             { code: "404", cls: "response-4xx", desc: "Not one of the organisation's links" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Checklists -->
+      <section class="section" id="checklists">
+        <div class="section-eyebrow">Contacts</div>
+        <h2 class="section-title">Checklists</h2>
+        <div class="section-desc">
+          <p>A Checklist is an ordered list of actions an Organisation expects to be done for each Contact, e.g. give them a Role, complete the Alpha Contact Form, invite them to an induction event. Each action's <code>criteria</code> say what counts as done. Projects offer a Checklist to their Contacts by hand (<code>manual</code>) or add it to every Contact automatically (<code>automatic</code>), and each Contact's profile shows which actions are done.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Get the action types and their criteria keys with <code>GET /checklists/action_types</code>, create the Checklist, then offer it in a Project with <code>PATCH /checklists/{id}/projects/{project_id}</code>. Check a Contact's progress with <code>GET /beneficiaries/{beneficiary_id}/checklists</code>.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/checklists", "List an Organisation's Checklists", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Checklists with <code>actions_count</code>" },
+            { code: "403", cls: "response-4xx", desc: "No role in the Organisation that can see Checklists" }
+          ])}
+          ${endpointCard("GET", "/checklists/action_types", "List the actions a Checklist can contain", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>{data: [{action_type, name, criteria_keys}]}</code>" }
+          ], "Criteria values are strings: IDs, or pairs such as <code>project_states</code> \"&lt;project_id&gt;:&lt;state_id&gt;\", <code>project_event_categories</code> \"&lt;project_id&gt;:&lt;event_category_id&gt;\", <code>relationship_sides</code> \"&lt;category_id&gt;:parent|child\" and <code>survey_waves</code> \"&lt;Survey Campaign id&gt;:&lt;Wave id, or 0&gt;\".")}
+          ${endpointCard("GET", "/checklists/{id}", "Get a Checklist", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>actions</code>, <code>projects</code> and <code>contacts_count</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
+          ])}
+          ${endpointCard("POST", "/checklists", "Create a Checklist", true, [], [
+            { code: "201", cls: "response-2xx", desc: "The new Checklist" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "e.g. an action with every option unticked" }
+          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria}]}</code>.")}
+          ${endpointCard("PATCH", "/checklists/{id}", "Update a Checklist", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The updated Checklist" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" }
+          ], "Actions with an <code>id</code> change; <code>{id, _destroy: true}</code> removes one; actions without an <code>id</code> are added.")}
+          ${endpointCard("PATCH", "/checklists/{id}/projects/{project_id}", "Set how a Project offers a Checklist", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "mode", type: "string", required: true, desc: "<code>none</code>, <code>manual</code> or <code>automatic</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{project_id, assignment_mode}</code>" },
+            { code: "404", cls: "response-4xx", desc: "A Project the user can't edit" }
+          ])}
+          ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code>" },
+            { code: "404", cls: "response-4xx", desc: "A Contact the user can't see" }
+          ])}
+          ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/available", "List the Checklists that can be added to a Contact", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{data: [{id, name}]}</code>" }
+          ])}
+          ${endpointCard("POST", "/beneficiaries/{beneficiary_id}/checklists", "Add a Checklist to a Contact", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", type: "integer", required: true, desc: "A Checklist from the available list" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>{checklist_id, beneficiary_id, added_by_user_id, created_at}</code>" },
+            { code: "422", cls: "response-4xx", desc: "That Checklist can't be added to this Contact" }
           ])}
         </div>
       </section>
