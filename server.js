@@ -1721,7 +1721,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">Cohort Trackers</h2>
         <div class="section-desc">
-          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
+          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. With <code>result_type: percentage</code> it shows the result as a percentage of its <code>denominator</code>: <code>members</code> (Contacts in this Project / Album) or <code>enough_data</code> (Contacts with enough data to be judged on every criterion), e.g. "84% Children attending 75%+" with "42 of 50 contacts with enough data". Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -1751,14 +1751,14 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "Cohort Tracker created" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria}</code>.")}
+          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria, result_type, denominator}</code>. <code>result_type</code> is <code>number</code> (default) or <code>percentage</code>; a percentage's <code>denominator</code> is <code>members</code> (default) or <code>enough_data</code>.")}
           ${endpointCard("PATCH", "/cohort_trackers/{id}", "Update a Cohort Tracker", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Cohort Tracker updated" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation editor or the reporter who created it" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Only the fields sent change. Changes apply everywhere the tracker is used.")}
+            { code: "422", cls: "response-4xx", desc: "Validation failed, or a result_type switch that would clear targets without <code>confirm_clear_targets</code>" }
+          ], "Only the fields sent change. Changes apply everywhere the tracker is used. Switching <code>result_type</code> clears the tracker's targets on every Project and Album, so while it has targets it is refused unless the body also has <code>confirm_clear_targets: true</code>.")}
           ${endpointCard("DELETE", "/cohort_trackers/{id}", "Delete a Cohort Tracker", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
           ], [
@@ -1783,12 +1783,12 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" }
           ])}
           ${endpointCard("PATCH", "/cohort_trackers/{id}/projects/{project_id}", "Set a Cohort Tracker's targets on a Project", true, [
-            { name: "target", type: "integer", required: false, desc: "One-off target: a number of Contacts to reach, not a total that adds up across periods" },
+            { name: "target", type: "integer", required: false, desc: "One-off target: a number of Contacts to reach (0-100 for a percentage tracker), not a total that adds up across periods" },
             { name: "deadlines", type: "array", required: false, desc: "<code>[{date: \"YYYY-MM-DD\", number}]</code>, replacing this tracker's deadline targets; <code>[]</code> clears them" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Targets saved" },
             { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" },
-            { code: "422", cls: "response-4xx", desc: "Bad deadlines, or neither field sent" }
+            { code: "422", cls: "response-4xx", desc: "Bad deadlines, a percentage outside 0-100, or neither field sent" }
           ])}
           ${endpointCard("GET", "/cohort_trackers/{id}/albums/{bundle_id}", "Get a Cohort Tracker's targets on an Album", true, [
             { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" }
@@ -1807,10 +1807,11 @@ function buildDocsPage() {
             { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
             { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default). Each is worked out afresh: Year to Date is not the sum of the periods" },
             { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on (default: the next Target Deadline, or today)" },
+            { name: "cohort", type: "string", required: false, desc: "<code>in</code> (default) lists the cohort; for a percentage, <code>not_in</code> lists the rest of the denominator" },
             { name: "page", type: "integer", required: false, desc: "Page of Contacts" },
             { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "<code>{count, eligible_count, target, starts_on, ends_on, page, page_size, page_count, total_count, data: [{id, name, qualifying_value}]}</code>. A Contact you can't read is <code>{restricted: true}</code>" },
+            { code: "200", cls: "response-2xx", desc: "<code>{count, eligible_count, result_type, denominator, denominator_count, percentage, target, starts_on, ends_on, cohort, page, page_size, page_count, total_count, data: [{id, name, qualifying_value}]}</code>. A Contact you can't read is <code>{restricted: true}</code>. <code>percentage</code> is null for a number, or when nobody is in the denominator" },
             { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" },
             { code: "404", cls: "response-4xx", desc: "The tracker isn't on the Project" },
             { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
@@ -1819,6 +1820,7 @@ function buildDocsPage() {
             { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" },
             { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
             { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on" },
+            { name: "cohort", type: "string", required: false, desc: "<code>in</code> (default) or, for a percentage, <code>not_in</code>" },
             { name: "page", type: "integer", required: false, desc: "Page of Contacts" },
             { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
           ], [
@@ -1838,7 +1840,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">Workflow Trackers</h2>
         <div class="section-desc">
-          <p>A Workflow Tracker is a metric that counts records Makerble's own features create, rather than Contacts tagged in updates. Its <code>source</code> says what it counts: <code>signpostings</code> (Signpostings made from the Project, counted once whether they name the Organisation signposted to, the Person, or both; signpostings saved without a Project aren't counted anywhere) or <code>internal_referrals</code> (Contacts in the Project who are added to another of the Organisation's Projects, dated by the Status in Projects history). <code>count_mode</code> is <code>items</code> (each signposting or referral; adds up across periods) or <code>contacts</code> (each Contact once; a snapshot). It is placed in an Impact Scorecard column like other metrics.</p>
+          <p>A Workflow Tracker is a metric that counts records Makerble's own features create, rather than Contacts tagged in updates. Its <code>source</code> says what it counts: <code>signpostings</code> (Signpostings made from the Project, counted once whether they name the Organisation signposted to, the Person, or both; signpostings saved without a Project aren't counted anywhere), <code>internal_referrals</code> (Contacts in the Project who are added to another of the Organisation's Projects, dated by the Status in Projects history), <code>cases_created</code> (Cases created on the Project), <code>cases_closed</code> (each time one of those Cases is closed) or <code>cases_open</code> (the Cases open at the end of each timeframe; always a snapshot). <code>count_mode</code> is <code>items</code> (each signposting, referral, Case or closing; adds up across periods, except <code>cases_open</code>) or <code>contacts</code> (each Contact once; a snapshot). Confidential Cases are counted, but only listed to people who can see them. It is placed in an Impact Scorecard column like other metrics.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -1861,7 +1863,7 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
           ])}
           ${endpointCard("POST", "/workflow_trackers/preview", "Preview a Workflow Tracker", true, [], [
-            { code: "200", cls: "response-2xx", desc: "<code>results: {period, year_to_date, all_time}</code> on the Project, and the latest <code>records</code> counted" },
+            { code: "200", cls: "response-2xx", desc: "<code>results: {period, year_to_date, all_time}</code> on the Project, and the latest <code>records</code> counted that the user may see, with <code>hidden_count</code> for the rest" },
             { code: "404", cls: "response-4xx", desc: "The Project isn't the Organisation's" },
             { code: "422", cls: "response-4xx", desc: "Unknown source or count_mode, or bad settings" }
           ], "Body: <code>charity_id</code>, <code>project_id</code>, <code>workflow_tracker: {source, count_mode, settings}</code>. The Period ends at the Project's next deadline, or today when it has none ahead.")}
@@ -1869,7 +1871,7 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "Workflow Tracker created" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Body: <code>workflow_tracker: {charity_id, name, description, source, count_mode, settings}</code>. For <code>internal_referrals</code>, <code>settings</code> choose which Projects count as a referral: <code>{destinations: \"any\"}</code>, <code>{destinations: \"only\", project_ids: [...]}</code> or <code>{destinations: \"except\", project_ids: [...]}</code> (the default, with none listed).")}
+          ], "Body: <code>workflow_tracker: {charity_id, name, description, source, count_mode, settings}</code>. For <code>internal_referrals</code>, <code>settings</code> choose which Projects count as a referral: <code>{destinations: \"any\"}</code>, <code>{destinations: \"only\", project_ids: [...]}</code> or <code>{destinations: \"except\", project_ids: [...]}</code> (the default, with none listed). For the Cases sources, <code>settings: {case_form_id: ...}</code> counts only the Cases created with that Case Form; leave it out for any.")}
           ${endpointCard("PATCH", "/workflow_trackers/{id}", "Update a Workflow Tracker", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Workflow Tracker ID" }
           ], [
@@ -1920,6 +1922,29 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Targets saved" },
             { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
+          ])}
+          ${endpointCard("GET", "/workflow_trackers/{id}/projects/{project_id}/results", "Get a Workflow Tracker's result on a Project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default). Counting each item adds up across periods; counting each Contact once is a snapshot, worked out for each window on its own" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on (default: the next Target Deadline, or today)" },
+            { name: "page", type: "integer", required: false, desc: "Page of items" },
+            { name: "per_page", type: "integer", required: false, desc: "Items per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{number, target, result_kind, as_of, starts_on, ends_on, page, page_size, page_count, total_count, hidden_count, data: [{contact_id, contact_name, detail, project_id, happened_at}]}</code>, newest first. Items you may not see are counted in <code>hidden_count</code>, never listed" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" },
+            { code: "404", cls: "response-4xx", desc: "The tracker isn't on the Project" },
+            { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
+          ])}
+          ${endpointCard("GET", "/workflow_trackers/{id}/albums/{bundle_id}/results", "Get a Workflow Tracker's result on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on" },
+            { name: "page", type: "integer", required: false, desc: "Page of items" },
+            { name: "per_page", type: "integer", required: false, desc: "Items per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "As for a Project. Each item, or each Contact, counts once across the Album's Projects, so the result is never the sum of the Projects'" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Album" },
+            { code: "404", cls: "response-4xx", desc: "No Project in the Album uses the tracker" }
           ])}
           ${endpointCard("DELETE", "/workflow_trackers/{id}/projects/{project_id}", "Remove a Workflow Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
@@ -2035,7 +2060,8 @@ function buildDocsPage() {
         <h2 class="section-title">Webhooks</h2>
         <div class="section-desc">
           <p>Instead of polling, an Organisation's admins can register webhook endpoints: HTTPS URLs that Makerble sends a signed JSON <code>POST</code> to when records change. Only the Organisation's admins can manage them, and only once an admin has ticked <strong>Turn on Webhooks</strong> in the Organisation's Settings (Preferences) page; until then these endpoints answer <code>403</code>.</p>
-          <p><strong>Events:</strong> <code>contact.created</code>, <code>contact.updated</code> (with <code>changed_fields</code>), <code>story.created</code> (about 30 seconds after the Story is posted, so survey answers are included; drafts are not sent), <code>story.updated</code> (including a draft being published), <code>project.created</code>, <code>project.updated</code> (update events are sent about 10 seconds after the change, so several saves of one change arrive as one event), <code>import.completed</code> (once per finished spreadsheet import; its rows send no events of their own) and <code>webhook.test</code>. The <code>data</code> of a Contact, Story or Project event is the same JSON as <code>GET /beneficiaries/{id}</code>, <code>GET /stories/{id}</code> or <code>GET /projects/{id}</code>, as the record is when the request is sent.</p>
+          <p><strong>Events:</strong> <code>contact.created</code>, <code>contact.updated</code> (with <code>changed_fields</code>), <code>story.created</code> (about 30 seconds after the Story is posted, so survey answers are included; drafts are not sent), <code>story.updated</code> (including a draft being published), <code>project.created</code>, <code>project.updated</code> (update events are sent about 10 seconds after the change, so several saves of one change arrive as one event), <code>import.completed</code> (once per finished spreadsheet import; its rows send no events of their own) and <code>webhook.test</code>. The <code>data</code> of a Contact, Story or Project event is the same JSON as <code>GET /beneficiaries/{id}</code>, <code>GET /stories/{id}</code> or <code>GET /projects/{id}</code>, as the record is when the request is sent. A changed dropdown answer on a Contact sends <code>contact.updated</code> with <code>custom_fields.&lt;dropdown title&gt;</code> in <code>changed_fields</code>.</p>
+          <p><strong>Removal and membership events:</strong> <code>contact.deleted</code> (<code>id</code>, <code>deleted_at</code>; no personal data), <code>contact.merged</code> (<code>kept_contact_id</code>, <code>merged_contact_ids</code>, <code>merged_at</code>; no <code>contact.deleted</code> is sent for a merged Contact), <code>contact.restored</code> (the full Contact, when a deleted Contact is restored or a merge undone), <code>story.deleted</code> (<code>id</code>, <code>project_id</code>, <code>contact_ids</code>, <code>deleted_at</code>), <code>project.deleted</code> (<code>id</code>, <code>name</code>, <code>deleted_at</code>), and <code>project.contact_added</code> / <code>project.contact_removed</code> (<code>project_id</code>, <code>project_name</code>, <code>contact_id</code>, <code>contact_state</code>). Their <code>data</code> is recorded when the event happens. Webhooks created before these events existed receive them only once an admin ticks them. Once an endpoint has 100 events waiting, further ones are spaced out at 5 a second, so a bulk action on thousands of records may take some minutes to arrive in full.</p>
           <p><strong>Envelope:</strong> <code>{ "id": "evt_…", "event": "contact.updated", "occurred_at": "2026-10-04T09:15:00Z", "charity_id": 123, "changed_fields": ["name"], "data": { … } }</code>. Headers: <code>X-Makerble-Event</code>, <code>X-Makerble-Delivery</code> (the <code>id</code>), <code>User-Agent: Makerble-Webhooks/1</code> and <code>X-Makerble-Signature: t=&lt;unix time&gt;,v1=&lt;signature&gt;</code>.</p>
           <p><strong>Verifying the signature:</strong> <code>v1</code> is the hex HMAC-SHA256 of <code>"&lt;t&gt;.&lt;raw request body&gt;"</code>, keyed with the endpoint's secret (shown once, when the endpoint is created or its secret rotated). Compare in constant time and reject timestamps more than 5 minutes old.</p>
           <p><strong>Retries:</strong> respond with any 2xx within 10 seconds. Anything else, a timeout or a refused connection is retried 8 more times over about 25 hours. Redirects are not followed. After 10 deliveries in a row fail, or 7 days without a success, the endpoint is switched off and the Organisation's admins are emailed. Delivery is at least once and unordered: de-duplicate on <code>id</code>.</p>

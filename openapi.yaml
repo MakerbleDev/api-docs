@@ -78,14 +78,26 @@ info:
     | Event | Sent when | `data` |
     |---|---|---|
     | `contact.created` | A Contact is created | Same as `GET /beneficiaries/{id}` |
-    | `contact.updated` | A Contact is edited (not when only counts Makerble keeps up to date change) | Same, plus `changed_fields` on the envelope |
+    | `contact.updated` | A Contact is edited, including its Contact Type or a dropdown answer (not when only counts Makerble keeps up to date change) | Same, plus `changed_fields` on the envelope. A changed dropdown is listed as `custom_fields.<dropdown title>` |
+    | `contact.deleted` | A Contact is deleted (archived), or removed for good without being archived first | `id`, `deleted_at`. No name or other personal data |
+    | `contact.merged` | A Contact is merged into another Contact. No `contact.deleted` is sent for it | `kept_contact_id`, `merged_contact_ids`, `merged_at` |
+    | `contact.restored` | A deleted Contact is restored, or a merge is undone | Same as `GET /beneficiaries/{id}` |
     | `story.created` | A Story is posted, about 30 seconds later so its survey answers are included (not drafts) | Same as `GET /stories/{id}` |
     | `story.updated` | A Story is edited, including a draft being published | Same |
-    | `project.created` / `project.updated` | A Project is created / edited | Same as `GET /projects/{id}` |
+    | `story.deleted` | A Story is deleted (not drafts) | `id`, `project_id`, `contact_ids`, `deleted_at` |
+    | `project.created` / `project.updated` | A Project is created / edited. Closing (archiving) or reopening a Project is an edit | Same as `GET /projects/{id}` |
+    | `project.deleted` | A Project is deleted | `id`, `name`, `deleted_at` |
+    | `project.contact_added` / `project.contact_removed` | A Contact joins / leaves a Project (not when the Contact is being deleted, and not from imports) | `project_id`, `project_name`, `contact_id`, `contact_state` (the Contact's state in the Project, e.g. `Enrolled`) |
     | `import.completed` | A spreadsheet import has processed every row. Rows of an import send no events of their own | `import_id`, `import_type`, `kind`, `status`, `counts`, `charity_id` |
     | `webhook.test` | Someone sends a test event | `{ "test": true, "message": "This is a test event from Makerble." }` |
 
     `*.updated` events are sent about 10 seconds after the change, so several saves of one change (publishing a draft Story saves it more than once) arrive as one event showing the latest state.
+
+    The `data` of `contact.deleted`, `contact.merged`, `story.deleted`, `project.deleted` and the `project.contact_*` events is recorded when the event happens, as the record may be gone by the time it is sent.
+
+    A webhook created before an event existed doesn't receive it until an admin ticks it under **Send a message when**. New webhooks receive every event unless unticked.
+
+    Bulk actions (merging many Contacts, adding many Contacts to a Project, undoing an import) still send one event per record. Once an endpoint has 100 events waiting, further ones are spaced out at 5 a second, so a bulk action on thousands of records may take some minutes to arrive in full.
 
     Every request has this body:
     ```json
@@ -3096,6 +3108,11 @@ paths:
       description: |
         Updates the fields sent. Changes apply everywhere the tracker is used. Requires an
         Organisation editor, or the reporter who created it.
+
+        Switching `result_type` between a number of Contacts and a percentage clears the tracker's
+        targets on every Project and Album, because the two aren't comparable. While it has targets,
+        the switch is refused (422, "Switching result type clears this tracker's N targets. Confirm to
+        continue.") unless `confirm_clear_targets` is true.
       operationId: updateCohortTracker
       security: [{tokenAuth: []}]
       parameters:
@@ -3384,9 +3401,20 @@ paths:
           isn't a referral. `settings` choose which Projects count: `{destinations: any}`,
           `{destinations: only, project_ids: [...]}` or `{destinations: except, project_ids: [...]}`
           (the default, with none listed).
+        - `cases_created`: Cases (Cases App) created on the Project, or on any of an Album's Projects,
+          each Case counted once.
+        - `cases_closed`: each time one of those Cases is closed. A Case closed, reopened and closed
+          again counts twice, or once when counting each Contact once.
+        - `cases_open`: the Cases open at the end of each timeframe (or today, while that is still to
+          come). Always a snapshot.
 
-        `count_mode` is `items` (default: each signposting or referral; adds up across periods) or
-        `contacts` (each Contact once; a snapshot). Requires an editor or reporter of the Organisation.
+        For the three Cases sources, `settings` can name one Case Form, `{case_form_id: ...}`, to count
+        only the Cases created with it; leave it out or send null for any Case Form. Confidential Cases
+        are counted, but only listed to people who can see them.
+
+        `count_mode` is `items` (default: each signposting, referral, Case or closing; adds up across
+        periods, except for `cases_open`) or `contacts` (each Contact once; a snapshot). Requires an
+        editor or reporter of the Organisation.
       operationId: createWorkflowTracker
       security: [{tokenAuth: []}]
       requestBody:
@@ -3395,15 +3423,28 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/WorkflowTrackerRequest'
-            example:
-              workflow_tracker:
-                charity_id: 913
-                name: "Internal referrals"
-                source: "internal_referrals"
-                count_mode: "items"
-                settings:
-                  destinations: "except"
-                  project_ids: [4512, 4513]
+            examples:
+              internalReferrals:
+                summary: Internal referrals to any Project but two
+                value:
+                  workflow_tracker:
+                    charity_id: 913
+                    name: "Internal referrals"
+                    source: "internal_referrals"
+                    count_mode: "items"
+                    settings:
+                      destinations: "except"
+                      project_ids: [4512, 4513]
+              casesOpen:
+                summary: Cases open, for one Case Form
+                value:
+                  workflow_tracker:
+                    charity_id: 913
+                    name: "Safeguarding cases open"
+                    source: "cases_open"
+                    count_mode: "items"
+                    settings:
+                      case_form_id: 2207
       responses:
         "201":
           description: Workflow Tracker created
@@ -3733,6 +3774,102 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /workflow_trackers/{id}/projects/{project_id}/results:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker's result on a Project
+      description: |
+        A Workflow Tracker's result on a Project's Results Canvas, with the items behind it: what the
+        Workflow Tracker card shows, and the list its popup opens. The tracker must be on the Project.
+
+        `result_kind` `additive` (counting each signposting or referral) adds up across periods.
+        `snapshot` (counting each Contact once) is worked out for the window on its own and read as of
+        `as_of`: the window's last day, or today while that is still to come. `target` is the deadline
+        targets dated in the window, added up (for a snapshot, the one on its last day), or else the
+        one-off target, or null.
+
+        `data` lists one page of the items counted, newest first: the Contact, `detail` (who they were
+        signposted to, or the Project they were referred to), `project_id` (a referral's destination) and
+        when it happened. `total_count` counts every item, whatever the count mode. An item the user may
+        not see (a Contact they can't read, or a referral to a Project they can't see) is counted in
+        `hidden_count` for that page but never listed. Requires the same rights as viewing that Results
+        Canvas.
+      operationId: getWorkflowTrackerProjectResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the items behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerResult'
+              example:
+                workflow_tracker_id: 7
+                name: Signpostings made
+                project_id: 34
+                timeframe: period
+                starts_on: "2026-07-01"
+                ends_on: "2026-12-31"
+                result_kind: additive
+                as_of: null
+                number: 12
+                target: 20
+                page: 1
+                page_size: 9
+                page_count: 2
+                total_count: 12
+                hidden_count: 1
+                data:
+                  - { contact_id: 501, contact_name: Thandi Mokoena, detail: "Mfuleni Clinic · Nurse Dlamini", project_id: null, happened_at: "2026-09-01T09:00:00Z" }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workflow_trackers/{id}/albums/{bundle_id}/results:
+    get:
+      tags: [Workflow Trackers]
+      summary: Get a Workflow Tracker's result on an Album
+      description: |
+        As for a Project, across the Album's open Projects: an item, or in `contacts` mode a Contact,
+        counts once however many of its Projects it relates to, so the result is never the sum of the
+        Projects'. The tracker must be on one of the Album's Projects. Requires rights to see the Album.
+      operationId: getWorkflowTrackerAlbumResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the items behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTrackerResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /cohort_trackers/{id}/projects/{project_id}/results:
     get:
       tags: [Cohort Trackers]
@@ -3751,6 +3888,11 @@ paths:
         `qualifying_value_label`, e.g. an attendance rate as a percentage) where the criteria have one.
         A Contact the user may not read is listed as `{restricted: true}` with no details, so the
         list always adds up to `count`. Requires the same rights as viewing that Results Canvas.
+
+        A percentage tracker also returns `denominator_count` and `percentage`, as the canvas shows
+        "84% Children attending 75%+" with "42 of 50 contacts with enough data". The cohort is always
+        within the denominator. `percentage` is a whole number, or null when `denominator_count` is 0
+        (the canvas shows "–"). `cohort=not_in` lists the rest of the denominator.
       operationId: getCohortTrackerProjectResults
       security: [{tokenAuth: []}]
       parameters:
@@ -3758,6 +3900,7 @@ paths:
         - $ref: '#/components/parameters/CohortTrackerProjectId'
         - $ref: '#/components/parameters/CohortTrackerTimeframe'
         - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/CohortTrackerCohort'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -3775,9 +3918,14 @@ paths:
                 starts_on: "2026-04-01"
                 ends_on: "2026-06-30"
                 count: 42
-                eligible_count: 60
-                target: { number: 50, date: "2026-06-30" }
+                eligible_count: 50
+                result_type: percentage
+                denominator: enough_data
+                denominator_count: 50
+                percentage: 84
+                target: { number: 75, date: "2026-06-30" }
                 qualifying_value_label: Attendance rate
+                cohort: in
                 page: 1
                 page_size: 2
                 page_count: 21
@@ -3942,6 +4090,11 @@ paths:
         `qualifying_value_label`, e.g. an attendance rate as a percentage) where the criteria have one.
         A Contact the user may not read is listed as `{restricted: true}` with no details, so the
         list always adds up to `count`. Requires the same rights as viewing that Results Canvas.
+
+        A percentage tracker also returns `denominator_count` and `percentage`, as the canvas shows
+        "84% Children attending 75%+" with "42 of 50 contacts with enough data". The cohort is always
+        within the denominator. `percentage` is a whole number, or null when `denominator_count` is 0
+        (the canvas shows "–"). `cohort=not_in` lists the rest of the denominator.
       operationId: getCohortTrackerAlbumResults
       security: [{tokenAuth: []}]
       parameters:
@@ -3949,6 +4102,7 @@ paths:
         - $ref: '#/components/parameters/CohortTrackerAlbumId'
         - $ref: '#/components/parameters/CohortTrackerTimeframe'
         - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/CohortTrackerCohort'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -3966,9 +4120,14 @@ paths:
                 starts_on: "2026-04-01"
                 ends_on: "2026-06-30"
                 count: 42
-                eligible_count: 60
-                target: { number: 50, date: "2026-06-30" }
+                eligible_count: 50
+                result_type: percentage
+                denominator: enough_data
+                denominator_count: 50
+                percentage: 84
+                target: { number: 75, date: "2026-06-30" }
                 qualifying_value_label: Attendance rate
+                cohort: in
                 page: 1
                 page_size: 2
                 page_count: 21
@@ -4641,6 +4800,15 @@ components:
       description: |
         period: the day after the previous Target Deadline up to the deadline. year_to_date: the
         start of the Project's or Album's year up to the deadline. all_time: everything up to the deadline.
+    CohortTrackerCohort:
+      name: cohort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [in, not_in]
+        default: in
+      description: Which Contacts `data` lists. `in` the cohort; for a percentage, `not_in` lists the Contacts in the denominator who aren't in the cohort (the popup's Not in cohort tab).
     CohortTrackerAsOf:
       name: as_of
       in: query
@@ -7090,7 +7258,17 @@ components:
           description: Membership of the Project or Album the tracker is placed on
         result_type:
           type: string
-          enum: [number]
+          enum: [number, percentage]
+          description: Show the result as a number of Contacts, or a percentage of the denominator
+        denominator:
+          type: string
+          enum: [members, enough_data]
+          nullable: true
+          description: |
+            For a percentage, what it is out of: `members` (Contacts in this Project / Album) or
+            `enough_data` (Contacts with enough data to be judged on every data-based criterion: invited
+            to an event in scope for Attendance Rate, two or more Choice Tracker responses for Distance
+            Travelled Direction, a response to the question for an answer-based criterion). null for a number.
         criteria:
           type: object
           description: Contact Filter criteria, in the shape a Saved Filter uses
@@ -7138,6 +7316,19 @@ components:
               enum: [ever_enrolled, currently_enrolled]
             criteria:
               type: object
+            result_type:
+              type: string
+              enum: [number, percentage]
+              description: Default number
+            denominator:
+              type: string
+              enum: [members, enough_data]
+              description: For a percentage. Defaults to members
+        confirm_clear_targets:
+          type: boolean
+          description: |
+            Update only. Switching result_type between number and percentage clears the tracker's
+            targets everywhere, so it is refused (422) while it has targets unless this is true.
 
     CohortTrackerDeadline:
       type: object
@@ -7152,7 +7343,9 @@ components:
 
     CohortTrackerTargetsRequest:
       type: object
-      description: Send target, deadlines or both. deadlines replaces the tracker's deadline targets.
+      description: |
+        Send target, deadlines or both. deadlines replaces the tracker's deadline targets. For a
+        percentage tracker, the target and each deadline number are a whole percentage from 0 to 100.
       properties:
         target:
           type: integer
@@ -7228,6 +7421,21 @@ components:
         eligible_count:
           type: integer
           description: Members the criteria could judge (who have the data the criteria need)
+        result_type:
+          type: string
+          enum: [number, percentage]
+        denominator:
+          type: string
+          enum: [members, enough_data]
+          nullable: true
+        denominator_count:
+          type: integer
+          nullable: true
+          description: For a percentage, how many Contacts it is out of. null for a number
+        percentage:
+          type: integer
+          nullable: true
+          description: count as a whole percentage of denominator_count. null for a number, or when denominator_count is 0
         target:
           type: object
           nullable: true
@@ -7243,6 +7451,10 @@ components:
           type: string
           nullable: true
           example: Attendance rate
+        cohort:
+          type: string
+          enum: [in, not_in]
+          description: Which Contacts data lists
         page:
           type: integer
         page_size:
@@ -7286,15 +7498,15 @@ components:
           type: string
         source:
           type: string
-          enum: [signpostings, internal_referrals]
+          enum: [signpostings, internal_referrals, cases_created, cases_closed, cases_open]
           description: What it counts
         count_mode:
           type: string
           enum: [items, contacts]
-          description: "items: each signposting or referral (adds up across periods); contacts: each Contact once (a snapshot)"
+          description: "items: each signposting, referral, Case or Case closing (adds up across periods, except cases_open); contacts: each Contact once (a snapshot)"
         settings:
           type: object
-          description: "internal_referrals only: which Projects count as a referral. signpostings has none."
+          description: "internal_referrals: which Projects count as a referral. The Cases sources: the Case Form to count (null for any). signpostings has none."
           properties:
             destinations:
               type: string
@@ -7303,6 +7515,10 @@ components:
               type: array
               items:
                 type: integer
+            case_form_id:
+              type: integer
+              nullable: true
+              description: "Cases sources only: count only the Cases created with this one of the Organisation's Case Forms"
 
     WorkflowTracker:
       type: object
@@ -7322,14 +7538,14 @@ components:
           nullable: true
         source:
           type: string
-          enum: [signpostings, internal_referrals]
+          enum: [signpostings, internal_referrals, cases_created, cases_closed, cases_open]
         count_mode:
           type: string
           enum: [items, contacts]
         result_kind:
           type: string
           enum: [additive, snapshot]
-          description: additive adds up across periods; snapshot works each timeframe out on its own
+          description: additive adds up across periods; snapshot (counting each Contact once, or cases_open) works each timeframe out on its own
         settings:
           type: object
           example:
@@ -7389,8 +7605,12 @@ components:
               type: integer
             all_time:
               type: integer
+        hidden_count:
+          type: integer
+          description: Latest records counted but not listed, because the user may not see them (e.g. a confidential Case)
         records:
           type: array
+          description: The latest records counted that the user may see
           items:
             type: object
             properties:
@@ -7398,7 +7618,7 @@ components:
                 type: string
               detail:
                 type: string
-                description: Who they were signposted to, or the Project they were referred to
+                description: Who they were signposted to, the Project they were referred to, or the Case's title
               happened_at:
                 type: string
                 format: date-time
@@ -7438,6 +7658,81 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    WorkflowTrackerResult:
+      type: object
+      properties:
+        workflow_tracker_id:
+          type: integer
+        name:
+          type: string
+        project_id:
+          type: integer
+          description: Present for a Project's result
+        album_id:
+          type: integer
+          description: Present for an Album's result
+        timeframe:
+          type: string
+          enum: [period, year_to_date, all_time]
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+          description: Null when the window runs from the start
+        ends_on:
+          type: string
+          format: date
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+        as_of:
+          type: string
+          format: date
+          nullable: true
+          description: For a snapshot, the date it is read at
+        number:
+          type: integer
+        target:
+          type: integer
+          nullable: true
+        page:
+          type: integer
+        page_size:
+          type: integer
+          description: Items listed on this page
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+          description: Every item counted, whatever the count mode
+        hidden_count:
+          type: integer
+          description: Items on this page counted but not listed, because the user may not see them
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              contact_id:
+                type: integer
+              contact_name:
+                type: string
+              detail:
+                type: string
+                nullable: true
+                description: Who the Contact was signposted to, the Project they were referred to, or the Case's title
+              project_id:
+                type: integer
+                nullable: true
+                description: A referral's destination Project
+              case_id:
+                type: integer
+                nullable: true
+                description: The Case, for the Cases sources
+              happened_at:
+                type: string
+                format: date-time
 
     PaginatedWorkflowTrackers:
       allOf:
@@ -7542,7 +7837,7 @@ components:
 
     WebhookEvent:
       type: string
-      enum: [contact.created, contact.updated, story.created, story.updated, project.created, project.updated, import.completed]
+      enum: [contact.created, contact.updated, contact.deleted, contact.merged, contact.restored, story.created, story.updated, story.deleted, project.created, project.updated, project.deleted, project.contact_added, project.contact_removed, import.completed]
 
     WebhookEndpointRequest:
       type: object
