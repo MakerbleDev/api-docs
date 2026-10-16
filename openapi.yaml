@@ -3138,6 +3138,108 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /projects/{id}/event_categories:
+    get:
+      tags: [Events]
+      summary: List the Event Formats you can create events with in a Project
+      description: >-
+        The Event Formats (Event Categories) assigned to the Project, which are the formats the
+        Create Event form offers there. Returns 403 unless you can create events in the Project:
+        it must have events turned on, and you must be an Organisation Admin, a Project Manager,
+        or a Project Reporter or Observer chosen as one of its Event Creators.
+      operationId: listProjectEventFormats
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The Project's Event Formats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectEventFormats'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{id}/event_form:
+    get:
+      tags: [Events]
+      summary: Get the Create or Edit Event form for an Event Format in a Project
+      description: >-
+        Everything the Create Event form offers once an Event Format is chosen: its fields (event
+        details, custom fields and Dropdowns with their answer choices), the Surveys and Waves
+        available for Self Check-in, the Project's Signup Pages, the Guest Statuses a Signup Page
+        can put guests into, and the Event Roles. Pass event_id to get the Edit Event form for an
+        existing event, which also allows the Event Format the event already uses. Returns 403
+        unless you can create events in the Project, or edit the event.
+      operationId: getEventForm
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: event_category_id
+          in: query
+          required: true
+          description: The Event Format (Event Category) chosen for the event.
+          schema:
+            type: integer
+          example: 42
+        - name: event_id
+          in: query
+          required: false
+          description: The event being edited, for the Edit Event form.
+          schema:
+            type: integer
+          example: 889
+      responses:
+        "200":
+          description: The form's fields and choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventForm'
+              example:
+                project: {id: 572, name: "Youth Mentoring Programme 2024"}
+                event_category: {id: 42, name: "Drop-in Session"}
+                event_id: null
+                fields:
+                  - {name: name, kind: event_attribute, field_id: null, data_type: text, mandatory: true, priority: 0, validation_hint: null, dropdown: null}
+                  - {name: start_datetime, kind: event_attribute, field_id: null, data_type: datetime, mandatory: true, priority: 1, validation_hint: null, dropdown: null}
+                  - {name: end_datetime, kind: event_attribute, field_id: null, data_type: datetime, mandatory: true, priority: 2, validation_hint: null, dropdown: null}
+                  - {name: "Room code", kind: custom_field, field_id: 311, data_type: text, mandatory: false, priority: 3, validation_hint: "Must contain exactly 3 letters and numbers", dropdown: null}
+                  - name: "Session type"
+                    kind: dropdown
+                    field_id: 15
+                    data_type: dropdown
+                    mandatory: true
+                    priority: 4
+                    validation_hint: null
+                    dropdown:
+                      choice: limited_choice
+                      choice_limit: 2
+                      options: [{id: 101, name: "Group"}, {id: 102, name: "One to one"}]
+                self_check_in:
+                  enabled: true
+                  surveys: [{project_story_category_id: 2053, story_category_id: 2136, name: "Attendance"}]
+                  waves: [{id: 31, name: "Week 1", story_category_id: 2136, project_story_category_id: 2053}]
+                signup_pages: [{id: 88, name: "Book a place"}]
+                guest_statuses: [{id: 7, name: "Booked"}, {id: 8, name: "Waiting list"}]
+                event_roles:
+                  enabled: false
+                  guests: []
+                  event_managers_and_workers: []
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /referral_submissions:
     post:
       tags: [Signup Pages]
@@ -5717,6 +5819,174 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/EventSummary'
+
+    ProjectEventFormat:
+      type: object
+      required: [id, name, is_default]
+      properties:
+        id:
+          type: integer
+          example: 42
+        name:
+          type: string
+          example: "Drop-in Session"
+        is_default:
+          type: boolean
+          example: false
+
+    PaginatedProjectEventFormats:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectEventFormat'
+
+    IdAndName:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          example: 7
+        name:
+          type: string
+          example: "Booked"
+
+    EventFormField:
+      type: object
+      required: [name, kind, field_id, data_type, mandatory, priority, validation_hint, dropdown]
+      properties:
+        name:
+          type: string
+          description: The event attribute (name, start_datetime, end_datetime), or the custom field's or Dropdown's name.
+          example: "Session type"
+        kind:
+          type: string
+          enum: [event_attribute, custom_field, dropdown]
+        field_id:
+          type: integer
+          nullable: true
+          description: The custom field's id, or the Dropdown's (Ratio Set's) id. Null for an event attribute.
+          example: 15
+        data_type:
+          type: string
+          description: datetime or text for an event attribute; the custom field's type (date, number, text, tickbox, ward, ...); or dropdown.
+          example: "dropdown"
+        mandatory:
+          type: boolean
+        priority:
+          type: integer
+          nullable: true
+          example: 4
+        validation_hint:
+          type: string
+          nullable: true
+          description: The rule a custom field's answer must follow, as the form shows it.
+          example: "Must contain exactly 3 letters and numbers"
+        dropdown:
+          type: object
+          nullable: true
+          required: [choice, choice_limit, options]
+          properties:
+            choice:
+              type: string
+              enum: [single_choice, unlimited_choice, limited_choice]
+            choice_limit:
+              type: integer
+              nullable: true
+              description: How many options may be chosen, for limited_choice.
+              example: 2
+            options:
+              type: array
+              description: The answer choices (Sub Ratios).
+              items:
+                $ref: '#/components/schemas/IdAndName'
+
+    EventForm:
+      type: object
+      required: [project, event_category, event_id, fields, self_check_in, signup_pages, guest_statuses, event_roles]
+      properties:
+        project:
+          $ref: '#/components/schemas/IdAndName'
+        event_category:
+          $ref: '#/components/schemas/IdAndName'
+        event_id:
+          type: integer
+          nullable: true
+          example: null
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventFormField'
+        self_check_in:
+          type: object
+          required: [enabled, surveys, waves]
+          properties:
+            enabled:
+              type: boolean
+              description: Whether the Event Format has Self Check-in (Survey Kiosk) turned on.
+            surveys:
+              type: array
+              items:
+                type: object
+                required: [project_story_category_id, story_category_id, name]
+                properties:
+                  project_story_category_id:
+                    type: integer
+                    example: 2053
+                  story_category_id:
+                    type: integer
+                    example: 2136
+                  name:
+                    type: string
+                    example: "Attendance"
+            waves:
+              type: array
+              items:
+                type: object
+                required: [id, name, story_category_id, project_story_category_id]
+                properties:
+                  id:
+                    type: integer
+                    example: 31
+                  name:
+                    type: string
+                    example: "Week 1"
+                  story_category_id:
+                    type: integer
+                    nullable: true
+                    example: 2136
+                  project_story_category_id:
+                    type: integer
+                    nullable: true
+                    example: 2053
+        signup_pages:
+          type: array
+          description: The Project's active Signup Pages (Referral Link Details).
+          items:
+            $ref: '#/components/schemas/IdAndName'
+        guest_statuses:
+          type: array
+          description: The Event Format's Guest Statuses (Event States), in order. The first is the default for people who sign up.
+          items:
+            $ref: '#/components/schemas/IdAndName'
+        event_roles:
+          type: object
+          required: [enabled, guests, event_managers_and_workers]
+          properties:
+            enabled:
+              type: boolean
+            guests:
+              type: array
+              items:
+                $ref: '#/components/schemas/IdAndName'
+            event_managers_and_workers:
+              type: array
+              items:
+                $ref: '#/components/schemas/IdAndName'
 
     PaginationEnvelope:
       type: object
