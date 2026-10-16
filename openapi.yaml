@@ -192,6 +192,8 @@ tags:
     description: Case Forms — field schemas for creating Case records
   - name: Media Gallery
     description: Photos, videos, audio and documents attached to Stories and to Contacts' bios
+  - name: Events
+    description: Events and recurring series of events, with their guests (Contacts) and staff
   - name: Signup Pages
     description: |
       Referral Link Details — public-facing signup forms, including the
@@ -2935,6 +2937,201 @@ paths:
               example:
                 error: "This Event Format can't be deleted because it has 3 events. Delete or move those events first. This Event Format can't be deleted because it is added to 2 projects. Remove it from those projects first."
 
+  /events:
+    get:
+      tags: [Events]
+      summary: List events
+      operationId: listEvents
+      description: |
+        Lists the events you can see, as on the **Manage Events** page, soonest first.
+        Organisation Admins see every event in their organisation; other users see the events
+        of the projects they are an editor of and the events they are an Event Manager or Event
+        Worker at.
+
+        Filter by `project_id`, `event_category_id` (Event Format), `event_type`, a
+        `start_date`/`end_date` range (the event's start falls between them), or
+        `master_event_id` to list every event in one recurring series (the master event and
+        its subsequent events). Pass `charity_id` to list one organisation; one you are not a
+        member of returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only this Organisation's (Charity's) events
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: event_category_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only events of this Event Format (Event Category)
+        - name: event_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [one-off, master, subsequent]
+          description: "`master` is the first event of a recurring series; `subsequent` are the rest of the series"
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Only events starting on or after this date
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Only events starting on or before this date
+        - name: master_event_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only the events of this recurring series
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEvents'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 9120
+                    name: "Yoga 2"
+                    charity_id: 123
+                    start_datetime: "2030-01-15T14:00:00.000Z"
+                    end_datetime: "2030-01-15T15:00:00.000Z"
+                    timezone: "Europe/London"
+                    location: "Main Hall"
+                    event_type: "subsequent"
+                    listing_enabled: false
+                    created_at: "2026-10-01T09:00:00.000Z"
+                    updated_at: "2026-10-01T09:00:00.000Z"
+                    project: { id: 456, name: "Youth Club" }
+                    event_category: { id: 4521, name: "Workshops" }
+                    master_event_id: 9119
+                    guests_count: 12
+                    managers_count: 1
+                    workers_count: 2
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /events/{id}:
+    get:
+      tags: [Events]
+      summary: Get an event
+      operationId: getEvent
+      description: |
+        One event, with everything shown on its event page and Edit Event page: its Event
+        Format's custom fields and Dropdown answers, the Signup Page, the Self Check-in Survey
+        and Wave, capacity and timesheet settings, listing details, and the links guests use to
+        sign up and check themselves in. For a master event (the first in a recurring series)
+        it also returns the Recurring Schedule, the Recurring End Date and how many events are
+        in the series.
+
+        Anyone who can open the event page can read it. A member of the organisation who can't
+        gets `403`; an event of another organisation, or an unknown id, returns `404`.
+        `can_edit` and `can_delete` say whether you may change or delete it.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+              example:
+                id: 9119
+                name: "Yoga 1"
+                charity_id: 123
+                start_datetime: "2030-01-08T14:00:00.000Z"
+                end_datetime: "2030-01-08T15:00:00.000Z"
+                timezone: "Europe/London"
+                location: "Main Hall"
+                event_type: "master"
+                listing_enabled: true
+                created_at: "2026-10-01T09:00:00.000Z"
+                updated_at: "2026-10-01T09:00:00.000Z"
+                project: { id: 456, name: "Youth Club" }
+                event_category: { id: 4521, name: "Workshops" }
+                master_event_id: null
+                guests_count: 12
+                managers_count: 1
+                workers_count: 2
+                can_edit: true
+                can_delete: true
+                recurring_schedule:
+                  rule: { rule_type: "IceCube::WeeklyRule", interval: 1, validations: { day: [2] } }
+                  description: "Weekly on Tuesdays"
+                recurring_end_date: "2030-03-26"
+                series_events_count: 12
+                custom_fields:
+                  - { id: 77, name: "Room booking reference", value: "B-114" }
+                dropdowns:
+                  - id: 3012
+                    name: "Session type"
+                    answer_choices: [{ id: 88101, name: "Drop-in" }]
+                signup_page: { id: 310, name: "Youth Club signup" }
+                self_check_in:
+                  survey: { id: 5501, name: "Session feedback", project_survey_id: 9921 }
+                  wave: null
+                capacity:
+                  guests: "fixed"
+                  max_guests: 20
+                  allow_signup_after_full: true
+                  guest_status_for_signup_id: 41
+                  guest_status_after_full_id: 43
+                  confirmation_message_after_full: "Unfortunately we have no more space, however we will keep your details on file and let you know if a space becomes available."
+                  thank_you_message: "Your registration has been received. Thank you."
+                  workers: "unlimited"
+                  max_workers: 0
+                  timesheets_for_workers: true
+                  timesheets_for_guests: false
+                listing:
+                  listing_enabled: true
+                  location: "Main Hall"
+                  description: "<p>Gentle yoga for all abilities.</p>"
+                  image_url: null
+                links:
+                  self_check_in: "https://app.makerble.com/events/9119/kiosk"
+                  signup: "https://app.makerble.com/charities/123/projects/456/beneficiaries/new?event_id=9119&redirect_to_check_in=false&referral_link_detail_id=310"
+                  signup_and_self_check_in: "https://app.makerble.com/charities/123/projects/456/beneficiaries/new?event_id=9119&referral_link_detail_id=310"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are in the organisation but may not see this event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "You don't have permission to see this event."
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /referral_submissions:
     post:
       tags: [Signup Pages]
@@ -5110,6 +5307,141 @@ components:
           type: string
           format: date-time
           example: "2024-01-15T09:30:00.000+00:00"
+
+    EventSummary:
+      type: object
+      description: An event, as listed on Manage Events.
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        charity_id: { type: integer }
+        start_datetime: { type: string, format: date-time }
+        end_datetime: { type: string, format: date-time }
+        timezone: { type: string, nullable: true, description: "IANA time zone the event is held in" }
+        location: { type: string, nullable: true }
+        event_type:
+          type: string
+          enum: [one-off, master, subsequent]
+          description: "`master` is the first event of a recurring series; `subsequent` are the rest"
+        listing_enabled: { type: boolean, description: "Whether the event appears in Events Catalogues" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        project:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        event_category:
+          type: object
+          description: The Event Format
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        master_event_id: { type: integer, nullable: true, description: "For a subsequent event, the master event of its series" }
+        guests_count: { type: integer }
+        managers_count: { type: integer }
+        workers_count: { type: integer }
+
+    Event:
+      allOf:
+        - $ref: '#/components/schemas/EventSummary'
+        - type: object
+          properties:
+            can_edit: { type: boolean }
+            can_delete: { type: boolean }
+            recurring_schedule:
+              type: object
+              nullable: true
+              description: For a master event, the rule its series repeats by
+              properties:
+                rule: { type: object, description: "The IceCube rule" }
+                description: { type: string, example: "Weekly on Tuesdays" }
+            recurring_end_date: { type: string, format: date, nullable: true }
+            series_events_count: { type: integer, nullable: true, description: "Events in this event's series, or null for a one-off event" }
+            custom_fields:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer, description: "Custom field id" }
+                  name: { type: string }
+                  value: { nullable: true, description: "The value; a file is an object with url and file_name" }
+            dropdowns:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer, description: "Dropdown (Ratio Set) id" }
+                  name: { type: string }
+                  answer_choices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer, description: "Answer choice (Sub Ratio) id" }
+                        name: { type: string }
+            signup_page:
+              type: object
+              nullable: true
+              description: The Signup Page (Referral Link Detail) people register through
+              properties:
+                id: { type: integer }
+                name: { type: string }
+            self_check_in:
+              type: object
+              nullable: true
+              description: The Survey (and Wave) guests answer when they check themselves in
+              properties:
+                survey:
+                  type: object
+                  properties:
+                    id: { type: integer, description: "Survey (Story Category) id" }
+                    name: { type: string }
+                    project_survey_id: { type: integer, description: "The Survey's link to the project (Project Story Category)" }
+                wave:
+                  type: object
+                  nullable: true
+                  properties:
+                    id: { type: integer }
+                    name: { type: string }
+            capacity:
+              type: object
+              properties:
+                guests: { type: string, enum: [fixed, unlimited] }
+                max_guests: { type: integer }
+                allow_signup_after_full: { type: boolean }
+                guest_status_for_signup_id: { type: integer, nullable: true, description: "Guest Status (Event State) for people who sign up while there is space" }
+                guest_status_after_full_id: { type: integer, nullable: true, description: "Guest Status for people who sign up once the event is full" }
+                confirmation_message_after_full: { type: string, nullable: true }
+                thank_you_message: { type: string, nullable: true }
+                workers: { type: string, enum: [fixed, unlimited] }
+                max_workers: { type: integer }
+                timesheets_for_workers: { type: boolean }
+                timesheets_for_guests: { type: boolean }
+            listing:
+              type: object
+              properties:
+                listing_enabled: { type: boolean }
+                location: { type: string, nullable: true }
+                description: { type: string, nullable: true, description: "HTML" }
+                image_url: { type: string, nullable: true }
+            links:
+              type: object
+              description: Links to share with guests; null when the event has no such page
+              properties:
+                self_check_in: { type: string, nullable: true }
+                signup: { type: string, nullable: true }
+                signup_and_self_check_in: { type: string, nullable: true }
+
+    PaginatedEvents:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventSummary'
 
     PaginationEnvelope:
       type: object

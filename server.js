@@ -904,6 +904,7 @@ function buildDocsPage() {
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Events</div>
+        <a href="#events"          class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Events</a>
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Event Formats</a>
       </div>
       <div class="nav-section">
@@ -2031,6 +2032,40 @@ function buildDocsPage() {
             { name: "as_of", type: "string", required: false, desc: "YYYY-MM-DD" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The result across the Album's open Projects" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Events -->
+      <section class="section" id="events">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Events</h2>
+        <div class="section-desc">
+          <p>Events are sessions, classes, appointments and other gatherings run within a project. A recurring series starts with a <strong>master</strong> event, followed by its <strong>subsequent</strong> events. You see the same events as on the Manage Events page: Organisation Admins see every event in their organisation, and other users see the events of the projects they edit and the events they manage or work at.</p>
+          <p>An event's details include its Event Format's custom fields and Dropdown answers, its Signup Page and Self Check-in Survey, its capacity settings, and the links guests use to sign up and check themselves in.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/events", "List events", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only this Organisation's events" },
+            { name: "project_id", type: "integer", required: false, desc: "Only this project's events" },
+            { name: "event_category_id", type: "integer", required: false, desc: "Only events of this Event Format" },
+            { name: "event_type", type: "string", required: false, desc: "one-off, master or subsequent" },
+            { name: "start_date", type: "string", required: false, desc: "Events starting on or after this date (YYYY-MM-DD)" },
+            { name: "end_date", type: "string", required: false, desc: "Events starting on or before this date (YYYY-MM-DD)" },
+            { name: "master_event_id", type: "integer", required: false, desc: "Every event in this recurring series" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of events, soonest first" },
+            { code: "404", cls: "response-4xx", desc: "charity_id is an organisation you are not in" }
+          ])}
+          ${endpointCard("GET", "/events/{id}", "Get an event", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The event, with its fields, settings, series and links" },
+            { code: "403", cls: "response-4xx", desc: "You are in the organisation but may not see this event" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
           ])}
         </div>
       </section>
