@@ -1942,7 +1942,9 @@ paths:
         Only Contacts (Beneficiaries) are available so far, so `record_type` must be `Contact`.
 
         Views by the same colleague, through the same route, less than 30 minutes apart are one entry with a
-        `view_count`. `source` is `web` (opened in Makerble), `api` (fetched with `GET /beneficiaries/{id}`) or `mcp`
+        `view_count`. Entries older than the Organisation's retention period (3 to 12 months, set on Organisation
+        Preferences) are rolled up into one entry per colleague per month, with `monthly_summary: true` and
+        `first_viewed_at` / `last_viewed_at` spanning that month. `source` is `web` (opened in Makerble), `api` (fetched with `GET /beneficiaries/{id}`) or `mcp`
         (fetched through the Makerble MCP server).
 
         Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one
@@ -2004,8 +2006,8 @@ paths:
                 total_count: 2
                 record: { record_type: Contact, record_id: 185170, charity_id: 304, name: Bella Thornton, deleted: false }
                 data:
-                  - { id: 912, record_type: Contact, record_id: 185170, charity_id: 304, action: "Viewed ×1", view_count: 1, source: mcp, user_id: 190, user_name: Sam Ahmed, first_viewed_at: "2026-10-02T14:05:00.000+01:00", last_viewed_at: "2026-10-02T14:05:00.000+01:00" }
-                  - { id: 877, record_type: Contact, record_id: 185170, charity_id: 304, action: "Viewed ×3", view_count: 3, source: web, user_id: 212, user_name: Jane Smith, first_viewed_at: "2026-10-01T09:20:00.000+01:00", last_viewed_at: "2026-10-01T09:30:00.000+01:00" }
+                  - { id: 912, record_type: Contact, record_id: 185170, charity_id: 304, action: "Viewed ×1", view_count: 1, source: mcp, user_id: 190, user_name: Sam Ahmed, first_viewed_at: "2026-10-02T14:05:00.000+01:00", last_viewed_at: "2026-10-02T14:05:00.000+01:00", monthly_summary: false }
+                  - { id: 877, record_type: Contact, record_id: 185170, charity_id: 304, action: "Viewed ×3", view_count: 3, source: web, user_id: 212, user_name: Jane Smith, first_viewed_at: "2026-10-01T09:20:00.000+01:00", last_viewed_at: "2026-10-01T09:30:00.000+01:00", monthly_summary: false }
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -6135,6 +6137,9 @@ components:
         last_viewed_at:
           type: string
           format: date-time
+        monthly_summary:
+          type: boolean
+          description: True for a monthly summary entry, which totals one colleague's views of the record in that month once they passed the retention period
 
     PaginatedAccessLogs:
       allOf:

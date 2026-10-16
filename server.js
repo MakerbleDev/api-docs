@@ -1515,7 +1515,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Audit &amp; compliance</div>
         <h2 class="section-title">Access Logs</h2>
         <div class="section-desc">
-          <p>Access Logs are the audit trail of <em>views</em>, on the <strong>Access Logs</strong> tab beside Versions on the Manage Versions page: who opened a Contact in Makerble or fetched it through the API, when, and how many times. Views by the same colleague less than 30 minutes apart are one entry with a <code>view_count</code>. <code>source</code> is <code>web</code>, <code>api</code> or <code>mcp</code>. Only Contacts are available so far.</p>
+          <p>Access Logs are the audit trail of <em>views</em>, on the <strong>Access Logs</strong> tab beside Versions on the Manage Versions page: who opened a Contact in Makerble or fetched it through the API, when, and how many times. Views by the same colleague less than 30 minutes apart are one entry with a <code>view_count</code>. Entries older than the Organisation's retention period (3 to 12 months, set on Organisation Preferences) are rolled up into one entry per colleague per month, with <code>monthly_summary: true</code>. <code>source</code> is <code>web</code>, <code>api</code> or <code>mcp</code>. Only Contacts are available so far.</p>
           <p>Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one of their Projects). Anything else returns <code>404</code>.</p>
         </div>
         <div class="endpoint-list">
