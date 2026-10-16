@@ -2043,6 +2043,7 @@ function buildDocsPage() {
         <div class="section-desc">
           <p>Events are sessions, classes, appointments and other gatherings run within a project. A recurring series starts with a <strong>master</strong> event, followed by its <strong>subsequent</strong> events. You see the same events as on the Manage Events page: Organisation Admins see every event in their organisation, and other users see the events of the projects they edit and the events they manage or work at.</p>
           <p>An event's details include its Event Format's custom fields and Dropdown answers, its Signup Page and Self Check-in Survey, its capacity settings, and the links guests use to sign up and check themselves in.</p>
+          <p>Before creating or editing an event, list the Event Formats you can use in its project, then get the form for the one you choose. The form lists the format's fields and their Dropdown answer choices, the Surveys and Waves available for Self Check-in, the project's Signup Pages, the Guest Statuses a Signup Page can put guests into, and the Event Roles. Both return <code>403</code> unless you can create events in the project (or edit the event): the project must have events turned on, and you must be an Organisation Admin, a Project Manager, or a Project Reporter or Observer chosen as one of its Event Creators.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/events", "List events", true, [
@@ -2066,6 +2067,24 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The event, with its fields, settings, series and links" },
             { code: "403", cls: "response-4xx", desc: "You are in the organisation but may not see this event" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("GET", "/projects/{id}/event_categories", "List a project's Event Formats", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of the Event Formats you can create events with in the project" },
+            { code: "403", cls: "response-4xx", desc: "You can't create events in this project" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("GET", "/projects/{id}/event_form", "Get the Create or Edit Event form", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "event_category_id", type: "integer", required: true, desc: "The Event Format chosen for the event" },
+            { name: "event_id", type: "integer", required: false, desc: "The event being edited, for the Edit Event form" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The form's fields and Dropdown choices, Self Check-in Surveys and Waves, Signup Pages, Guest Statuses and Event Roles" },
+            { code: "403", cls: "response-4xx", desc: "You can't create events in this project, or edit this event" },
+            { code: "404", cls: "response-4xx", desc: "The project or the Event Format isn't available to you" }
           ])}
         </div>
       </section>
