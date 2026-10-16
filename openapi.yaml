@@ -658,6 +658,18 @@ paths:
             type: string
             enum: [project, month]
           description: Split each tracker's figures into a `groups` array by Project or by month (months with nothing recorded are included). Default is one total.
+        - name: template_id
+          in: query
+          schema:
+            type: integer
+          example: 2413
+          description: |
+            Return only the trackers in this **Impact Framework** (Template), as choosing it in **Metrics included**
+            does on the Results Canvas: its Activity and Engagement trackers, and the indicators under its Outcomes
+            (including your organisation's own indicators linked to those Outcomes). It never adds a tracker the
+            Projects don't use. The Impact Framework must be your own, or belong to the Organisation of every Project
+            requested; otherwise the response is a 422. A Project's default Impact Framework is
+            `default_results_template_id` on `GET /projects/{id}`. Omit for every tracker.
       responses:
         "200":
           description: One page of trackers
@@ -6340,6 +6352,14 @@ components:
             charity_id:
               type: integer
               example: 31
+            default_results_template_id:
+              type: integer
+              nullable: true
+              example: 2413
+              description: |
+                The Impact Framework (Template) the Project's Results Canvas shows by default, chosen on Project
+                Preferences. `null` means All metrics. Pass it as `template_id` to `GET /project_results` for the
+                same figures.
 
     User:
       allOf:
