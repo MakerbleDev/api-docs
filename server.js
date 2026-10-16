@@ -1010,6 +1010,53 @@ function buildDocsPage() {
             </div>
           </div>
         </div>
+
+        <h3 id="oauth" style="margin-top:36px">Connecting an app with OAuth 2.0</h3>
+        <div class="section-desc">
+          <p>Apps published for other people to use, such as marketplace connectors, connect with OAuth 2.0 instead of asking for a password. The user signs in to Makerble, chooses which of their organisations the app may use, and selects <strong>Allow</strong>. The app then calls the API as that user, limited to that organisation.</p>
+          <ol>
+            <li><strong>Get a client ID and secret.</strong> Makerble registers client applications: email <a href="mailto:api-key-request@makerble.com">api-key-request@makerble.com</a> with your app's name and its exact redirect URI (https only).</li>
+            <li><strong>Send the user to</strong> <code>https://makerble.com/oauth/authorize?response_type=code&amp;client_id=…&amp;redirect_uri=…&amp;scope=api&amp;state=…</code>. After the consent screen, Makerble redirects to your redirect URI with <code>?code=…&amp;state=…</code>, or <code>?error=access_denied</code> if the user cancels.</li>
+            <li><strong>Exchange the code</strong> at <code>POST https://makerble.com/oauth/token</code>. It works once and expires after 10 minutes.</li>
+            <li><strong>Call the API</strong> with <code>Authorization: Bearer &lt;access_token&gt;</code> instead of the <code>X-User-*</code> headers.</li>
+            <li><strong>Refresh</strong> when the access token expires (after 1 hour). Refresh tokens don't expire, but each refresh returns a new one: always store the latest.</li>
+          </ol>
+        </div>
+
+        <table class="info-table" style="margin-top:20px">
+          <thead><tr><th>Situation</th><th>Response</th></tr></thead>
+          <tbody>
+            <tr><td>Token expired or revoked, or the user is no longer in the connected organisation</td><td><code>401 {"error":"invalid_token"}</code></td></tr>
+            <tr><td>Endpoint not yet available to connected apps</td><td><code>403 {"error":"not_available_to_connected_apps"}</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout-info" style="margin-top:20px">
+          <span class="callout-icon">ℹ</span>
+          <span>A connected app sees only the organisation the user chose, with that user's permissions there. Endpoints that accept it list <code>oauth2</code> under Security in the <a href="/openapi.yaml">OpenAPI spec</a>; more are added as they are reviewed. Users and Organisation Admins can disconnect an app at any time from <strong>Settings → Connected Apps</strong>, and it stops working straight away.</span>
+        </div>
+
+        <div class="endpoint-list">
+          ${endpointCard("POST", "/oauth/token", "Exchange a code, or refresh a token (OAuth 2.0)", false, [
+            { name: "grant_type", in: "body", required: true, desc: "<code>authorization_code</code> or <code>refresh_token</code>" },
+            { name: "code", in: "body", desc: "For <code>authorization_code</code>: the code from the redirect" },
+            { name: "redirect_uri", in: "body", desc: "For <code>authorization_code</code>: the same redirect URI used on <code>/oauth/authorize</code>" },
+            { name: "refresh_token", in: "body", desc: "For <code>refresh_token</code>: the latest refresh token" },
+            { name: "client_id", in: "body", required: true, desc: "Your app's client ID" },
+            { name: "client_secret", in: "body", required: true, desc: "Your app's client secret (or send both with HTTP Basic auth)" },
+          ], [
+            { code: 200, cls: "response-2xx", desc: "<code>access_token</code>, <code>token_type: Bearer</code>, <code>expires_in: 3600</code>, <code>refresh_token</code>, <code>scope: api</code>" },
+            { code: 400, cls: "response-4xx", desc: "<code>invalid_grant</code>: the code or refresh token is invalid, expired or already used" },
+            { code: 401, cls: "response-4xx", desc: "<code>invalid_client</code>: unknown client or wrong secret" },
+          ], "<p>Sent to <code>https://makerble.com/oauth/token</code>, not under <code>/api/v2</code>. Body is form-urlencoded.</p>")}
+          ${endpointCard("POST", "/oauth/revoke", "Revoke a token (OAuth 2.0)", false, [
+            { name: "token", in: "body", required: true, desc: "An access or refresh token. Revoking either stops both working" },
+            { name: "client_id", in: "body", required: true, desc: "Your app's client ID" },
+            { name: "client_secret", in: "body", required: true, desc: "Your app's client secret" },
+          ], [
+            { code: 200, cls: "response-2xx", desc: "Revoked, or already invalid" },
+          ], "<p>Sent to <code>https://makerble.com/oauth/revoke</code>, not under <code>/api/v2</code>. Use it when the user disconnects from inside your app.</p>")}
+        </div>
       </section>
 
       <!-- Pagination -->
