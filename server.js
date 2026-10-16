@@ -897,6 +897,7 @@ function buildDocsPage() {
         <a href="#audit-trail"     class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Audit Trail</a>
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
+        <a href="#library"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Library</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
@@ -1627,6 +1628,45 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Outcome record" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Library -->
+      <section class="section" id="library">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Library</h2>
+        <div class="section-desc">
+          <p>The Library holds the reusable building blocks your organisation can see: Surveys, Metrics, Activity and Attendance trackers, Outcomes, Lists of answer choices, Units, Fields, Contact Forms, Case Forms, Impact Frameworks, Toolkits, Project Types and Ideas. Search it before making something new, so results keep adding up with those recorded against the original.</p>
+          <p>Each item has a <code>type</code>: <code>survey</code>, <code>metric</code>, <code>activity_tracker</code>, <code>outcome</code>, <code>list</code>, <code>unit</code>, <code>field</code>, <code>contact_form</code>, <code>case_form</code>, <code>impact_framework</code>, <code>toolkit</code>, <code>project_type</code>, <code>idea</code>. <code>source</code> chooses your organisation's own library (default), the public library shared by every organisation, or both. Items you may not see are never returned; asking for one by id returns <code>404</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/library/search", "Search the library", true, [
+            { name: "query", type: "string", required: false, desc: "Words to look for. Every word must match the name or description; Surveys also match on their questions, Lists on their choices and Metrics on their default question" },
+            { name: "item_types", type: "string", required: false, desc: "Comma-separated types to search (default every type)" },
+            { name: "source", type: "string", required: false, desc: "<code>organisation</code> (default), <code>public</code> or <code>both</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number, applied to each type" },
+            { name: "per_page", type: "integer", required: false, desc: "Results per type (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only items updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Matching items with <code>id</code>, <code>type</code>, <code>name</code>, <code>description</code> and <code>owner</code> (<code>your organisation</code>, <code>public library</code> or <code>Makerble</code>); Metrics add <code>metric_type</code> and <code>choices</code>, Lists add <code>choices</code>" },
+            { code: "422", cls: "response-4xx", desc: "Unknown <code>item_types</code> value or <code>source</code>" }
+          ])}
+          ${endpointCard("GET", "/library/{item_type}/{id}", "Get a library item in full", true, [
+            { name: "item_type", in: "path", type: "string", required: true, desc: "The item's type, as returned by Search the library" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "The item's id" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The item: a Survey's questions in order with the Metric, List or Field behind each; a Metric's type, default question, Unit, List and Outcomes; a List's choices; a form's fields; a framework's stages; a toolkit's contents" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" },
+            { code: "422", cls: "response-4xx", desc: "Unknown <code>item_type</code>" }
+          ])}
+          ${endpointCard("GET", "/library/{item_type}/{id}/usage", "See where a library item is used", true, [
+            { name: "item_type", in: "path", type: "string", required: true, desc: "The item's type, as returned by Search the library" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "The item's id" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>projects</code> you can see and <code>other_projects_count</code>, <code>records_count</code> and <code>last_used_at</code>, <code>contained_in</code> (the Surveys, Forms, Outcomes, Frameworks, Metrics or Toolkits including it), <code>contained_in_count</code> and <code>in_use</code>. Counts only" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" },
+            { code: "422", cls: "response-4xx", desc: "Unknown <code>item_type</code>" }
           ])}
         </div>
       </section>

@@ -182,6 +182,8 @@ tags:
     description: Join table linking Outcomes to Indicators
   - name: Framework Sets
     description: Groups of Impact Frameworks (e.g. the SDGs) that organisations report their contribution towards
+  - name: Library
+    description: Search the organisation's library and the public library of reusable building blocks, read an item in full, and see where it is used
   - name: Ratio Sets
     description: Dropdown / List field definitions
   - name: Sub Ratios
@@ -3747,6 +3749,228 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /library/search:
+    get:
+      tags: [Library]
+      summary: Search the library
+      operationId: searchLibrary
+      description: |
+        Searches the reusable building blocks you may see: your organisation's own library, the
+        public library shared by every organisation, or both. Use it before making a new Survey,
+        Metric or List, so results keep adding up with those recorded against the original.
+
+        - Every word of `query` must match the item's name or description. Surveys also match on
+          their question wording, Lists on their choices, and Metrics on their default question.
+        - `item_types` limits the search to some types (comma-separated): `survey` (Survey),
+          `metric` (Metric), `activity_tracker` (Activity or Attendance tracker), `outcome`,
+          `list` (List of answer choices), `unit`, `field`, `contact_form` (Contact Form),
+          `case_form` (Case Form), `impact_framework` (Impact Framework), `toolkit`,
+          `project_type` and `idea`. Default: every type.
+        - `source` is `organisation` (default), `public` or `both`. The public library holds items
+          approved for everyone; Makerble staff also see public items awaiting approval. Units and
+          Project Types belong to no organisation and are always included.
+        - `page` and `per_page` apply to each type, so a page holds up to `per_page` results of
+          each type. `total_count` adds up every type's matches and `page_count` is the page count
+          of the type with the most matches.
+        - Each result has `owner`: `your organisation`, `public library` or `Makerble`. Metrics also
+          have `metric_type` (`scale`, `value` or `binary`) and `choices`; Lists have `choices`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: agree disagree
+          description: Words to look for. Leave it out to list everything of the chosen types.
+        - name: item_types
+          in: query
+          required: false
+          schema:
+            type: string
+          example: metric,list
+          description: Comma-separated item types to search (default every type)
+        - name: source
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [organisation, public, both]
+            default: organisation
+          description: Which library to search
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Matching items, up to `per_page` of each type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLibrarySearch'
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - id: 812
+                    type: metric
+                    name: Confidence
+                    description: How confident the person feels about the future
+                    owner: your organisation
+                    metric_type: scale
+                    choices: ["Strongly agree", "Agree", "Disagree", "Strongly disagree"]
+                  - id: 97
+                    type: list
+                    name: Agree – Disagree
+                    description: null
+                    owner: public library
+                    choices: ["Strongly agree", "Agree", "Disagree", "Strongly disagree"]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          description: An unknown `item_types` value or `source`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unknown item type 'spreadsheet'. Use one of: survey, metric, activity_tracker, outcome, list, unit, field, contact_form, case_form, impact_framework, toolkit, project_type, idea"
+
+  /library/{item_type}/{id}:
+    get:
+      tags: [Library]
+      summary: Get a library item
+      operationId: getLibraryItem
+      description: |
+        Reads one library item in full, so it can be reused or copied. Use the `type` and `id` from
+        **Search the library**. Besides `id`, `type`, `name` and `owner`:
+
+        - **survey**: `description` and `questions` in the order the Survey shows them. A question
+          has `question` (its wording), `mandatory` and `item` (the Metric, List, Field or Activity
+          tracker behind it, with `metric_type`, `unit` and `choices` where they apply). A section
+          title is `{section, text}`.
+        - **metric**: `description`, `metric_type`, `default_question`, `unit`, `list` (with
+          `choices`), `success_direction` and `outcomes`.
+        - **list**: `choices` in order, each with `id`, `name` and `points`.
+        - **contact_form**: `fields`, shaped like a Survey's questions. **case_form**: `fields`,
+          each with `name`, `field_type`, `mandatory` and `choices`.
+        - **impact_framework**: `description` and `stages`, each with its `outcomes`,
+          `activity_trackers` and `metrics`.
+        - **toolkit**: `description` and `contents`, each with `type`, `id` and `name`.
+        - **activity_tracker**: `description`, `instruction`. **outcome**: `description`, `metrics`.
+          **unit**: `alignment`. **field**: `field_type`. **project_type**: `strapline`,
+          `description`. **idea**: `description`.
+
+        Linked Outcomes and Metrics are named only when you may see them. An item you may not see
+        returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: item_type
+          in: path
+          required: true
+          schema:
+            type: string
+          example: survey
+          description: The item's type, as in **Search the library**
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryItem'
+              example:
+                id: 3051
+                type: survey
+                name: Wellbeing check
+                owner: your organisation
+                description: Monthly check-in
+                questions:
+                  - section: About you
+                    text: A few questions about you
+                  - question: How confident do you feel?
+                    mandatory: true
+                    item:
+                      type: metric
+                      id: 812
+                      name: Confidence
+                      metric_type: scale
+                      unit: null
+                      choices: ["Strongly agree", "Agree", "Disagree", "Strongly disagree"]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: An unknown `item_type`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /library/{item_type}/{id}/usage:
+    get:
+      tags: [Library]
+      summary: See where a library item is used
+      operationId: getLibraryItemUsage
+      description: |
+        Says whether anything depends on a library item before you change it.
+
+        - `projects`: up to 50 projects you can see that use it, and `other_projects_count` for the rest.
+        - `records_count` and `last_used_at`: survey responses for a Survey; recorded values for a
+          Metric, Activity tracker, Outcome or List; Contacts for a Contact Form; Cases for a Case Form.
+        - `contained_in`: up to 50 Surveys, Contact Forms, Outcomes, Impact Frameworks, Metrics or
+          Toolkits that include it and that you may see. `contained_in_count` counts them all.
+        - `in_use` is true when any of these is above zero.
+
+        Counts only: no records are returned. An item you may not see returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: item_type
+          in: path
+          required: true
+          schema:
+            type: string
+          example: metric
+          description: The item's type, as in **Search the library**
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Where the item is used
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryUsage'
+              example:
+                id: 812
+                type: metric
+                name: Confidence
+                projects:
+                  - id: 4410
+                    name: Breakfast club
+                other_projects_count: 3
+                records_count: 40
+                last_used_at: "2026-10-14T09:12:00.000Z"
+                contained_in:
+                  - type: survey
+                    id: 3051
+                    name: Wellbeing check
+                contained_in_count: 1
+                in_use: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: An unknown `item_type`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /referral_submissions:
     post:
       tags: [Signup Pages]
@@ -6106,6 +6330,104 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+
+    LibrarySearchResult:
+      type: object
+      description: A library item found by **Search the library**. Metrics also have `metric_type` and `choices`; Lists have `choices`.
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [survey, metric, activity_tracker, outcome, list, unit, field, contact_form, case_form, impact_framework, toolkit, project_type, idea]
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+          description: One line of plain text
+        owner:
+          type: string
+          enum: [your organisation, public library, Makerble]
+
+    PaginatedLibrarySearch:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LibrarySearchResult'
+
+    LibraryItem:
+      type: object
+      description: A library item in full. The fields beyond these depend on `type`; see **Get a library item**.
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        name:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          enum: [your organisation, public library, Makerble]
+
+    LibraryUsage:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        name:
+          type: string
+          nullable: true
+        projects:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+                nullable: true
+        other_projects_count:
+          type: integer
+        records_count:
+          type: integer
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        contained_in:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              id:
+                type: integer
+              name:
+                type: string
+                nullable: true
+        contained_in_count:
+          type: integer
+        in_use:
+          type: boolean
 
     ContactSummaryResponse:
       type: object
