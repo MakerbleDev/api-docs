@@ -2200,6 +2200,75 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "Not a master event, or a schedule or end date that can't be used" }
           ])}
+          ${endpointCard("DELETE", "/events/{id}", "Delete an event", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event ID; a master event deletes its whole series" },
+            { name: "delete_option", in: "query", type: "string", required: false, desc: "this_event (default), current_and_upcoming_series_events or all_series_events" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "deleted_event_ids" },
+            { code: "403", cls: "response-4xx", desc: "You may not delete this event" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "An unknown delete_option" }
+          ])}
+          ${endpointCard("GET", "/events/{id}/guests", "List an event's guests", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
+            { name: "page / per_page", type: "integer", required: false, desc: "Pagination" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated guests (Contacts) with Guest Status and Event Role" },
+            { code: "403", cls: "response-4xx", desc: "You may not see this event" }
+          ])}
+          ${endpointCard("POST", "/events/{id}/guests", "Add guests to an event", true, [
+            { name: "contact_ids", type: "array", required: true, desc: "Contacts in the event's project" },
+            { name: "guest_status_id", type: "integer", required: false, desc: "One of the Event Format's Guest Statuses; its requirements are checked" },
+            { name: "event_role_id", type: "integer", required: false, desc: "One of the Event Format's Event Roles for guests" },
+            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or this_and_upcoming_events" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "event_id and guests_count" },
+            { code: "422", cls: "response-4xx", desc: "Every problem: Contacts outside the project, an unmet requirement, a full event..." }
+          ])}
+          ${endpointCard("PATCH", "/events/{id}/guests/{contact_id}", "Change a guest's Guest Status or Event Role", true, [
+            { name: "guest_status_id", type: "integer", required: false, desc: "New Guest Status; its requirements are checked" },
+            { name: "event_role_id", type: "integer | null", required: false, desc: "New Event Role, or null to clear it" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "event_id and guests_count" },
+            { code: "422", cls: "response-4xx", desc: "Not a guest, an unmet requirement, or a role not on the Event Format" }
+          ])}
+          ${endpointCard("DELETE", "/events/{id}/guests/{contact_id}", "Remove a guest", true, [
+            { name: "apply_to", in: "query", type: "string", required: false, desc: "this_event (default) or this_and_upcoming_events" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "event_id and guests_count" },
+            { code: "422", cls: "response-4xx", desc: "Not a guest of this event" }
+          ])}
+          ${endpointCard("GET", "/events/{id}/staff", "List an event's Event Managers and Workers", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
+            { name: "page / per_page", type: "integer", required: false, desc: "Pagination" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated staff with roles (manager / worker) and Event Role" },
+            { code: "403", cls: "response-4xx", desc: "You may not see this event" }
+          ])}
+          ${endpointCard("POST", "/events/{id}/staff", "Add Event Managers or Workers", true, [
+            { name: "user_ids", type: "array", required: true, desc: "Colleagues in the project or organisation" },
+            { name: "role", type: "string", required: true, desc: "manager or worker" },
+            { name: "event_role_id", type: "integer", required: false, desc: "One of the Event Format's Event Roles for Event Managers and Workers" },
+            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or all_events_in_series, for a master event" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The event" },
+            { code: "403", cls: "response-4xx", desc: "You may not edit this event" },
+            { code: "422", cls: "response-4xx", desc: "Not colleagues, the worker limit, or a role not on the Event Format" }
+          ])}
+          ${endpointCard("PATCH", "/events/{id}/staff/{user_id}", "Change an Event Manager's or Worker's Event Role", true, [
+            { name: "event_role_id", type: "integer | null", required: true, desc: "New Event Role, or null to clear it" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The event" },
+            { code: "422", cls: "response-4xx", desc: "Not on the event's staff, or a role not on the Event Format" }
+          ])}
+          ${endpointCard("DELETE", "/events/{id}/staff/{user_id}", "Remove an Event Manager or Worker", true, [
+            { name: "role", in: "query", type: "string", required: false, desc: "manager or worker; both if left out" },
+            { name: "apply_to", in: "query", type: "string", required: false, desc: "this_event (default) or all_events_in_series" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The event" },
+            { code: "422", cls: "response-4xx", desc: "The last Event Manager, or not on the event's staff" }
+          ])}
         </div>
       </section>
 

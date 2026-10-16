@@ -3254,6 +3254,44 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+    delete:
+      tags: [Events]
+      summary: Delete an event
+      operationId: deleteEvent
+      description: |
+        Deletes an event, as the event page's Delete Event does. Deleting a master event (the
+        first of a recurring series) deletes the whole series. For a later event in a series,
+        `delete_option` chooses what goes: `this_event` (the default),
+        `current_and_upcoming_series_events`, or `all_series_events`. Anyone who can edit the
+        event can delete it. Deleting an event also deletes what is recorded against it.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: delete_option
+          in: query
+          required: false
+          schema: { type: string, enum: [this_event, current_and_upcoming_series_events, all_series_events], default: this_event }
+      responses:
+        "200":
+          description: The ids of the deleted events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted_event_ids]
+                properties:
+                  deleted_event_ids: { type: array, items: { type: integer } }
+              example:
+                deleted_event_ids: [9120, 9121]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /events/{id}/series_schedule_preview:
     post:
       tags: [Events]
@@ -3299,6 +3337,293 @@ paths:
                   - { start_datetime: "2030-02-05T18:00:00.000Z", event_id: null, exists: false }
                 no_longer_fitting_events:
                   - { id: 9120, name: "Youth Club 2", start_datetime: "2030-01-15T18:00:00.000Z", has_stories: false, has_timesheets: false }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /events/{id}/guests:
+    get:
+      tags: [Events]
+      summary: List an event's guests
+      operationId: listEventGuests
+      description: |
+        The event's guests (Contacts), with each one's Guest Status (event state) and, when
+        the Event Format has Event Roles turned on, Event Role. Anyone who can open the event
+        page can see them.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of guests, by name
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/EventGuest' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Events]
+      summary: Add guests to an event
+      operationId: addEventGuests
+      description: |
+        Adds Contacts in the event's project as guests, as the event page's Add Guests does.
+        Contacts already on the event are left as they are. `guest_status_id` is one of the
+        Event Format's Guest Statuses (default: its first), and each Contact must meet that
+        Guest Status's requirements. `event_role_id` must be one of the Event Format's Event
+        Roles for guests. A fixed guest limit is respected. For an event in a recurring
+        series, `apply_to: this_and_upcoming_events` adds them to the later events too.
+        Anyone who can open the event page can add guests.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_ids]
+              properties:
+                contact_ids: { type: array, items: { type: integer } }
+                guest_status_id: { type: integer }
+                event_role_id: { type: integer }
+                apply_to: { type: string, enum: [this_event, this_and_upcoming_events], default: this_event }
+            example:
+              contact_ids: [5501, 5502]
+              guest_status_id: 12
+              event_role_id: 4
+      responses:
+        "201":
+          description: The guests were added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestCount' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /events/{id}/guests/{contact_id}:
+    patch:
+      tags: [Events]
+      summary: Change a guest's Guest Status or Event Role
+      operationId: updateEventGuest
+      description: |
+        Changes one guest's Guest Status (checking its requirements) and/or Event Role on this
+        event. Send `event_role_id: null` to clear the role.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - { name: contact_id, in: path, required: true, schema: { type: integer }, description: "The guest's Contact (beneficiary) id" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                guest_status_id: { type: integer }
+                event_role_id: { type: integer, nullable: true }
+            example:
+              guest_status_id: 13
+      responses:
+        "200":
+          description: The guest was changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestCount' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+    delete:
+      tags: [Events]
+      summary: Remove a guest from an event
+      operationId: removeEventGuest
+      description: |
+        Removes the Contact from the event's guests. For an event in a recurring series,
+        `apply_to: this_and_upcoming_events` removes them from the later events too.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - { name: contact_id, in: path, required: true, schema: { type: integer }, description: "The guest's Contact (beneficiary) id" }
+        - { name: apply_to, in: query, required: false, schema: { type: string, enum: [this_event, this_and_upcoming_events], default: this_event } }
+      responses:
+        "200":
+          description: The guest was removed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestCount' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /events/{id}/staff:
+    get:
+      tags: [Events]
+      summary: List an event's Event Managers and Workers
+      operationId: listEventStaff
+      description: |
+        The event's Event Managers and Event Workers, with their roles on the event and, when
+        the Event Format has Event Roles turned on, their Event Role. Anyone who can open the
+        event page can see them.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: A page of staff, by name
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/EventStaffMember' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Events]
+      summary: Add Event Managers or Workers
+      operationId: addEventStaff
+      description: |
+        Adds colleagues in the event's project or organisation as Event Managers or Event
+        Workers, as the Edit Event form does, respecting a fixed worker limit. `event_role_id`
+        must be one of the Event Format's Event Roles for Event Managers and Workers, and is
+        set on this event. For a master event, `apply_to: all_events_in_series` adds them to
+        the whole series. Needs permission to edit the event.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids, role]
+              properties:
+                user_ids: { type: array, items: { type: integer } }
+                role: { type: string, enum: [manager, worker] }
+                event_role_id: { type: integer }
+                apply_to: { type: string, enum: [this_event, all_events_in_series], default: this_event }
+            example:
+              user_ids: [301]
+              role: worker
+              event_role_id: 7
+      responses:
+        "200":
+          description: The event, as Get an event returns it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /events/{id}/staff/{user_id}:
+    patch:
+      tags: [Events]
+      summary: Change an Event Manager's or Worker's Event Role
+      operationId: updateEventStaffMember
+      description: "Sets or clears (`event_role_id: null`) the Event Role of one of the event's Event Managers or Workers."
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - { name: user_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event_role_id: { type: integer, nullable: true }
+            example:
+              event_role_id: 7
+      responses:
+        "200":
+          description: The event, as Get an event returns it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+    delete:
+      tags: [Events]
+      summary: Remove an Event Manager or Worker
+      operationId: removeEventStaffMember
+      description: |
+        Removes the user as an Event Manager and/or Worker (`role` to remove only one). At
+        least one Event Manager must remain. For a master event, `apply_to:
+        all_events_in_series` removes them from the whole series.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - { name: user_id, in: path, required: true, schema: { type: integer } }
+        - { name: role, in: query, required: false, schema: { type: string, enum: [manager, worker] } }
+        - { name: apply_to, in: query, required: false, schema: { type: string, enum: [this_event, all_events_in_series], default: this_event } }
+      responses:
+        "200":
+          description: The event, as Get an event returns it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -6272,6 +6597,42 @@ components:
               start_datetime: { type: string, format: date-time }
               has_stories: { type: boolean }
               has_timesheets: { type: boolean }
+
+    EventGuest:
+      type: object
+      required: [contact_id, name, guest_status, event_role, added_at, updated_at]
+      properties:
+        contact_id: { type: integer, description: "The Contact (beneficiary) id" }
+        name: { type: string }
+        guest_status:
+          type: object
+          nullable: true
+          properties: { id: { type: integer }, name: { type: string } }
+        event_role:
+          type: object
+          nullable: true
+          properties: { id: { type: integer }, name: { type: string } }
+        added_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    EventGuestCount:
+      type: object
+      required: [event_id, guests_count]
+      properties:
+        event_id: { type: integer }
+        guests_count: { type: integer }
+
+    EventStaffMember:
+      type: object
+      required: [user_id, name, roles, event_role]
+      properties:
+        user_id: { type: integer }
+        name: { type: string }
+        roles: { type: array, items: { type: string, enum: [manager, worker] } }
+        event_role:
+          type: object
+          nullable: true
+          properties: { id: { type: integer }, name: { type: string } }
 
     EventCreateRequest:
       allOf:
