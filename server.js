@@ -2252,6 +2252,7 @@ function buildDocsPage() {
           ])}
           ${endpointCard("GET", "/events/{id}/guests", "List an event's guests", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
+            { name: "search", type: "string", required: false, desc: "Part of a guest's name or Contact ID" },
             { name: "page / per_page", type: "integer", required: false, desc: "Pagination" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [

@@ -3368,10 +3368,17 @@ paths:
       description: |
         The event's guests (Contacts), with each one's Guest Status (event state) and, when
         the Event Format has Event Roles turned on, Event Role. Anyone who can open the event
-        page can see them.
+        page can see them. Use search to find guests by part of their name or Contact ID, as
+        the search box above the event page's guests table does.
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
+        - name: search
+          in: query
+          required: false
+          description: Part of a guest's name or Contact ID (the prefix and leading zeros of a Contact ID are ignored). Searches every page.
+          schema: { type: string }
+          example: Mokoena
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
