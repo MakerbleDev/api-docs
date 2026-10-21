@@ -6176,7 +6176,8 @@ paths:
         A page of the places of one destination type the user can add the metric to, alphabetically,
         each with `added: true` if the metric is already there. For `projects`: the open Projects whose
         metrics the user can edit (as a Project editor or an editor of its Organisation), with their
-        Organisation.
+        Organisation. For `impact_frameworks`: the Impact Frameworks the user created, the only ones
+        they can edit.
       operationId: listMetricDestinationTargets
       security: [{tokenAuth: []}]
       parameters:
@@ -6226,12 +6227,13 @@ paths:
   /metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}:
     post:
       tags: [Add Metric To]
-      summary: Add a metric to a Project
+      summary: Add a metric to a Project or Impact Framework
       description: |
-        Adds a Change or Outcome to a Project, as Edit Project Metrics does: in the Impact Scorecard column
-        of the metric's own stage, after the metrics already there. It is also added to the Project's
+        Adds a Change or Outcome. To a Project, as Edit Project Metrics does: in the Impact Scorecard column
+        of the metric's own stage, after the metrics already there; it is also added to the Project's
         Default Survey and, if the Organisation uses one, its default Progress Board. Requires rights to
-        edit the Project's metrics. There is no request body.
+        edit the Project's metrics. To an Impact Framework: in the metric's own stage, which is added to
+        the framework if missing; only the framework's creator can. There is no request body.
       operationId: addMetricToDestination
       security: [{tokenAuth: []}]
       parameters:
@@ -6253,8 +6255,8 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
     delete:
       tags: [Add Metric To]
-      summary: Remove a metric from a Project
-      description: Removes a Change or Outcome from a Project's metrics. Requires rights to edit the Project's metrics.
+      summary: Remove a metric from a Project or Impact Framework
+      description: Removes a Change or Outcome from a Project's metrics or an Impact Framework. Requires the same rights as adding it.
       operationId: removeMetricFromDestination
       security: [{tokenAuth: []}]
       parameters:
@@ -6323,8 +6325,8 @@ components:
       required: true
       schema:
         type: string
-        enum: [projects]
-      description: Where to add the metric
+        enum: [projects, impact_frameworks]
+      description: Where to add the metric (`impact_frameworks` are Templates)
     MetricDestinationTargetId:
       name: target_id
       in: path

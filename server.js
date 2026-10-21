@@ -1835,7 +1835,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">Add Metric To</h2>
         <div class="section-desc">
-          <p>The Add metric to popup: the places a metric can be added to, and adding or removing it there. A metric is a Change (<code>change</code>), an Outcome (<code>outcome</code>) or an Indicator (<code>indicator</code>). Projects are the first destination (<code>projects</code>). An Indicator is never added to a Project directly, only through one of its Outcomes, so it has no Projects option.</p>
+          <p>The Add metric to popup: the places a metric can be added to, and adding or removing it there. A metric is a Change (<code>change</code>), an Outcome (<code>outcome</code>) or an Indicator (<code>indicator</code>). Destinations are Projects (<code>projects</code>) and Impact Frameworks (<code>impact_frameworks</code>, the frameworks you created). An Indicator is never added to a Project or Impact Framework directly, only through one of its Outcomes, so it has neither option.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -1850,21 +1850,21 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "A metric you can't see" }
           ])}
           ${endpointCard("GET", "/metrics/{metric_type}/{metric_id}/destinations/{destination}", "List the places a metric can be added to", true, [
-            { name: "destination", in: "path", type: "string", required: true, desc: "<code>projects</code>" },
+            { name: "destination", in: "path", type: "string", required: true, desc: "<code>projects</code> or <code>impact_frameworks</code>" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated places, alphabetically, each with <code>id</code>, <code>name</code>, <code>added</code> and its <code>organisation</code>. For projects: the open Projects whose metrics you can edit" },
             { code: "404", cls: "response-4xx", desc: "A metric you can't see, or a destination it can't go to" }
           ])}
-          ${endpointCard("POST", "/metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}", "Add a metric to a Project", true, [
-            { name: "target_id", in: "path", type: "integer", required: true, desc: "The Project ID" }
+          ${endpointCard("POST", "/metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}", "Add a metric to a Project or Impact Framework", true, [
+            { name: "target_id", in: "path", type: "integer", required: true, desc: "The Project or Impact Framework ID" }
           ], [
             { code: "201", cls: "response-2xx", desc: "<code>{added: true}</code>" },
             { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: a Project you can't edit the metrics of, or one that already has the metric" }
           ], "Adds a Change or Outcome as Edit Project Metrics does: in the Impact Scorecard column of its own stage, after the metrics already there, and to the Project's Default Survey. No request body.")}
-          ${endpointCard("DELETE", "/metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}", "Remove a metric from a Project", true, [
-            { name: "target_id", in: "path", type: "integer", required: true, desc: "The Project ID" }
+          ${endpointCard("DELETE", "/metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}", "Remove a metric from a Project or Impact Framework", true, [
+            { name: "target_id", in: "path", type: "integer", required: true, desc: "The Project or Impact Framework ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "<code>{added: false}</code>" },
             { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: a Project you can't edit the metrics of, or one without the metric" }
