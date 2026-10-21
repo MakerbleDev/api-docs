@@ -900,6 +900,7 @@ function buildDocsPage() {
         <a href="#library"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Library</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
+        <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Add Metric To</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
         <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Workflow Trackers</a>
         <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Filtered Metrics</a>
@@ -1825,6 +1826,48 @@ function buildDocsPage() {
           ], [
             { code: "201", cls: "response-2xx", desc: "<code>{checklist_id, beneficiary_id, added_by_user_id, created_at}</code>" },
             { code: "422", cls: "response-4xx", desc: "That Checklist can't be added to this Contact" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Add Metric To (CP-559) -->
+      <section class="section" id="add-metric-to">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Add Metric To</h2>
+        <div class="section-desc">
+          <p>The Add metric to popup: the places a metric can be added to, and adding or removing it there. A metric is a Change (<code>change</code>), an Outcome (<code>outcome</code>) or an Indicator (<code>indicator</code>). Projects are the first destination (<code>projects</code>). An Indicator is never added to a Project directly, only through one of its Outcomes, so it has no Projects option.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> List the destination types with <code>GET /metrics/{metric_type}/{metric_id}/destinations</code>, list the places of one type with <code>GET .../destinations/projects</code> (each has <code>added</code>), then <code>POST</code> or <code>DELETE .../destinations/projects/{target_id}</code>.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/metrics/{metric_type}/{metric_id}/destinations", "List where a metric can be added", true, [
+            { name: "metric_type", in: "path", type: "string", required: true, desc: "<code>change</code>, <code>outcome</code> or <code>indicator</code>" },
+            { name: "metric_id", in: "path", type: "integer", required: true, desc: "The metric's ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{data: [{key, label}]}</code>, e.g. <code>{key: \"projects\", label: \"Projects\"}</code>" },
+            { code: "404", cls: "response-4xx", desc: "A metric you can't see" }
+          ])}
+          ${endpointCard("GET", "/metrics/{metric_type}/{metric_id}/destinations/{destination}", "List the places a metric can be added to", true, [
+            { name: "destination", in: "path", type: "string", required: true, desc: "<code>projects</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated places, alphabetically, each with <code>id</code>, <code>name</code>, <code>added</code> and its <code>organisation</code>. For projects: the open Projects whose metrics you can edit" },
+            { code: "404", cls: "response-4xx", desc: "A metric you can't see, or a destination it can't go to" }
+          ])}
+          ${endpointCard("POST", "/metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}", "Add a metric to a Project", true, [
+            { name: "target_id", in: "path", type: "integer", required: true, desc: "The Project ID" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>{added: true}</code>" },
+            { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: a Project you can't edit the metrics of, or one that already has the metric" }
+          ], "Adds a Change or Outcome as Edit Project Metrics does: in the Impact Scorecard column of its own stage, after the metrics already there, and to the Project's Default Survey. No request body.")}
+          ${endpointCard("DELETE", "/metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}", "Remove a metric from a Project", true, [
+            { name: "target_id", in: "path", type: "integer", required: true, desc: "The Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{added: false}</code>" },
+            { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: a Project you can't edit the metrics of, or one without the metric" }
           ])}
         </div>
       </section>

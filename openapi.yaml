@@ -224,6 +224,11 @@ tags:
       Indicator (Choice, Achievement or Numerical tracker) counted again for only some responses
       and Contacts, e.g. "Session attendances — Female, under 21". Each has its own row, name,
       column and targets on a Project's or Album's Results Canvas.
+  - name: Add Metric To
+    description: |
+      The Add metric to popup: the places a metric (a Change, Outcome or Indicator) can be added
+      to, and adding or removing it there. Projects are the first destination; an Indicator is only
+      ever added to a Project through one of its Outcomes.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
   - name: Webhooks
@@ -6130,6 +6135,146 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /metrics/{metric_type}/{metric_id}/destinations:
+    get:
+      tags: [Add Metric To]
+      summary: List where a metric can be added
+      description: |
+        The options of "What would you like to add this to?" in the Add metric to popup, for a Change,
+        Outcome or Indicator the user can see. An Indicator has no Projects option: it reaches a
+        Project only through one of its Outcomes.
+      operationId: listMetricDestinations
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+      responses:
+        "200":
+          description: The destination types offered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: {type: string, example: projects}
+                        label: {type: string, example: Projects}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /metrics/{metric_type}/{metric_id}/destinations/{destination}:
+    get:
+      tags: [Add Metric To]
+      summary: List the places a metric can be added to
+      description: |
+        A page of the places of one destination type the user can add the metric to, alphabetically,
+        each with `added: true` if the metric is already there. For `projects`: the open Projects whose
+        metrics the user can edit (as a Project editor or an editor of its Organisation), with their
+        Organisation.
+      operationId: listMetricDestinationTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestination'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated places
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: {type: integer}
+                  page_size: {type: integer}
+                  page_count: {type: integer}
+                  total_count: {type: integer}
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: integer}
+                        name: {type: string}
+                        added: {type: boolean}
+                        organisation:
+                          type: object
+                          properties:
+                            id: {type: integer}
+                            name: {type: string}
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - {id: 41, name: Albany, added: false, organisation: {id: 7, name: Bambanani Trust}}
+                  - {id: 12, name: Bambanani, added: true, organisation: {id: 7, name: Bambanani Trust}}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}:
+    post:
+      tags: [Add Metric To]
+      summary: Add a metric to a Project
+      description: |
+        Adds a Change or Outcome to a Project, as Edit Project Metrics does: in the Impact Scorecard column
+        of the metric's own stage, after the metrics already there. It is also added to the Project's
+        Default Survey and, if the Organisation uses one, its default Progress Board. Requires rights to
+        edit the Project's metrics. There is no request body.
+      operationId: addMetricToDestination
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestination'
+        - $ref: '#/components/parameters/MetricDestinationTargetId'
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              example: {added: true}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Add Metric To]
+      summary: Remove a metric from a Project
+      description: Removes a Change or Outcome from a Project's metrics. Requires rights to edit the Project's metrics.
+      operationId: removeMetricFromDestination
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestination'
+        - $ref: '#/components/parameters/MetricDestinationTargetId'
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              example: {added: false}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
 components:
 
   securitySchemes:
@@ -6157,6 +6302,36 @@ components:
       schema:
         type: integer
       description: Unique integer identifier
+    MetricType:
+      name: metric_type
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [change, outcome, indicator]
+      description: The kind of metric
+    MetricId:
+      name: metric_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Change, Outcome or Indicator ID
+    MetricDestination:
+      name: destination
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [projects]
+      description: Where to add the metric
+    MetricDestinationTargetId:
+      name: target_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The ID of the Project (or other destination) to add the metric to
     CohortTrackerAlbumId:
       name: bundle_id
       in: path
