@@ -2973,6 +2973,19 @@ paths:
         `master_event_id` to list every event in one recurring series (the master event and
         its subsequent events). Pass `charity_id` to list one organisation; one you are not a
         member of returns `404`.
+
+        Filter by the answers on the events' **Event Creation Form** (the custom fields and
+        Dropdowns of their Event Format) with `form_field_filters`, as the "Event Creation Form
+        fields" section of the Filter Events panel does. Get the keys from
+        `GET /event_filter_fields`. Values: text the answer contains for a Text or Email Address
+        field; digits for a Telephone field; `yes` or `no` for a Tickbox, Attachment or
+        Signature field; `<key>_from` and/or `<key>_to` for a Number, Date (`YYYY-MM-DD`) or
+        Time (`HH:MM`) range, inclusive; a list of answer choice (Sub Ratio) ids for a Dropdown,
+        matching an event that has any of them. Every key given must match.
+
+        `sort` orders the whole list, not just one page, by those fields: a `sort_key` from
+        `GET /event_filter_fields` and optionally `asc` (the default) or `desc`, several
+        separated by commas. Blank answers come last. An unknown filter or sort key returns `422`.
       security: [{tokenAuth: []}]
       parameters:
         - name: charity_id
@@ -3019,6 +3032,27 @@ paths:
           schema:
             type: integer
           description: Only the events of this recurring series
+        - name: form_field_filters
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties: true
+          example:
+            custom_field_12: archery
+            custom_field_15_from: 5
+            custom_field_15_to: 10
+            ratio_set_7: [31, 32]
+          description: Event Creation Form answers to match, keyed by the `filter_keys` of `GET /event_filter_fields`, e.g. `form_field_filters[custom_field_12]=archery&form_field_filters[ratio_set_7][]=31`
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "custom_field_12 desc, ratio_set_7 asc"
+          description: "Sort by Event Creation Form fields: `sort_key` values from `GET /event_filter_fields`, each optionally followed by `asc` or `desc`. Default: soonest first"
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
@@ -3056,6 +3090,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
 
     post:
       tags: [Events]
@@ -3122,6 +3158,145 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+
+  /event_filter_fields:
+    get:
+      tags: [Events]
+      summary: List the fields events can be filtered and sorted by
+      operationId: listEventFilterFields
+      description: |
+        Lists the custom fields and Dropdowns used on the **Event Creation Forms** of your
+        organisations' Event Formats, alphabetically, as the "Event Creation Form fields"
+        section of the Filter Events panel on the Manage Events page lists them. Use their
+        `filter_keys` in the `form_field_filters` of `GET /events`, and their `sort_key` in its
+        `sort`.
+
+        `data_type` is one of `text`, `email_address`, `telephone`, `number`, `date`, `time`,
+        `tickbox`, `file` (Attachment), `signature` or `dropdown`. A Number, Date or Time field
+        has two filter keys, `<key>_from` and `<key>_to`. A Dropdown's filter takes answer
+        choice ids: list them with `GET /event_filter_fields/{id}/choices`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only this Organisation's (Charity's) Event Creation Forms
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  page_count: { type: integer }
+                  total_count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string }
+                        id: { type: integer, description: The custom field or Dropdown (Ratio Set) id }
+                        name: { type: string }
+                        data_type: { type: string }
+                        filter_keys: { type: array, items: { type: string } }
+                        filter_hint: { type: string }
+                        sort_key: { type: string }
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - key: ratio_set_7
+                    id: 7
+                    name: Activity
+                    data_type: dropdown
+                    filter_keys: [ratio_set_7]
+                    filter_hint: A list of answer choice ids; an event matches if it has any of them
+                    sort_key: ratio_set_7
+                  - key: custom_field_15
+                    id: 15
+                    name: Age
+                    data_type: number
+                    filter_keys: [custom_field_15_from, custom_field_15_to]
+                    filter_hint: A number for either or both ends of the range, inclusive
+                    sort_key: custom_field_15
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /event_filter_fields/{id}/choices:
+    get:
+      tags: [Events]
+      summary: List a Dropdown's answer choices for filtering events
+      operationId: listEventFilterFieldChoices
+      description: |
+        Lists the answer choices (Sub Ratios) of a Dropdown (Ratio Set) from
+        `GET /event_filter_fields`, alphabetically, as the Filter Events panel's typeahead
+        offers them. Pass their ids in `form_field_filters[ratio_set_<id>]` of `GET /events`.
+        A Dropdown that isn't on an Event Creation Form of your organisations returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: The Dropdown (Ratio Set) id
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Only answer choices whose name contains this, ignoring case
+        - name: charity_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only this Organisation's Event Creation Forms
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of answer choices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  page_count: { type: integer }
+                  total_count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - { id: 31, name: Archery }
+                  - { id: 32, name: Boxing }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /events/{id}:
     get:
