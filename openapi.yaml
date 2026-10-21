@@ -4086,6 +4086,14 @@ paths:
         type has no criteria keys, `criteria` saying what counts as done; see
         `GET /checklists/action_types`. Actions keep the order sent. Requires an editor or reporter
         of the Organisation.
+
+        Each action may say who is responsible for it ("Who is responsible?"): `owner_kind` is `none`
+        (nobody in particular, the default), `adder` (the colleague who added the Checklist to the
+        Contact, or the Project's Project Managers when a Project added it automatically), `user`
+        (`owner_user_id`, a colleague), `team` (`owner_team_id`, anyone in one of the Organisation's
+        Teams who can see the Contact) or `relationship` (`owner_relationship_side`
+        "<relationship_category_id>:parent|child", any colleague with that kind of Relationship with
+        the Contact, e.g. their Therapist). See `GET /checklists/owner_options`.
       operationId: createChecklist
       security: [{tokenAuth: []}]
       requestBody:
@@ -4108,6 +4116,8 @@ paths:
                       project_event_categories: ["301:7"]
                   - action_type: "create_task"
                     title: "Set a follow-up task"
+                    owner_kind: "team"
+                    owner_team_id: 18
       responses:
         "201":
           description: The Checklist, with its actions, projects and contacts_count
@@ -4139,11 +4149,42 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /checklists/owner_options:
+    get:
+      tags: [Checklists]
+      summary: List the choices for who is responsible for a Checklist action
+      description: |
+        The "Who is responsible?" dropdown on the Create / Edit Checklist page: the kinds of owner, the
+        Organisation's Teams and its relationship sides ("Therapist from Therapist & Client"). Colleagues
+        for `owner_kind: user` come from `GET /users`. Visible to anyone who can see the Organisation's
+        Checklists.
+      operationId: listChecklistOwnerOptions
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: "`{kinds: [{owner_kind, name}], teams: [{id, name}], relationship_sides: [{owner_relationship_side, name}]}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user has no role in the Organisation that lets them see Checklists
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /checklists/{id}:
     get:
       tags: [Checklists]
       summary: Get a Checklist
-      description: A Checklist with its ordered actions, the Projects that offer it and how many Contacts have it.
+      description: |
+        A Checklist with its ordered actions, the Projects that offer it and how many Contacts have it.
+        Each action includes who is responsible for it: `owner_kind`, `owner_user_id`, `owner_team_id`,
+        `owner_relationship_side` and a readable `owner_description`.
       operationId: getChecklist
       security: [{tokenAuth: []}]
       parameters:
@@ -4190,6 +4231,8 @@ paths:
                       beneficiary_role_ids: ["12"]
                   - id: 56
                     _destroy: true
+                  - id: 57
+                    owner_kind: "adder"
       responses:
         "200":
           description: The updated Checklist
@@ -4249,6 +4292,13 @@ paths:
       description: |
         The Checklists box on a Contact's profile: each Checklist with `done_count` of `actions_count`,
         and every action with `done: true|false`. Only Contacts the user can see are returned.
+
+        Each action also says who is responsible for it for this Contact: the owner fields
+        (`owner_kind`, `owner_user_id`, `owner_team_id`, `owner_relationship_side`), `owner_overridden`
+        (true when a colleague changed it for this Contact only), `owner_description` (e.g.
+        "Safeguarding Team"), `responsible_user_ids` (only colleagues who can see the Contact) and
+        `owner_warning` when nobody responsible can see them (e.g. "No one in Safeguarding Team can see
+        this contact").
       operationId: listContactChecklists
       security: [{tokenAuth: []}]
       parameters:
@@ -4296,6 +4346,84 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner:
+    patch:
+      tags: [Checklists]
+      summary: Change who is responsible for an action for one Contact
+      description: |
+        The Change link under an action in a Contact's Checklists box. Sets who is responsible for this
+        action for this Contact only; other Contacts keep the Checklist's default. Choosing the
+        Checklist's own default removes the change. Takes the same owner fields as an action of
+        `POST /checklists`. Requires edit access to the Contact.
+      operationId: setContactChecklistActionOwner
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: checklist_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: action_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              owner_kind: "user"
+              owner_user_id: 5021
+      responses:
+        "200":
+          description: "`{checklist_id, action_id, owner_kind, owner_user_id, owner_team_id, owner_relationship_side, owner_overridden, owner_description, responsible_user_ids, owner_warning}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can see the Contact but can't edit it
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Checklists]
+      summary: Go back to the Checklist's own owner for one Contact
+      description: Removes a change made with the PATCH above, so this Contact follows the Checklist's default again. Requires edit access to the Contact.
+      operationId: resetContactChecklistActionOwner
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: checklist_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: action_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The action's owner fields, as for the PATCH
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can see the Contact but can't edit it
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /beneficiaries/{beneficiary_id}/checklists/available:
     get:
