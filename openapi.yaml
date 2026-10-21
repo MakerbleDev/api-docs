@@ -6178,7 +6178,8 @@ paths:
         metrics the user can edit (as a Project editor or an editor of its Organisation), with their
         Organisation. For `impact_frameworks`: the Impact Frameworks the user created, the only ones
         they can edit. For `collections`: the user's own Collections and those of Organisations they
-        are an editor of; each item has `owner` ({type, id, name}) instead of `organisation`. For
+        are an editor of; each item has `owner` ({type, id, name}) instead of `organisation`, as do
+        `surveys` (the Surveys the user can edit; `removable` is false once the Survey asks the metric). For
         `outcomes` (an Indicator's): the Outcomes the user can edit, with `stage_id`. For `indicators`
         (an Outcome's, offered only if the user can edit it): the Indicators they can see, including the
         public library, with `indicator_type`.
@@ -6217,7 +6218,7 @@ paths:
                         added: {type: boolean}
                         removable:
                           type: boolean
-                          description: False when stories have recorded the Indicator under that Outcome, so the link can't be removed
+                          description: False when it can't be removed here (a Survey that asks the metric, or an Outcome/Indicator link that stories have used)
                         organisation:
                           type: object
                           properties:
@@ -6248,7 +6249,9 @@ paths:
         the framework if missing; only the framework's creator can. To a Collection (which also takes an
         Indicator): at the end; you must own the Collection or edit the Organisation that owns it. With
         `outcomes` or `indicators`: makes the Outcome a parent of the Indicator; you must be able to edit
-        the Outcome. There is no request body.
+        the Outcome. To a Survey: as its last, optional question (a scale Indicator is Single Choice;
+        an Outcome adds each of its Indicators, as a grid when they share answer choices). There is no
+        request body.
       operationId: addMetricToDestination
       security: [{tokenAuth: []}]
       parameters:
@@ -6271,7 +6274,7 @@ paths:
     delete:
       tags: [Add Metric To]
       summary: Remove a metric from a Project, Impact Framework or Collection
-      description: Removes a metric from a Project's metrics, an Impact Framework or a Collection, or unlinks an Indicator from an Outcome (refused with 422 once stories have recorded the Indicator under that Outcome). Requires the same rights as adding it.
+      description: Removes a metric from a Project's metrics, an Impact Framework or a Collection, or unlinks an Indicator from an Outcome (refused with 422 once stories have recorded the Indicator under that Outcome). A Survey's questions are removed by editing the Survey, so `surveys` always answers 422. Requires the same rights as adding it.
       operationId: removeMetricFromDestination
       security: [{tokenAuth: []}]
       parameters:
@@ -6340,8 +6343,8 @@ components:
       required: true
       schema:
         type: string
-        enum: [projects, impact_frameworks, collections, outcomes, indicators]
-      description: Where to add the metric (`impact_frameworks` are Templates; `outcomes` is for an Indicator, `indicators` for an Outcome)
+        enum: [projects, impact_frameworks, surveys, collections, outcomes, indicators]
+      description: Where to add the metric (`impact_frameworks` are Templates, `surveys` are Story Categories; `outcomes` is for an Indicator, `indicators` for an Outcome)
     MetricDestinationTargetId:
       name: target_id
       in: path
