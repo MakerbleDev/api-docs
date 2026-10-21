@@ -1834,7 +1834,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">Cohort Trackers</h2>
         <div class="section-desc">
-          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. With <code>result_type: percentage</code> it shows the result as a percentage of its <code>denominator</code>: <code>members</code> (Contacts in this Project / Album) or <code>enough_data</code> (Contacts with enough data to be judged on every criterion), e.g. "84% Children attending 75%+" with "42 of 50 contacts with enough data". Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
+          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. With <code>result_type: percentage</code> it shows the result as a percentage of its <code>denominator</code>: <code>members</code> (Contacts in this Project / Album), <code>enough_data</code> (Contacts with enough data to be judged on every criterion) or <code>filtered</code> (members who also meet <code>denominator_criteria</code>, e.g. "of the girls in this project"), e.g. "84% Children attending 75%+" with "42 of 50 contacts with enough data". Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -1864,7 +1864,7 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "Cohort Tracker created" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria, result_type, denominator}</code>. <code>result_type</code> is <code>number</code> (default) or <code>percentage</code>; a percentage's <code>denominator</code> is <code>members</code> (default) or <code>enough_data</code>.")}
+          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria, result_type, denominator, denominator_criteria}</code>. <code>result_type</code> is <code>number</code> (default) or <code>percentage</code>; a percentage's <code>denominator</code> is <code>members</code> (default), <code>enough_data</code> or <code>filtered</code>, which needs <code>denominator_criteria</code> (Contact Filter criteria, the same keys as <code>criteria</code>).")}
           ${endpointCard("PATCH", "/cohort_trackers/{id}", "Update a Cohort Tracker", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
           ], [
