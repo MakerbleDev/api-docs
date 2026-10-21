@@ -1492,13 +1492,13 @@ function buildDocsPage() {
         <div class="section-eyebrow">Audit &amp; compliance</div>
         <h2 class="section-title">Versions</h2>
         <div class="section-desc">
-          <p>Versions are the audit trail behind the <strong>Manage Versions</strong> page: every time a Contact is created or edited, a Version records who did it, when, and a full snapshot of every field at that moment. Only Contacts are versioned so far.</p>
-          <p>Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one of their Projects). Anything else returns <code>404</code>. <code>user_name</code> is <code>System</code> when no signed-in user made the change, e.g. a CSV import.</p>
+          <p>Versions are the audit trail behind the <strong>Manage Versions</strong> page: every time a Contact or a Story (Survey Response) is created, edited or deleted, a Version records who did it, when, and a full snapshot of the record at that moment. A Story is named <code>[story ID] &lt;survey&gt; in &lt;project&gt; by &lt;user&gt; on &lt;date happened&gt;</code>.</p>
+          <p>Visible to Charity Editors (any Contact or Story in their Organisation) and Project Editors (Contacts in at least one of their Projects, and Stories in their Projects that they may read: a Story shared only with specific individuals is hidden unless they are one of them). Anything else returns <code>404</code>. <code>user_name</code> is <code>System</code> when no signed-in user made the change, e.g. a CSV import.</p>
         </div>
         <div class="endpoint-list">
-          ${endpointCard("GET", "/versions", "List a Contact's Versions (audit trail)", true, [
-            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> (the only type for now)" },
-            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID" },
+          ${endpointCard("GET", "/versions", "List a Contact's or Story's Versions (audit trail)", true, [
+            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> or <code>Story</code> (a Story or Survey Response)" },
+            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID or Story ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
             { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 — only Versions created after this" }
@@ -1520,13 +1520,13 @@ function buildDocsPage() {
         <div class="section-eyebrow">Audit &amp; compliance</div>
         <h2 class="section-title">Access Logs</h2>
         <div class="section-desc">
-          <p>Access Logs are the audit trail of <em>views</em>, on the <strong>Access Logs</strong> tab beside Versions on the Manage Versions page: who opened a Contact in Makerble or fetched it through the API, when, and how many times. Views by the same colleague less than 30 minutes apart are one entry with a <code>view_count</code>. Entries older than the Organisation's retention period (3 to 12 months, set on Organisation Preferences) are rolled up into one entry per colleague per month, with <code>monthly_summary: true</code>. <code>source</code> is <code>web</code>, <code>api</code> or <code>mcp</code>. Only Contacts are available so far.</p>
-          <p>Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one of their Projects). Anything else returns <code>404</code>.</p>
+          <p>Access Logs are the audit trail of <em>views</em>, on the <strong>Access Logs</strong> tab beside Versions on the Manage Versions page: who opened a Contact or Story in Makerble or fetched it through the API, when, and how many times. Views by the same colleague less than 30 minutes apart are one entry with a <code>view_count</code>. Entries older than the Organisation's retention period (3 to 12 months, set on Organisation Preferences) are rolled up into one entry per colleague per month, with <code>monthly_summary: true</code>. <code>source</code> is <code>web</code>, <code>api</code> or <code>mcp</code>.</p>
+          <p>Same permissions as Versions. Anything else returns <code>404</code>.</p>
         </div>
         <div class="endpoint-list">
-          ${endpointCard("GET", "/access_logs", "List who viewed a Contact (Access Logs)", true, [
-            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> (the only type for now)" },
-            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID" },
+          ${endpointCard("GET", "/access_logs", "List who viewed a Contact or Story (Access Logs)", true, [
+            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> or <code>Story</code> (a Story or Survey Response)" },
+            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID or Story ID" },
             { name: "from", type: "string", required: false, desc: "YYYY-MM-DD — only entries on or after this date" },
             { name: "to", type: "string", required: false, desc: "YYYY-MM-DD — only entries on or before this date" },
             { name: "user_id", type: "integer", required: false, desc: "Only this colleague's views" },
