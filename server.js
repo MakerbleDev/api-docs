@@ -1768,7 +1768,7 @@ function buildDocsPage() {
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
-          <span><strong>Workflow tip:</strong> Get the action types and their criteria keys with <code>GET /checklists/action_types</code>, create the Checklist, then offer it in a Project with <code>PATCH /checklists/{id}/projects/{project_id}</code>. Check a Contact's progress with <code>GET /beneficiaries/{beneficiary_id}/checklists</code>.</span>
+          <span><strong>Workflow tip:</strong> Get the action types and their criteria keys with <code>GET /checklists/action_types</code>, create the Checklist, then offer it in a Project with <code>PATCH /checklists/{id}/projects/{project_id}</code>. Check a Contact's progress, and who is responsible for each action, with <code>GET /beneficiaries/{beneficiary_id}/checklists</code>.</span>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/checklists", "List an Organisation's Checklists", true, [
@@ -1783,17 +1783,23 @@ function buildDocsPage() {
           ${endpointCard("GET", "/checklists/action_types", "List the actions a Checklist can contain", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>{data: [{action_type, name, criteria_keys}]}</code>" }
           ], "Criteria values are strings: IDs, or pairs such as <code>project_states</code> \"&lt;project_id&gt;:&lt;state_id&gt;\", <code>project_event_categories</code> \"&lt;project_id&gt;:&lt;event_category_id&gt;\", <code>relationship_sides</code> \"&lt;category_id&gt;:parent|child\" and <code>survey_waves</code> \"&lt;Survey Campaign id&gt;:&lt;Wave id, or 0&gt;\".")}
+          ${endpointCard("GET", "/checklists/owner_options", "List the choices for who is responsible for an action", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{kinds: [{owner_kind, name}], teams: [{id, name}], relationship_sides: [{owner_relationship_side, name}]}</code>" },
+            { code: "403", cls: "response-4xx", desc: "No role in the Organisation that can see Checklists" }
+          ], "<code>owner_kind</code>: <code>none</code> (nobody in particular), <code>adder</code> (the colleague who added the Checklist, or the Project's Project Managers when a Project added it), <code>user</code> (<code>owner_user_id</code>, from <code>GET /users</code>), <code>team</code> (<code>owner_team_id</code>: anyone in the Team who can see the Contact) or <code>relationship</code> (<code>owner_relationship_side</code> \"&lt;category_id&gt;:parent|child\").")}
           ${endpointCard("GET", "/checklists/{id}", "Get a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>actions</code>, <code>projects</code> and <code>contacts_count</code>" },
+            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>actions</code> (each with its owner fields and <code>owner_description</code>), <code>projects</code> and <code>contacts_count</code>" },
             { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
           ])}
           ${endpointCard("POST", "/checklists", "Create a Checklist", true, [], [
             { code: "201", cls: "response-2xx", desc: "The new Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "e.g. an action with every option unticked" }
-          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria}]}</code>.")}
+          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. The owner fields are optional.")}
           ${endpointCard("PATCH", "/checklists/{id}", "Update a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
@@ -1811,8 +1817,29 @@ function buildDocsPage() {
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code>, owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
             { code: "404", cls: "response-4xx", desc: "A Contact the user can't see" }
+          ])}
+          ${endpointCard("PATCH", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner", "Change who is responsible for an action for one Contact", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "action_id", in: "path", type: "integer", required: true, desc: "The Checklist action's ID" },
+            { name: "owner_kind", type: "string", required: true, desc: "<code>none</code>, <code>adder</code>, <code>user</code>, <code>team</code> or <code>relationship</code>" },
+            { name: "owner_user_id", type: "integer", required: false, desc: "For <code>user</code>" },
+            { name: "owner_team_id", type: "integer", required: false, desc: "For <code>team</code>" },
+            { name: "owner_relationship_side", type: "string", required: false, desc: "For <code>relationship</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{checklist_id, action_id, owner_kind, …, owner_overridden, owner_description, responsible_user_ids, owner_warning}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can see the Contact but not edit it" },
+            { code: "422", cls: "response-4xx", desc: "e.g. a Team from another Organisation" }
+          ], "For this Contact only; other Contacts keep the Checklist's default.")}
+          ${endpointCard("DELETE", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner", "Go back to the Checklist's own owner for one Contact", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "action_id", in: "path", type: "integer", required: true, desc: "The Checklist action's ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The action's owner fields, as for the PATCH" },
+            { code: "403", cls: "response-4xx", desc: "Can see the Contact but not edit it" }
           ])}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/available", "List the Checklists that can be added to a Contact", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
