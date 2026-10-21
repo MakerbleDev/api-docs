@@ -2270,6 +2270,64 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /metrics/{id}/copy:
+    post:
+      tags: [Outcomes]
+      summary: Copy a metric (an Output, Outcome or Indicator)
+      description: >-
+        Copies an Output (API: Change), an Outcome or an Indicator (Progress Tracker), as on a metric's page in Makerble.
+        The copy is called "Copy of <original name>" (numbered, e.g. "Copy of X (2)", when that name is taken), keeps the
+        original's owner, settings, survey question wording and levels, and is not added to any Project, Survey or
+        Impact Framework. A copied Indicator keeps the original's Outcomes; a copied Outcome keeps the original's
+        Indicators. Only someone who can edit the original may copy it.
+      operationId: copyMetric
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metric_class]
+              properties:
+                metric_class:
+                  type: string
+                  enum: [Change, Indicator, Outcome]
+                  description: What kind of metric `id` is.
+            example:
+              metric_class: Indicator
+      responses:
+        "201":
+          description: The copy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+                  metric_class: {type: string, enum: [Change, Indicator, Outcome]}
+                  name: {type: string}
+                  owner_type: {type: string, enum: [Charity, User]}
+                  owner_id: {type: integer}
+                  copied_from_id: {type: integer}
+              example:
+                id: 912
+                metric_class: Indicator
+                name: Copy of Hours of sleep
+                owner_type: Charity
+                owner_id: 42
+                copied_from_id: 311
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /outcome_indicators:
     get:
       tags: [Outcome Indicators]

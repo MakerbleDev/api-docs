@@ -1629,6 +1629,15 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Outcome record" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
+          ${endpointCard("POST", "/metrics/{id}/copy", "Copy a metric (an Output, Outcome or Indicator)", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "ID of the metric to copy" },
+            { name: "metric_class", in: "body", type: "string", required: true, desc: "Change (an Output), Indicator or Outcome" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The copy: id, metric_class, name (\"Copy of …\"), owner_type, owner_id, copied_from_id" },
+            { code: "403", cls: "response-4xx", desc: "You can't edit the original, so you can't copy it" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "metric_class isn't Change, Indicator or Outcome, or the copy is invalid" }
+          ], "The copy keeps the original's owner, settings and survey wording and isn't added to any Project, Survey or Impact Framework. A copied Indicator keeps its Outcomes; a copied Outcome keeps its Indicators.")}
         </div>
       </section>
 
