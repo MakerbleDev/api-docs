@@ -6142,12 +6142,15 @@ paths:
       description: |
         The options of "What would you like to add this to?" in the Add metric to popup, for a Change,
         Outcome or Indicator the user can see. An Indicator has no Projects option: it reaches a
-        Project only through one of its Outcomes.
+        Project only through one of its Outcomes. `progress_boards` is offered only with `project_id`
+        or `bundle_id`, as the popup offers Progress Boards only from a Project's or Album's Results Canvas.
       operationId: listMetricDestinations
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/MetricType'
         - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
       responses:
         "200":
           description: The destination types offered
@@ -6182,12 +6185,16 @@ paths:
         `surveys` (the Surveys the user can edit; `removable` is false once the Survey asks the metric). For
         `outcomes` (an Indicator's): the Outcomes the user can edit, with `stage_id`. For `indicators`
         (an Outcome's, offered only if the user can edit it): the Indicators they can see, including the
-        public library, with `indicator_type`.
+        public library, with `indicator_type`. For `progress_boards`: the open Progress Boards the user
+        created or is a Board Admin of, with `board_type` (`managed` or `basic`); `added` is for the given
+        Project's or Album's card.
       operationId: listMetricDestinationTargets
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/MetricType'
         - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
         - $ref: '#/components/parameters/MetricDestination'
         - name: q
           in: query
@@ -6237,6 +6244,36 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+    post:
+      tags: [Add Metric To]
+      summary: Create a Progress Board with a metric on it
+      description: |
+        "+ Create a new Progress Board and add this to it" in the Add metric to popup. Creates a Managed
+        Progress Board named "<your name>'s Progress Board" for the Organisation of the Project (or Album)
+        given by `project_id` or `bundle_id`, with that Project (or the Album's Projects) on it, "Colleagues
+        have their own personalised version of the board" ticked, and the metric as its card. Only
+        `progress_boards` supports this. There is no request body.
+      operationId: createMetricDestination
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
+        - $ref: '#/components/parameters/MetricDestination'
+      responses:
+        "201":
+          description: Created, with the card on it
+          content:
+            application/json:
+              example: {added: true, data: {id: 88, name: "Thandi Mokoena's Progress Board"}}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}:
     post:
       tags: [Add Metric To]
@@ -6250,13 +6287,16 @@ paths:
         Indicator): at the end; you must own the Collection or edit the Organisation that owns it. With
         `outcomes` or `indicators`: makes the Outcome a parent of the Indicator; you must be able to edit
         the Outcome. To a Survey: as its last, optional question (a scale Indicator is Single Choice;
-        an Outcome adds each of its Indicators, as a grid when they share answer choices). There is no
-        request body.
+        an Outcome adds each of its Indicators, as a grid when they share answer choices). To a Progress
+        Board (with `project_id` or `bundle_id`): as its last card, showing that Project's or Album's
+        results; you must have created the board or be a Board Admin. There is no request body.
       operationId: addMetricToDestination
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/MetricType'
         - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
         - $ref: '#/components/parameters/MetricDestination'
         - $ref: '#/components/parameters/MetricDestinationTargetId'
       responses:
@@ -6274,12 +6314,14 @@ paths:
     delete:
       tags: [Add Metric To]
       summary: Remove a metric from a Project, Impact Framework or Collection
-      description: Removes a metric from a Project's metrics, an Impact Framework or a Collection, or unlinks an Indicator from an Outcome (refused with 422 once stories have recorded the Indicator under that Outcome). A Survey's questions are removed by editing the Survey, so `surveys` always answers 422. Requires the same rights as adding it.
+      description: Removes a metric from a Project's metrics, an Impact Framework, a Collection or a Progress Board (only the card for the given `project_id` or `bundle_id`), or unlinks an Indicator from an Outcome (refused with 422 once stories have recorded the Indicator under that Outcome). A Survey's questions are removed by editing the Survey, so `surveys` always answers 422. Requires the same rights as adding it.
       operationId: removeMetricFromDestination
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/MetricType'
         - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
         - $ref: '#/components/parameters/MetricDestination'
         - $ref: '#/components/parameters/MetricDestinationTargetId'
       responses:
@@ -6343,8 +6385,20 @@ components:
       required: true
       schema:
         type: string
-        enum: [projects, impact_frameworks, surveys, collections, outcomes, indicators]
-      description: Where to add the metric (`impact_frameworks` are Templates, `surveys` are Story Categories; `outcomes` is for an Indicator, `indicators` for an Outcome)
+        enum: [projects, impact_frameworks, surveys, collections, outcomes, indicators, progress_boards]
+      description: Where to add the metric (`impact_frameworks` are Templates, `surveys` are Story Categories; `outcomes` is for an Indicator, `indicators` for an Outcome; `progress_boards` needs `project_id` or `bundle_id`)
+    MetricDestinationProjectId:
+      name: project_id
+      in: query
+      required: false
+      schema: {type: integer}
+      description: The Project whose results a Progress Board card shows. Offers `progress_boards`; you need a role on the Project.
+    MetricDestinationBundleId:
+      name: bundle_id
+      in: query
+      required: false
+      schema: {type: integer}
+      description: The Album (Bundle) whose results a Progress Board card shows, instead of a Project. You must be able to see the Album.
     MetricDestinationTargetId:
       name: target_id
       in: path
