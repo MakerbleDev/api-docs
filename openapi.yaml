@@ -6178,13 +6178,21 @@ paths:
         metrics the user can edit (as a Project editor or an editor of its Organisation), with their
         Organisation. For `impact_frameworks`: the Impact Frameworks the user created, the only ones
         they can edit. For `collections`: the user's own Collections and those of Organisations they
-        are an editor of; each item has `owner` ({type, id, name}) instead of `organisation`.
+        are an editor of; each item has `owner` ({type, id, name}) instead of `organisation`. For
+        `outcomes` (an Indicator's): the Outcomes the user can edit, with `stage_id`. For `indicators`
+        (an Outcome's, offered only if the user can edit it): the Indicators they can see, including the
+        public library, with `indicator_type`.
       operationId: listMetricDestinationTargets
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/MetricType'
         - $ref: '#/components/parameters/MetricId'
         - $ref: '#/components/parameters/MetricDestination'
+        - name: q
+          in: query
+          required: false
+          schema: {type: string}
+          description: Search by name (`outcomes` and `indicators` only)
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -6207,6 +6215,9 @@ paths:
                         id: {type: integer}
                         name: {type: string}
                         added: {type: boolean}
+                        removable:
+                          type: boolean
+                          description: False when stories have recorded the Indicator under that Outcome, so the link can't be removed
                         organisation:
                           type: object
                           properties:
@@ -6235,8 +6246,9 @@ paths:
         Default Survey and, if the Organisation uses one, its default Progress Board. Requires rights to
         edit the Project's metrics. To an Impact Framework: in the metric's own stage, which is added to
         the framework if missing; only the framework's creator can. To a Collection (which also takes an
-        Indicator): at the end; you must own the Collection or edit the Organisation that owns it. There
-        is no request body.
+        Indicator): at the end; you must own the Collection or edit the Organisation that owns it. With
+        `outcomes` or `indicators`: makes the Outcome a parent of the Indicator; you must be able to edit
+        the Outcome. There is no request body.
       operationId: addMetricToDestination
       security: [{tokenAuth: []}]
       parameters:
@@ -6259,7 +6271,7 @@ paths:
     delete:
       tags: [Add Metric To]
       summary: Remove a metric from a Project, Impact Framework or Collection
-      description: Removes a metric from a Project's metrics, an Impact Framework or a Collection. Requires the same rights as adding it.
+      description: Removes a metric from a Project's metrics, an Impact Framework or a Collection, or unlinks an Indicator from an Outcome (refused with 422 once stories have recorded the Indicator under that Outcome). Requires the same rights as adding it.
       operationId: removeMetricFromDestination
       security: [{tokenAuth: []}]
       parameters:
@@ -6328,8 +6340,8 @@ components:
       required: true
       schema:
         type: string
-        enum: [projects, impact_frameworks, collections]
-      description: Where to add the metric (`impact_frameworks` are Templates)
+        enum: [projects, impact_frameworks, collections, outcomes, indicators]
+      description: Where to add the metric (`impact_frameworks` are Templates; `outcomes` is for an Indicator, `indicators` for an Outcome)
     MetricDestinationTargetId:
       name: target_id
       in: path

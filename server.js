@@ -1835,7 +1835,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">Add Metric To</h2>
         <div class="section-desc">
-          <p>The Add metric to popup: the places a metric can be added to, and adding or removing it there. A metric is a Change (<code>change</code>), an Outcome (<code>outcome</code>) or an Indicator (<code>indicator</code>). Destinations are Projects (<code>projects</code>), Impact Frameworks (<code>impact_frameworks</code>, the frameworks you created) and Collections (<code>collections</code>, your own and your Organisations'). An Indicator is never added to a Project or Impact Framework directly, only through one of its Outcomes, but it can go in a Collection.</p>
+          <p>The Add metric to popup: the places a metric can be added to, and adding or removing it there. A metric is a Change (<code>change</code>), an Outcome (<code>outcome</code>) or an Indicator (<code>indicator</code>). Destinations are Projects (<code>projects</code>), Impact Frameworks (<code>impact_frameworks</code>, the frameworks you created) and Collections (<code>collections</code>, your own and your Organisations'). An Indicator is never added to a Project or Impact Framework directly, only through one of its Outcomes, but it can go in a Collection. An Indicator can be added to Outcomes you can edit (<code>outcomes</code>), and an Outcome you can edit can be made the parent of Indicators (<code>indicators</code>); search both with <code>q</code>. <code>removable: false</code> means stories have recorded the Indicator under that Outcome, so it can't be unlinked.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -1850,7 +1850,8 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "A metric you can't see" }
           ])}
           ${endpointCard("GET", "/metrics/{metric_type}/{metric_id}/destinations/{destination}", "List the places a metric can be added to", true, [
-            { name: "destination", in: "path", type: "string", required: true, desc: "<code>projects</code>, <code>impact_frameworks</code> or <code>collections</code>" },
+            { name: "destination", in: "path", type: "string", required: true, desc: "<code>projects</code>, <code>impact_frameworks</code>, <code>collections</code>, <code>outcomes</code> or <code>indicators</code>" },
+            { name: "q", type: "string", required: false, desc: "Search by name (outcomes and indicators)" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
           ], [
