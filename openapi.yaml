@@ -1876,11 +1876,14 @@ paths:
       summary: List a record's Versions (audit trail)
       description: |
         Returns every Version of one record, newest first: each time it was created or edited, who did it and when.
-        Only Contacts (Beneficiaries) are versioned so far, so `record_type` must be `Contact`.
+        `record_type` is `Contact` (a Contact, i.e. Beneficiary) or `Story` (a Story or Survey Response). A Story is
+        named `[story ID] <survey> in <project> by <user> on <date happened>`. A deleted record's Versions are still
+        listed, with `record.deleted: true`.
 
-        Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one
-        of their Projects). Anything the caller may not see returns `404`, so the endpoint never confirms that
-        another Organisation's record exists.
+        Visible to Charity Editors (any Contact or Story in their Organisation) and Project Editors (Contacts in at
+        least one of their Projects, and Stories in their Projects that they may read: a Story shared only with
+        specific individuals is hidden unless they are one of them). Anything the caller may not see returns `404`,
+        so the endpoint never confirms that another Organisation's record exists.
 
         `user_name` is `System` when no signed-in user made the change (e.g. a CSV import run in the background).
         One Save can write several Versions a fraction of a second apart. Use `GET /versions/{id}` to see the full
@@ -1893,14 +1896,14 @@ paths:
           required: true
           schema:
             type: string
-            enum: [Contact]
-          description: Type of record. Only `Contact` for now.
+            enum: [Contact, Story]
+          description: '`Contact` (Beneficiary) or `Story` (a Story or Survey Response)'
         - name: record_id
           in: query
           required: true
           schema:
             type: integer
-          description: The Contact (Beneficiary) ID
+          description: The Contact (Beneficiary) ID or the Story ID
         - $ref: '#/components/parameters/Page'
         - name: per_page
           in: query
@@ -1938,6 +1941,8 @@ paths:
       description: |
         Returns one Version including `full_object`: every field of the record exactly as it was saved at that
         moment, not just the fields that changed. Compare two Versions' `full_object` to see what changed.
+        For a Story, `full_object` is `{schema_version, story, privacy_settings, contact_ids, outcome_ids, label_ids,
+        media, answers}`, where each answer carries the survey question's label as it was then.
         Same permissions as `GET /versions`.
       operationId: getVersion
       security: [{tokenAuth: []}]
@@ -1963,7 +1968,7 @@ paths:
         Returns the Access Log of one record, newest first: each time a colleague opened it in Makerble or fetched it
         through the API, who it was, when, and how many times. This is the **Access Logs** tab beside Versions on the
         Manage Versions page. Changes are in `GET /versions` instead.
-        Only Contacts (Beneficiaries) are available so far, so `record_type` must be `Contact`.
+        `record_type` is `Contact` (a Contact, i.e. Beneficiary) or `Story` (a Story or Survey Response).
 
         Views by the same colleague, through the same route, less than 30 minutes apart are one entry with a
         `view_count`. Entries older than the Organisation's retention period (3 to 12 months, set on Organisation
@@ -1971,9 +1976,10 @@ paths:
         `first_viewed_at` / `last_viewed_at` spanning that month. `source` is `web` (opened in Makerble), `api` (fetched with `GET /beneficiaries/{id}`) or `mcp`
         (fetched through the Makerble MCP server).
 
-        Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one
-        of their Projects). Anything the caller may not see returns `404`, so the endpoint never confirms that
-        another Organisation's record exists.
+        Visible to Charity Editors (any Contact or Story in their Organisation) and Project Editors (Contacts in at
+        least one of their Projects, and Stories in their Projects that they may read: a Story shared only with
+        specific individuals is hidden unless they are one of them). Anything the caller may not see returns `404`,
+        so the endpoint never confirms that another Organisation's record exists.
       operationId: listAccessLogs
       security: [{tokenAuth: []}]
       parameters:
@@ -1982,14 +1988,14 @@ paths:
           required: true
           schema:
             type: string
-            enum: [Contact]
-          description: Type of record. Only `Contact` for now.
+            enum: [Contact, Story]
+          description: '`Contact` (Beneficiary) or `Story` (a Story or Survey Response)'
         - name: record_id
           in: query
           required: true
           schema:
             type: integer
-          description: The Contact (Beneficiary) ID
+          description: The Contact (Beneficiary) ID or the Story ID
         - name: from
           in: query
           schema:
@@ -8077,10 +8083,11 @@ components:
           type: integer
         record_type:
           type: string
+          enum: [Contact, Story]
           example: Contact
         record_id:
           type: integer
-          description: The Contact (Beneficiary) ID
+          description: The Contact (Beneficiary) ID or the Story ID
         charity_id:
           type: integer
         event:
