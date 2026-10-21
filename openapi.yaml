@@ -7771,6 +7771,15 @@ components:
               type: boolean
             display_respondent_name:
               type: boolean
+            allow_respondent_finish_later:
+              type: boolean
+              description: Respondents answering from a personal survey link can save their answers and finish later.
+            hide_unanswered_questions:
+              type: boolean
+              description: >-
+                "Hide unanswered questions when viewing the story" on the Survey Campaign Settings page. When true,
+                viewing one contact's response (for example on their profile timeline) leaves out the questions they
+                did not answer. Read-only through the API.
 
     StoryCategoryResponse:
       allOf:
