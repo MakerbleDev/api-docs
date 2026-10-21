@@ -9408,13 +9408,19 @@ components:
           description: Show the result as a number of Contacts, or a percentage of the denominator
         denominator:
           type: string
-          enum: [members, enough_data]
+          enum: [members, enough_data, filtered]
           nullable: true
           description: |
-            For a percentage, what it is out of: `members` (Contacts in this Project / Album) or
+            For a percentage, what it is out of: `members` (Contacts in this Project / Album),
             `enough_data` (Contacts with enough data to be judged on every data-based criterion: invited
             to an event in scope for Attendance Rate, two or more Choice Tracker responses for Distance
-            Travelled Direction, a response to the question for an answer-based criterion). null for a number.
+            Travelled Direction, a response to the question for an answer-based criterion), or `filtered`
+            (members who also meet `denominator_criteria`). null for a number.
+        denominator_criteria:
+          type: object
+          description: For a `filtered` denominator, the Contact Filter criteria the members must meet. `{}` otherwise
+          example:
+            group_ids: ["12"]
         criteria:
           type: object
           description: Contact Filter criteria, in the shape a Saved Filter uses
@@ -9468,8 +9474,13 @@ components:
               description: Default number
             denominator:
               type: string
-              enum: [members, enough_data]
+              enum: [members, enough_data, filtered]
               description: For a percentage. Defaults to members
+            denominator_criteria:
+              type: object
+              description: |
+                Required when denominator is `filtered`: Contact Filter criteria, the same keys as `criteria`,
+                for the Contacts the percentage is out of. Cleared for any other denominator
         confirm_clear_targets:
           type: boolean
           description: |
@@ -9572,7 +9583,7 @@ components:
           enum: [number, percentage]
         denominator:
           type: string
-          enum: [members, enough_data]
+          enum: [members, enough_data, filtered]
           nullable: true
         denominator_count:
           type: integer
