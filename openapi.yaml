@@ -6142,7 +6142,8 @@ paths:
       description: |
         The options of "What would you like to add this to?" in the Add metric to popup, for a Change,
         Outcome or Indicator the user can see. An Indicator has no Projects option: it reaches a
-        Project only through one of its Outcomes. `progress_boards` is offered only with `project_id`
+        Project only through one of its Outcomes. A Cohort or Workflow Tracker gets `projects` (its own
+        Organisation's) and `impact_frameworks`. `progress_boards` is offered for a Change or an Indicator only with `project_id`
         or `bundle_id`, as the popup offers Progress Boards only from a Project's or Album's Results Canvas.
       operationId: listMetricDestinations
       security: [{tokenAuth: []}]
@@ -6187,7 +6188,8 @@ paths:
         (an Outcome's, offered only if the user can edit it): the Indicators they can see, including the
         public library, with `indicator_type`. For `progress_boards`: the open Progress Boards the user
         created or is a Board Admin of, with `board_type` (`managed` or `basic`); `added` is for the given
-        Project's or Album's card.
+        Project's or Album's card. For a tracker, each item has `column`: the Impact Scorecard column it is
+        in, or null.
       operationId: listMetricDestinationTargets
       security: [{tokenAuth: []}]
       parameters:
@@ -6289,10 +6291,13 @@ paths:
         the Outcome. To a Survey: as its last, optional question (a scale Indicator is Single Choice;
         an Outcome adds each of its Indicators, as a grid when they share answer choices). To a Progress
         Board (with `project_id` or `bundle_id`): as its last card, showing that Project's or Album's
-        results; you must have created the board or be a Board Admin. There is no request body.
+        results; you must have created the board or be a Board Admin. A Cohort or Workflow Tracker goes in
+        the `column` given (default `engagement`) of a Project in its own Organisation or of an Impact
+        Framework you created. There is no request body.
       operationId: addMetricToDestination
       security: [{tokenAuth: []}]
       parameters:
+        - $ref: '#/components/parameters/MetricDestinationColumn'
         - $ref: '#/components/parameters/MetricType'
         - $ref: '#/components/parameters/MetricId'
         - $ref: '#/components/parameters/MetricDestinationProjectId'
@@ -6370,8 +6375,17 @@ components:
       required: true
       schema:
         type: string
-        enum: [change, outcome, indicator]
-      description: The kind of metric
+        enum: [change, outcome, indicator, cohort_tracker, workflow_tracker]
+      description: The kind of metric. A Cohort or Workflow Tracker can go to `projects` and `impact_frameworks` only.
+    MetricDestinationColumn:
+      name: column
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [activities, engagement, potential, behaviour, growth]
+        default: engagement
+      description: For a Cohort or Workflow Tracker, the Impact Scorecard column to put it in.
     MetricId:
       name: metric_id
       in: path
