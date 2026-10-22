@@ -1382,7 +1382,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/project_story_categories", "List Survey Campaigns", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects" }])}
+          ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects, with their display settings (including hide_unanswered_questions and allow_respondent_finish_later)" }])}
           ${endpointCard("GET", "/project_story_categories/{id}/survey_waves", "List the Waves of a Survey Campaign", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
