@@ -5,7 +5,6 @@
  *   GET /              → Scalar API docs UI (Makerble-branded, three-column layout)
  *   GET /openapi.yaml  → Raw OpenAPI 3.0 spec (for Scalar, external tools, etc.)
  *   ALL /mock/*        → Prism mock server proxy (safe sandbox for developers)
- *   GET /assets/*      → Brand assets (logo, favicon)
  *   GET /health        → Health check
  *
  * The Prism mock server is spawned as a child process on startup.
@@ -21,9 +20,7 @@ import { readFileSync, existsSync } from "fs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT       = process.env.PORT || 3000;
 const PRISM_PORT = process.env.PRISM_PORT || 4010;
-const SPEC_PATH  = join(__dirname, "openapi.yaml");
-const LOGO_PNG    = readFileSync(join(__dirname, "assets", "makerble-logo.png"));
-const FAVICON_PNG = readFileSync(join(__dirname, "assets", "favicon.png"));
+const SPEC_PATH  = join(__dirname, "public", "openapi.yaml");
 
 // ─── Spawn Prism mock server ──────────────────────────────────────────────────
 
@@ -76,16 +73,6 @@ app.get("/openapi.yaml", (_req, res) => {
   res.sendFile(SPEC_PATH);
 });
 
-// Brand assets
-app.get("/assets/makerble-logo.png", (_req, res) => {
-  res.setHeader("Cache-Control", "public, max-age=86400");
-  res.type("png").send(LOGO_PNG);
-});
-app.get(["/favicon.png", "/favicon.ico"], (_req, res) => {
-  res.setHeader("Cache-Control", "public, max-age=86400");
-  res.type("png").send(FAVICON_PNG);
-});
-
 // Mock proxy — strip /mock prefix, forward to Prism
 app.use("/mock", createProxyMiddleware({
   target: `http://127.0.0.1:${PRISM_PORT}`,
@@ -117,54 +104,50 @@ function buildDocsPage() {
   <title>Makerble API Reference</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="icon" type="image/png" href="/favicon.png" />
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     /* ── Reset ─────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     /* ── Makerble token system ──────────────────────
-       Matches the Makerble app (qa/app.makerble.com):
-       Navy           #2d3e58  — headings, header text, code panel base
-       Purple         #ac3898  — brand primary: active nav, eyebrows, accents
-       Blue           #2f6fb0  — links, GET badges, param names
+       Primary blue   #4a8ac9  — links, active states, method badges (GET)
+       Deep navy      #1d3448  — sidebar bg, code panels
        Green          #22b573  — POST badges, success
-       Red            #ee364a  — DELETE badges, required markers
+       Pink           #ea409d  — logo accent
+       Red            #ff3f45  — DELETE badges
        Orange         #ff771b  — PATCH/PUT badges
-       Surface        #f5f7fa  — page / sidebar background
-       Fonts          Quicksand for UI text, JetBrains Mono for code
+       Purple         #ab3897  — headers, section labels
+       Surface        #f7f9fc  — page background
+       Code dark      #111d27  — code panel bg
     ──────────────────────────────────────────────── */
 
     :root {
-      --brand-blue:    #2f6fb0;
-      --brand-sky:     #508bbe;
-      --brand-navy:    #2d3e58;
-      --brand-navy-2:  #1f2d44;
+      --brand-blue:    #4a8ac9;
+      --brand-navy:    #1d3448;
+      --brand-navy-2:  #243d54;   /* slightly lighter for hover states */
       --brand-green:   #22b573;
       --brand-pink:    #ea409d;
-      --brand-red:     #ee364a;
+      --brand-red:     #ff3f45;
       --brand-orange:  #ff771b;
-      --brand-purple:  #ac3898;
+      --brand-purple:  #ab3897;
       --brand-violet:  #7e6cb0;
-      --surface:       #ffffff;
-      --surface-2:     #f2f4f7;
-      --sidebar-bg:    #f7f8fa;
-      --code-bg:       #1f2d44;
-      --code-bg-2:     #18233a;
-      --text-primary:  #2d3e58;
-      --text-secondary: #4a5361;
-      --text-muted:    #6b7584;
-      --text-light:    #939393;
-      --border:        #e3e7ec;
-      --border-dark:   #d7dee7;
-      --nav-text:      #4a5361;
-      --nav-text-active: #ac3898;
-      --font-sans: "Quicksand", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace;
+      --surface:       #f7f9fc;
+      --surface-2:     #eef1f6;
+      --code-bg:       #111d27;
+      --code-bg-2:     #0d1820;
+      --text-primary:  #1a2535;
+      --text-secondary: #4a5568;
+      --text-muted:    #718096;
+      --text-light:    #a0aec0;
+      --border:        #e2e8f0;
+      --border-dark:   #2d4a65;
+      --nav-text:      rgba(255,255,255,0.7);
+      --nav-text-active: #ffffff;
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
       --sidebar-w: 260px;
       --content-max: 720px;
       --panel-w: 380px;
-      --topbar-h: 64px;
       --radius: 6px;
       --radius-lg: 10px;
     }
@@ -177,13 +160,8 @@ function buildDocsPage() {
       color: var(--text-primary);
       line-height: 1.6;
       font-size: 15px;
-      font-weight: 500;
       -webkit-font-smoothing: antialiased;
     }
-
-    code, pre, kbd, samp { font-family: var(--font-mono); font-weight: 400; }
-
-    a { color: var(--brand-blue); }
 
     /* ── Layout shell ───────────────────────────── */
 
@@ -198,15 +176,13 @@ function buildDocsPage() {
 
     .topbar {
       grid-column: 1 / -1;
-      background: #fff;
+      background: var(--brand-navy);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
       padding: 0 24px;
-      height: var(--topbar-h);
-      border-bottom: 1px solid var(--border);
-      box-shadow: 0 1px 3px rgba(45, 62, 88, 0.06);
+      height: 56px;
+      border-bottom: 1px solid var(--border-dark);
       position: sticky;
       top: 0;
       z-index: 100;
@@ -215,80 +191,75 @@ function buildDocsPage() {
     .topbar-brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
       text-decoration: none;
-      flex-shrink: 0;
     }
 
     .topbar-logo {
-      height: 34px;
-      width: auto;
-      display: block;
+      width: 30px;
+      height: 30px;
     }
 
     .topbar-name {
       font-size: 15px;
-      font-weight: 600;
-      color: var(--text-muted);
-      padding-left: 14px;
-      border-left: 1px solid var(--border-dark);
-      line-height: 28px;
-      white-space: nowrap;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+
+    .topbar-name span {
+      color: var(--brand-pink);
     }
 
     .topbar-right {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 16px;
     }
 
     .topbar-badge {
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: var(--brand-purple);
-      background: rgba(172, 56, 152, 0.08);
-      border: 1px solid rgba(172, 56, 152, 0.25);
+      color: var(--brand-blue);
+      background: rgba(74, 138, 201, 0.15);
+      border: 1px solid rgba(74, 138, 201, 0.3);
       border-radius: 20px;
       padding: 3px 10px;
     }
 
     .topbar-link {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-primary);
+      font-size: 13px;
+      color: var(--nav-text);
       text-decoration: none;
       transition: color 0.15s;
-      white-space: nowrap;
     }
-    .topbar-link:hover { color: var(--brand-purple); }
+    .topbar-link:hover { color: var(--nav-text-active); }
 
     .mock-btn {
-      font-size: 13px;
-      font-weight: 700;
-      color: #fff;
-      background: var(--brand-purple);
-      border: 1px solid var(--brand-purple);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--brand-green);
+      background: rgba(34, 181, 115, 0.12);
+      border: 1px solid rgba(34, 181, 115, 0.3);
       border-radius: 20px;
-      padding: 6px 14px;
+      padding: 4px 12px;
       text-decoration: none;
       transition: background 0.15s;
       cursor: pointer;
-      white-space: nowrap;
     }
-    .mock-btn:hover { background: #8f2e7e; border-color: #8f2e7e; }
+    .mock-btn:hover { background: rgba(34, 181, 115, 0.2); }
 
     /* ── Sidebar ─────────────────────────────────── */
 
     .sidebar {
-      background: var(--sidebar-bg);
-      border-right: 1px solid var(--border);
+      background: var(--brand-navy);
       position: sticky;
-      top: var(--topbar-h);
-      height: calc(100vh - var(--topbar-h));
+      top: 56px;
+      height: calc(100vh - 56px);
       overflow-y: auto;
-      padding: 12px 0 40px;
+      padding: 20px 0 40px;
       scrollbar-width: thin;
       scrollbar-color: var(--border-dark) transparent;
     }
@@ -302,11 +273,11 @@ function buildDocsPage() {
     }
 
     .nav-section-label {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--text-primary);
+      color: rgba(255,255,255,0.35);
       padding: 16px 20px 6px;
     }
 
@@ -314,36 +285,31 @@ function buildDocsPage() {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 20px 6px 18px;
-      font-size: 14px;
-      font-weight: 500;
+      padding: 7px 20px;
+      font-size: 13px;
       color: var(--nav-text);
       text-decoration: none;
       transition: background 0.1s, color 0.1s;
-      border-left: 3px solid transparent;
+      border-left: 2px solid transparent;
     }
 
     .nav-link:hover {
-      background: var(--surface-2);
-      color: var(--text-primary);
+      background: rgba(255,255,255,0.06);
+      color: var(--nav-text-active);
     }
 
     .nav-link.active {
-      background: rgba(172, 56, 152, 0.07);
+      background: rgba(74, 138, 201, 0.15);
       color: var(--nav-text-active);
-      font-weight: 700;
-      border-left-color: var(--brand-purple);
+      border-left-color: var(--brand-blue);
     }
 
     .nav-method {
-      font-family: var(--font-mono);
       font-size: 9px;
       font-weight: 700;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
       border-radius: 3px;
-      padding: 1px 0;
-      width: 36px;
-      text-align: center;
+      padding: 1px 5px;
       flex-shrink: 0;
     }
 
@@ -360,8 +326,8 @@ function buildDocsPage() {
     .panel {
       background: var(--code-bg);
       position: sticky;
-      top: var(--topbar-h);
-      height: calc(100vh - var(--topbar-h));
+      top: 56px;
+      height: calc(100vh - 56px);
       overflow-y: auto;
       padding: 0;
       border-left: 1px solid rgba(255,255,255,0.05);
@@ -382,7 +348,7 @@ function buildDocsPage() {
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.55);
+      color: rgba(255,255,255,0.35);
       margin-bottom: 12px;
     }
 
@@ -393,18 +359,17 @@ function buildDocsPage() {
       font-family: var(--font-mono);
       font-size: 12px;
       line-height: 1.7;
-      color: #d7e1ec;
-      white-space: pre;
+      color: #c9d8e8;
       overflow-x: auto;
       margin-bottom: 12px;
       border: 1px solid rgba(255,255,255,0.06);
     }
 
     .code-block .cm { color: #6a8fa8; }   /* comments */
-    .code-block .k  { color: #7fb4e6; }   /* keywords */
+    .code-block .k  { color: var(--brand-blue); }   /* keywords */
     .code-block .s  { color: #8fcf8e; }   /* strings */
     .code-block .n  { color: #f0c97a; }   /* numbers */
-    .code-block .kw { color: #f08bc8; }  /* special keywords */
+    .code-block .kw { color: var(--brand-pink); }  /* special keywords */
 
     .panel-mock-note {
       margin: 0 24px 20px;
@@ -412,8 +377,8 @@ function buildDocsPage() {
       background: rgba(34, 181, 115, 0.08);
       border: 1px solid rgba(34, 181, 115, 0.2);
       border-radius: var(--radius);
-      font-size: 13px;
-      color: rgba(255,255,255,0.75);
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
       line-height: 1.5;
     }
 
@@ -441,9 +406,9 @@ function buildDocsPage() {
     }
 
     .section-title {
-      font-size: 28px;
+      font-size: 26px;
       font-weight: 700;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.03em;
       color: var(--text-primary);
       margin-bottom: 16px;
       line-height: 1.25;
@@ -487,8 +452,7 @@ function buildDocsPage() {
     }
 
     .endpoint-card:hover {
-      box-shadow: 0 2px 12px rgba(45,62,88,0.08);
-      border-color: var(--border-dark);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
     }
 
     .endpoint-header {
@@ -511,9 +475,9 @@ function buildDocsPage() {
       font-family: var(--font-mono);
     }
 
-    .method-GET    { background: rgba(47,111,176,0.1);   color: #2f6fb0; border: 1px solid rgba(47,111,176,0.25); }
+    .method-GET    { background: rgba(74,138,201,0.12);  color: #2e72b8; border: 1px solid rgba(74,138,201,0.25); }
     .method-POST   { background: rgba(34,181,115,0.12);  color: #1a9068; border: 1px solid rgba(34,181,115,0.25); }
-    .method-DELETE { background: rgba(238,54,74,0.1);    color: #c42236; border: 1px solid rgba(238,54,74,0.2); }
+    .method-DELETE { background: rgba(255,63,69,0.1);    color: #c92d33; border: 1px solid rgba(255,63,69,0.2); }
     .method-PATCH  { background: rgba(255,119,27,0.1);   color: #d4610d; border: 1px solid rgba(255,119,27,0.2); }
     .method-PUT    { background: rgba(255,172,36,0.12);  color: #a86b00; border: 1px solid rgba(255,172,36,0.25); }
 
@@ -522,7 +486,6 @@ function buildDocsPage() {
       font-size: 14px;
       color: var(--text-primary);
       font-weight: 500;
-      word-break: break-all;
     }
 
     .endpoint-summary {
@@ -813,24 +776,23 @@ function buildDocsPage() {
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--brand-purple);
-      border: 1px solid rgba(172,56,152,0.25);
-      background: rgba(172,56,152,0.05);
+      color: var(--brand-blue);
+      border: 1px solid rgba(74,138,201,0.25);
       border-radius: 20px;
       padding: 3px 10px;
       margin-bottom: 16px;
     }
 
     .intro-hero h1 {
-      font-size: 36px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
       color: var(--text-primary);
       line-height: 1.2;
       margin-bottom: 14px;
     }
 
-    .intro-hero h1 span { color: var(--brand-purple); }
+    .intro-hero h1 span { color: var(--brand-blue); }
 
     .intro-hero p {
       font-size: 16px;
@@ -849,19 +811,18 @@ function buildDocsPage() {
     .quick-link {
       font-size: 13px;
       font-weight: 500;
-      font-weight: 600;
-      color: var(--brand-purple);
+      color: var(--brand-blue);
       text-decoration: none;
       padding: 6px 14px;
-      border: 1px solid rgba(172,56,152,0.25);
+      border: 1px solid rgba(74,138,201,0.25);
       border-radius: 20px;
-      background: rgba(172,56,152,0.04);
+      background: rgba(74,138,201,0.05);
       transition: background 0.15s, border-color 0.15s;
     }
 
     .quick-link:hover {
-      background: rgba(172,56,152,0.1);
-      border-color: rgba(172,56,152,0.45);
+      background: rgba(74,138,201,0.12);
+      border-color: rgba(74,138,201,0.4);
     }
 
     /* ── Responsive ─────────────────────────────── */
@@ -874,20 +835,10 @@ function buildDocsPage() {
       .panel { display: none; }
     }
 
-    @media (max-width: 960px) {
-      .topbar-link, .topbar-badge { display: none; }
-    }
-
     @media (max-width: 760px) {
       .layout { grid-template-columns: 1fr; }
       .sidebar { display: none; }
-      .content { padding: 24px 16px 60px; }
-      .content code { overflow-wrap: anywhere; }
-      .info-table td:first-child { white-space: normal; }
-      .info-table, .params-table, .endpoint-desc table { display: block; overflow-x: auto; }
-      .topbar { padding: 0 16px; }
-      .topbar-logo { height: 28px; }
-      .topbar-name { display: none; }
+      .content { padding: 24px 20px 60px; }
     }
   </style>
 </head>
@@ -897,13 +848,17 @@ function buildDocsPage() {
     <!-- Top bar -->
     <header class="topbar">
       <a href="/" class="topbar-brand">
-        <img class="topbar-logo" src="/assets/makerble-logo.png" alt="Makerble" width="141" height="34" />
-        <span class="topbar-name">API Reference</span>
+        <!-- Makerble wordmark as SVG — M in brand blue + "makerble" -->
+        <svg class="topbar-logo" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="30" height="30" rx="7" fill="#4a8ac9"/>
+          <path d="M6 22V10l6 7 6-7v12M21 10v12" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="topbar-name">maker<span>ble</span></span>
       </a>
       <div class="topbar-right">
         <span class="topbar-badge">API v2</span>
         <a href="/openapi.yaml" class="topbar-link" target="_blank">OpenAPI spec ↗</a>
-        <a href="/mock" class="mock-btn" id="mockBtnTop">Try mock API</a>
+        <a href="/mock" class="mock-btn" id="mockBtnTop">⬡ Try mock API</a>
         <a href="https://discover.makerble.com" class="topbar-link" target="_blank">Makerble.com ↗</a>
       </div>
     </header>
@@ -920,49 +875,49 @@ function buildDocsPage() {
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Core resources</div>
-        <a href="#organisations"   class="nav-link"><span class="nav-method method-GET">GET</span>Organisations</a>
-        <a href="#projects"        class="nav-link"><span class="nav-method method-GET">GET</span>Projects</a>
-        <a href="#users"           class="nav-link"><span class="nav-method method-POST">POST</span>Users</a>
-        <a href="#contacts"        class="nav-link"><span class="nav-method method-POST">POST</span>Contacts</a>
-        <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET">GET</span>Contact Bio Forms</a>
-        <a href="#cases"           class="nav-link"><span class="nav-method method-POST">POST</span>Cases</a>
+        <a href="#organisations"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Organisations</a>
+        <a href="#projects"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Projects</a>
+        <a href="#users"           class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Users</a>
+        <a href="#contacts"        class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Contacts</a>
+        <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Contact Bio Forms</a>
+        <a href="#cases"           class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cases</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Surveys &amp; stories</div>
-        <a href="#surveys"         class="nav-link"><span class="nav-method method-GET">GET</span>Surveys</a>
-        <a href="#stories"         class="nav-link"><span class="nav-method method-POST">POST</span>Stories</a>
-        <a href="#story-metrics"   class="nav-link"><span class="nav-method method-GET">GET</span>Story Metrics</a>
-        <a href="#media-gallery"   class="nav-link"><span class="nav-method method-GET">GET</span>Media Gallery</a>
+        <a href="#surveys"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Surveys</a>
+        <a href="#stories"         class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Stories</a>
+        <a href="#story-metrics"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Story Metrics</a>
+        <a href="#media-gallery"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Media Gallery</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Impact framework</div>
-        <a href="#changes"         class="nav-link"><span class="nav-method method-GET">GET</span>Changes</a>
-        <a href="#versions"        class="nav-link"><span class="nav-method method-GET">GET</span>Versions</a>
-        <a href="#access-logs"     class="nav-link"><span class="nav-method method-GET">GET</span>Access Logs</a>
-        <a href="#audit-trail"     class="nav-link"><span class="nav-method method-GET">GET</span>Audit Trail</a>
-        <a href="#indicators"      class="nav-link"><span class="nav-method method-GET">GET</span>Indicators</a>
-        <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET">GET</span>Outcomes</a>
-        <a href="#library"         class="nav-link"><span class="nav-method method-GET">GET</span>Library</a>
-        <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST">POST</span>Framework Sets</a>
-        <a href="#checklists"      class="nav-link"><span class="nav-method method-POST">POST</span>Checklists</a>
-        <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST">POST</span>Add Metric To</a>
-        <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST">POST</span>Cohort Trackers</a>
-        <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST">POST</span>Workflow Trackers</a>
-        <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST">POST</span>Filtered Metrics</a>
+        <a href="#changes"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Changes</a>
+        <a href="#versions"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Versions</a>
+        <a href="#access-logs"     class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Access Logs</a>
+        <a href="#audit-trail"     class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Audit Trail</a>
+        <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
+        <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
+        <a href="#library"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Library</a>
+        <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
+        <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
+        <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Add Metric To</a>
+        <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
+        <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Workflow Trackers</a>
+        <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Filtered Metrics</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Events</div>
-        <a href="#events"          class="nav-link"><span class="nav-method method-GET">GET</span>Events</a>
-        <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
+        <a href="#events"          class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Events</a>
+        <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Event Formats</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
-        <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST">POST</span>Webhooks</a>
+        <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Webhooks</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
-        <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET">GET</span>Ratio Sets</a>
-        <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET">GET</span>Case Forms</a>
+        <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Ratio Sets</a>
+        <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Case Forms</a>
       </div>
     </nav>
 
@@ -1172,7 +1127,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/projects/{id}", "Get a single Project", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Project ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Project record, including <code>default_results_template_id</code>: the Impact Framework its Results Canvas shows by default (<code>null</code> for All metrics)" },
+            { code: "200", cls: "response-2xx", desc: "Project record, including <code>default_results_template_id</code>: the Impact Framework its Results Canvas shows by default (<code>null</code> for All metrics), and <code>beneficiary_states</code>: the Contact statuses (e.g. Enrolled, Waiting List) switched on for the Project, as <code>{id, name}</code>" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
@@ -1292,6 +1247,17 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Join table records: project_id and beneficiary_id (the Contact) for each link" },
             { code: "422", cls: "response-4xx", desc: "project_ids is not an array of integers" }
           ])}
+          ${endpointCard("POST", "/project_beneficiaries", "Add existing Contacts to a Project", true, [
+            { name: "project_id", in: "body", type: "integer", required: true, desc: "The Project to add the Contacts to" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: true, desc: "Contacts of the Project's organisation, at most 200" },
+            { name: "beneficiary_state_id", in: "body", type: "integer", required: false, desc: "The Contacts' status in the Project, from <code>beneficiary_states</code> in <code>GET /projects/{id}</code>. Default: Enrolled, or the Project's first status if Enrolled is switched off" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>data</code>: one entry per Contact with <code>id</code>, <code>project_id</code>, <code>beneficiary_id</code>, <code>beneficiary_state_id</code> and <code>already_in_project</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You may not move these Contacts between Projects" },
+            { code: "404", cls: "response-4xx", desc: "Project not found, or in an organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "Contacts not found in the Project's organisation (<code>beneficiary_ids_not_found</code>), a status not switched on for the Project, a closed Project, no ids, or more than 200" }
+          ], "The same as <strong>Assign Contacts to projects</strong> on the Contacts page: each Contact added gets an activity timeline entry and the Project's team is notified. Contacts already in the Project are left as they are (<code>already_in_project: true</code>). Nothing is added if any Contact is refused. Use it before generating survey links with <code>beneficiary_ids</code> for Contacts who aren't in the Survey Campaign's Project yet. Requires an Organisation Editor, Reporter or Observer, or a user who may edit the Contact.")}
         </div>
       </section>
 
@@ -2633,7 +2599,7 @@ function buildDocsPage() {
         <code id="panelMockUrl" style="font-size:11px;font-family:var(--font-mono);color:#8fcf8e">/mock</code>
       </div>
       <div style="padding: 0 24px">
-        <h3 style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-bottom:12px">Creating a Story</h3>
+        <h3 style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:12px">Creating a Story</h3>
         <div class="code-block" style="font-size:11px">{
   <span class="k">"story"</span>: {
     <span class="k">"story_group"</span>: <span class="s">"change_created"</span>,
