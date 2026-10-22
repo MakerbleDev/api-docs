@@ -1558,6 +1558,14 @@ paths:
             Invalid request: Contacts outside the Project (listed in `invalid_beneficiary_ids`),
             more than 200 recipients, no recipients, an unknown `link_expiry`, or a Wave that
             is not available for this Survey Campaign.
+
+            Refused Contacts are also split in two. `beneficiary_ids_not_in_project` are Contacts of
+            the organisation who aren't in the Survey Campaign's Project: add them with
+            `POST /project_beneficiaries`, then try again, or pass their email addresses in `emails`.
+            `beneficiary_ids_not_found` aren't Contacts of the organisation (the same answer whether
+            the id belongs to another organisation or doesn't exist). A Contact created from an
+            email address joins the organisation but not the Project. The three lists are only
+            present when Contacts were refused.
           content:
             application/json:
               schema:
@@ -1571,9 +1579,26 @@ paths:
                     type: array
                     items:
                       type: integer
+                  beneficiary_ids_not_in_project:
+                    type: array
+                    items:
+                      type: integer
+                  beneficiary_ids_not_found:
+                    type: array
+                    items:
+                      type: integer
               example:
-                errors: ["These contacts are not in this project: 9876."]
-                invalid_beneficiary_ids: [9876]
+                errors:
+                  - >-
+                    These contacts are in your organisation but not in the project "Understanding Italian": 9876.
+                    Add them to the project first (API: POST /api/v2/project_beneficiaries; MCP:
+                    makerble_add_contacts_to_project; in Makerble: Contacts page, More options, Assign Contacts
+                    to projects), then try again. Or pass their email addresses in emails instead, which doesn't
+                    need them to be in the project.
+                  - "These contacts were not found in your organisation: 9877."
+                invalid_beneficiary_ids: [9876, 9877]
+                beneficiary_ids_not_in_project: [9876]
+                beneficiary_ids_not_found: [9877]
     get:
       tags: [Project Story Categories]
       summary: List personal survey links for a Survey Campaign
