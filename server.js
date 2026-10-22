@@ -21,7 +21,7 @@ import { readFileSync, existsSync } from "fs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT       = process.env.PORT || 3000;
 const PRISM_PORT = process.env.PRISM_PORT || 4010;
-const SPEC_PATH  = join(__dirname, "public", "openapi.yaml");
+const SPEC_PATH  = join(__dirname, "openapi.yaml");
 const LOGO_PNG    = readFileSync(join(__dirname, "assets", "makerble-logo.png"));
 const FAVICON_PNG = readFileSync(join(__dirname, "assets", "favicon.png"));
 
