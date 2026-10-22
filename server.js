@@ -1493,13 +1493,13 @@ function buildDocsPage() {
         <div class="section-eyebrow">Audit &amp; compliance</div>
         <h2 class="section-title">Versions</h2>
         <div class="section-desc">
-          <p>Versions are the audit trail behind the <strong>Manage Versions</strong> page: every time a Contact is created or edited, a Version records who did it, when, and a full snapshot of every field at that moment. Only Contacts are versioned so far.</p>
-          <p>Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one of their Projects). Anything else returns <code>404</code>. <code>user_name</code> is <code>System</code> when no signed-in user made the change, e.g. a CSV import.</p>
+          <p>Versions are the audit trail behind the <strong>Manage Versions</strong> page: every time a Contact or a Story (Survey Response) is created, edited or deleted, a Version records who did it, when, and a full snapshot of the record at that moment. A Story is named <code>[story ID] &lt;survey&gt; in &lt;project&gt; by &lt;user&gt; on &lt;date happened&gt;</code>.</p>
+          <p>Visible to Charity Editors (any Contact or Story in their Organisation) and Project Editors (Contacts in at least one of their Projects, and Stories in their Projects that they may read: a Story shared only with specific individuals is hidden unless they are one of them). Anything else returns <code>404</code>. <code>user_name</code> is <code>System</code> when no signed-in user made the change, e.g. a CSV import.</p>
         </div>
         <div class="endpoint-list">
-          ${endpointCard("GET", "/versions", "List a Contact's Versions (audit trail)", true, [
-            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> (the only type for now)" },
-            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID" },
+          ${endpointCard("GET", "/versions", "List a Contact's or Story's Versions (audit trail)", true, [
+            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> or <code>Story</code> (a Story or Survey Response)" },
+            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID or Story ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
             { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 — only Versions created after this" }
@@ -1521,13 +1521,13 @@ function buildDocsPage() {
         <div class="section-eyebrow">Audit &amp; compliance</div>
         <h2 class="section-title">Access Logs</h2>
         <div class="section-desc">
-          <p>Access Logs are the audit trail of <em>views</em>, on the <strong>Access Logs</strong> tab beside Versions on the Manage Versions page: who opened a Contact in Makerble or fetched it through the API, when, and how many times. Views by the same colleague less than 30 minutes apart are one entry with a <code>view_count</code>. Entries older than the Organisation's retention period (3 to 12 months, set on Organisation Preferences) are rolled up into one entry per colleague per month, with <code>monthly_summary: true</code>. <code>source</code> is <code>web</code>, <code>api</code> or <code>mcp</code>. Only Contacts are available so far.</p>
-          <p>Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one of their Projects). Anything else returns <code>404</code>.</p>
+          <p>Access Logs are the audit trail of <em>views</em>, on the <strong>Access Logs</strong> tab beside Versions on the Manage Versions page: who opened a Contact or Story in Makerble or fetched it through the API, when, and how many times. Views by the same colleague less than 30 minutes apart are one entry with a <code>view_count</code>. Entries older than the Organisation's retention period (3 to 12 months, set on Organisation Preferences) are rolled up into one entry per colleague per month, with <code>monthly_summary: true</code>. <code>source</code> is <code>web</code>, <code>api</code> or <code>mcp</code>.</p>
+          <p>Same permissions as Versions. Anything else returns <code>404</code>.</p>
         </div>
         <div class="endpoint-list">
-          ${endpointCard("GET", "/access_logs", "List who viewed a Contact (Access Logs)", true, [
-            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> (the only type for now)" },
-            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID" },
+          ${endpointCard("GET", "/access_logs", "List who viewed a Contact or Story (Access Logs)", true, [
+            { name: "record_type", type: "string", required: true, desc: "<code>Contact</code> or <code>Story</code> (a Story or Survey Response)" },
+            { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID or Story ID" },
             { name: "from", type: "string", required: false, desc: "YYYY-MM-DD — only entries on or after this date" },
             { name: "to", type: "string", required: false, desc: "YYYY-MM-DD — only entries on or before this date" },
             { name: "user_id", type: "integer", required: false, desc: "Only this colleague's views" },
@@ -1630,6 +1630,15 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Outcome record" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
+          ${endpointCard("POST", "/metrics/{id}/copy", "Copy a metric (an Output, Outcome or Indicator)", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "ID of the metric to copy" },
+            { name: "metric_class", in: "body", type: "string", required: true, desc: "Change (an Output), Indicator or Outcome" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The copy: id, metric_class, name (\"Copy of …\"), owner_type, owner_id, copied_from_id" },
+            { code: "403", cls: "response-4xx", desc: "You can't edit the original, so you can't copy it" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "metric_class isn't Change, Indicator or Outcome, or the copy is invalid" }
+          ], "The copy keeps the original's owner, settings and survey wording and isn't added to any Project, Survey or Impact Framework. A copied Indicator keeps its Outcomes; a copied Outcome keeps its Indicators.")}
         </div>
       </section>
 
@@ -1769,7 +1778,7 @@ function buildDocsPage() {
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
-          <span><strong>Workflow tip:</strong> Get the action types and their criteria keys with <code>GET /checklists/action_types</code>, create the Checklist, then offer it in a Project with <code>PATCH /checklists/{id}/projects/{project_id}</code>. Check a Contact's progress with <code>GET /beneficiaries/{beneficiary_id}/checklists</code>.</span>
+          <span><strong>Workflow tip:</strong> Get the action types and their criteria keys with <code>GET /checklists/action_types</code>, create the Checklist, then offer it in a Project with <code>PATCH /checklists/{id}/projects/{project_id}</code>. Check a Contact's progress, and who is responsible for each action, with <code>GET /beneficiaries/{beneficiary_id}/checklists</code>.</span>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/checklists", "List an Organisation's Checklists", true, [
@@ -1784,17 +1793,23 @@ function buildDocsPage() {
           ${endpointCard("GET", "/checklists/action_types", "List the actions a Checklist can contain", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>{data: [{action_type, name, criteria_keys}]}</code>" }
           ], "Criteria values are strings: IDs, or pairs such as <code>project_states</code> \"&lt;project_id&gt;:&lt;state_id&gt;\", <code>project_event_categories</code> \"&lt;project_id&gt;:&lt;event_category_id&gt;\", <code>relationship_sides</code> \"&lt;category_id&gt;:parent|child\" and <code>survey_waves</code> \"&lt;Survey Campaign id&gt;:&lt;Wave id, or 0&gt;\".")}
+          ${endpointCard("GET", "/checklists/owner_options", "List the choices for who is responsible for an action", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{kinds: [{owner_kind, name}], teams: [{id, name}], relationship_sides: [{owner_relationship_side, name}]}</code>" },
+            { code: "403", cls: "response-4xx", desc: "No role in the Organisation that can see Checklists" }
+          ], "<code>owner_kind</code>: <code>none</code> (nobody in particular), <code>adder</code> (the colleague who added the Checklist, or the Project's Project Managers when a Project added it), <code>user</code> (<code>owner_user_id</code>, from <code>GET /users</code>), <code>team</code> (<code>owner_team_id</code>: anyone in the Team who can see the Contact) or <code>relationship</code> (<code>owner_relationship_side</code> \"&lt;category_id&gt;:parent|child\").")}
           ${endpointCard("GET", "/checklists/{id}", "Get a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>actions</code>, <code>projects</code> and <code>contacts_count</code>" },
+            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>actions</code> (each with its owner fields and <code>owner_description</code>), <code>projects</code> and <code>contacts_count</code>" },
             { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
           ])}
           ${endpointCard("POST", "/checklists", "Create a Checklist", true, [], [
             { code: "201", cls: "response-2xx", desc: "The new Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "e.g. an action with every option unticked" }
-          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria}]}</code>.")}
+          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. The owner fields are optional.")}
           ${endpointCard("PATCH", "/checklists/{id}", "Update a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
@@ -1812,8 +1827,29 @@ function buildDocsPage() {
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code>, owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
             { code: "404", cls: "response-4xx", desc: "A Contact the user can't see" }
+          ])}
+          ${endpointCard("PATCH", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner", "Change who is responsible for an action for one Contact", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "action_id", in: "path", type: "integer", required: true, desc: "The Checklist action's ID" },
+            { name: "owner_kind", type: "string", required: true, desc: "<code>none</code>, <code>adder</code>, <code>user</code>, <code>team</code> or <code>relationship</code>" },
+            { name: "owner_user_id", type: "integer", required: false, desc: "For <code>user</code>" },
+            { name: "owner_team_id", type: "integer", required: false, desc: "For <code>team</code>" },
+            { name: "owner_relationship_side", type: "string", required: false, desc: "For <code>relationship</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{checklist_id, action_id, owner_kind, …, owner_overridden, owner_description, responsible_user_ids, owner_warning}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can see the Contact but not edit it" },
+            { code: "422", cls: "response-4xx", desc: "e.g. a Team from another Organisation" }
+          ], "For this Contact only; other Contacts keep the Checklist's default.")}
+          ${endpointCard("DELETE", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner", "Go back to the Checklist's own owner for one Contact", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "action_id", in: "path", type: "integer", required: true, desc: "The Checklist action's ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The action's owner fields, as for the PATCH" },
+            { code: "403", cls: "response-4xx", desc: "Can see the Contact but not edit it" }
           ])}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/available", "List the Checklists that can be added to a Contact", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
@@ -1890,7 +1926,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">Cohort Trackers</h2>
         <div class="section-desc">
-          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. With <code>result_type: percentage</code> it shows the result as a percentage of its <code>denominator</code>: <code>members</code> (Contacts in this Project / Album) or <code>enough_data</code> (Contacts with enough data to be judged on every criterion), e.g. "84% Children attending 75%+" with "42 of 50 contacts with enough data". Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
+          <p>A Cohort Tracker is a metric that counts the Contacts in a Project or Album who meet a set of Contact Filter criteria, e.g. "Children attending 75%+". It is placed in an Impact Scorecard column like other metrics and targeted with a number of Contacts to reach. With <code>result_type: percentage</code> it shows the result as a percentage of its <code>denominator</code>: <code>members</code> (Contacts in this Project / Album), <code>enough_data</code> (Contacts with enough data to be judged on every criterion) or <code>filtered</code> (members who also meet <code>denominator_criteria</code>, e.g. "of the girls in this project"), e.g. "84% Children attending 75%+" with "42 of 50 contacts with enough data". Every tracker counts only members of the Project or Album it is placed on: <code>membership</code> is <code>ever_enrolled</code> (anyone whose status History shows them Enrolled at any time) or <code>currently_enrolled</code>.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -1920,7 +1956,7 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "Cohort Tracker created" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria, result_type, denominator}</code>. <code>result_type</code> is <code>number</code> (default) or <code>percentage</code>; a percentage's <code>denominator</code> is <code>members</code> (default) or <code>enough_data</code>.")}
+          ], "Body: <code>cohort_tracker: {charity_id, name, description, membership, criteria, result_type, denominator, denominator_criteria}</code>. <code>result_type</code> is <code>number</code> (default) or <code>percentage</code>; a percentage's <code>denominator</code> is <code>members</code> (default), <code>enough_data</code> or <code>filtered</code>, which needs <code>denominator_criteria</code> (Contact Filter criteria, the same keys as <code>criteria</code>).")}
           ${endpointCard("PATCH", "/cohort_trackers/{id}", "Update a Cohort Tracker", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Cohort Tracker ID" }
           ], [

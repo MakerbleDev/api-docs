@@ -1881,11 +1881,14 @@ paths:
       summary: List a record's Versions (audit trail)
       description: |
         Returns every Version of one record, newest first: each time it was created or edited, who did it and when.
-        Only Contacts (Beneficiaries) are versioned so far, so `record_type` must be `Contact`.
+        `record_type` is `Contact` (a Contact, i.e. Beneficiary) or `Story` (a Story or Survey Response). A Story is
+        named `[story ID] <survey> in <project> by <user> on <date happened>`. A deleted record's Versions are still
+        listed, with `record.deleted: true`.
 
-        Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one
-        of their Projects). Anything the caller may not see returns `404`, so the endpoint never confirms that
-        another Organisation's record exists.
+        Visible to Charity Editors (any Contact or Story in their Organisation) and Project Editors (Contacts in at
+        least one of their Projects, and Stories in their Projects that they may read: a Story shared only with
+        specific individuals is hidden unless they are one of them). Anything the caller may not see returns `404`,
+        so the endpoint never confirms that another Organisation's record exists.
 
         `user_name` is `System` when no signed-in user made the change (e.g. a CSV import run in the background).
         One Save can write several Versions a fraction of a second apart. Use `GET /versions/{id}` to see the full
@@ -1898,14 +1901,14 @@ paths:
           required: true
           schema:
             type: string
-            enum: [Contact]
-          description: Type of record. Only `Contact` for now.
+            enum: [Contact, Story]
+          description: '`Contact` (Beneficiary) or `Story` (a Story or Survey Response)'
         - name: record_id
           in: query
           required: true
           schema:
             type: integer
-          description: The Contact (Beneficiary) ID
+          description: The Contact (Beneficiary) ID or the Story ID
         - $ref: '#/components/parameters/Page'
         - name: per_page
           in: query
@@ -1943,6 +1946,8 @@ paths:
       description: |
         Returns one Version including `full_object`: every field of the record exactly as it was saved at that
         moment, not just the fields that changed. Compare two Versions' `full_object` to see what changed.
+        For a Story, `full_object` is `{schema_version, story, privacy_settings, contact_ids, outcome_ids, label_ids,
+        media, answers}`, where each answer carries the survey question's label as it was then.
         Same permissions as `GET /versions`.
       operationId: getVersion
       security: [{tokenAuth: []}]
@@ -1968,7 +1973,7 @@ paths:
         Returns the Access Log of one record, newest first: each time a colleague opened it in Makerble or fetched it
         through the API, who it was, when, and how many times. This is the **Access Logs** tab beside Versions on the
         Manage Versions page. Changes are in `GET /versions` instead.
-        Only Contacts (Beneficiaries) are available so far, so `record_type` must be `Contact`.
+        `record_type` is `Contact` (a Contact, i.e. Beneficiary) or `Story` (a Story or Survey Response).
 
         Views by the same colleague, through the same route, less than 30 minutes apart are one entry with a
         `view_count`. Entries older than the Organisation's retention period (3 to 12 months, set on Organisation
@@ -1976,9 +1981,10 @@ paths:
         `first_viewed_at` / `last_viewed_at` spanning that month. `source` is `web` (opened in Makerble), `api` (fetched with `GET /beneficiaries/{id}`) or `mcp`
         (fetched through the Makerble MCP server).
 
-        Visible to Charity Editors (any Contact in their Organisation) and Project Editors (Contacts in at least one
-        of their Projects). Anything the caller may not see returns `404`, so the endpoint never confirms that
-        another Organisation's record exists.
+        Visible to Charity Editors (any Contact or Story in their Organisation) and Project Editors (Contacts in at
+        least one of their Projects, and Stories in their Projects that they may read: a Story shared only with
+        specific individuals is hidden unless they are one of them). Anything the caller may not see returns `404`,
+        so the endpoint never confirms that another Organisation's record exists.
       operationId: listAccessLogs
       security: [{tokenAuth: []}]
       parameters:
@@ -1987,14 +1993,14 @@ paths:
           required: true
           schema:
             type: string
-            enum: [Contact]
-          description: Type of record. Only `Contact` for now.
+            enum: [Contact, Story]
+          description: '`Contact` (Beneficiary) or `Story` (a Story or Survey Response)'
         - name: record_id
           in: query
           required: true
           schema:
             type: integer
-          description: The Contact (Beneficiary) ID
+          description: The Contact (Beneficiary) ID or the Story ID
         - name: from
           in: query
           schema:
@@ -2268,6 +2274,64 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+
+  /metrics/{id}/copy:
+    post:
+      tags: [Outcomes]
+      summary: Copy a metric (an Output, Outcome or Indicator)
+      description: >-
+        Copies an Output (API: Change), an Outcome or an Indicator (Progress Tracker), as on a metric's page in Makerble.
+        The copy is called "Copy of <original name>" (numbered, e.g. "Copy of X (2)", when that name is taken), keeps the
+        original's owner, settings, survey question wording and levels, and is not added to any Project, Survey or
+        Impact Framework. A copied Indicator keeps the original's Outcomes; a copied Outcome keeps the original's
+        Indicators. Only someone who can edit the original may copy it.
+      operationId: copyMetric
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metric_class]
+              properties:
+                metric_class:
+                  type: string
+                  enum: [Change, Indicator, Outcome]
+                  description: What kind of metric `id` is.
+            example:
+              metric_class: Indicator
+      responses:
+        "201":
+          description: The copy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+                  metric_class: {type: string, enum: [Change, Indicator, Outcome]}
+                  name: {type: string}
+                  owner_type: {type: string, enum: [Charity, User]}
+                  owner_id: {type: integer}
+                  copied_from_id: {type: integer}
+              example:
+                id: 912
+                metric_class: Indicator
+                name: Copy of Hours of sleep
+                owner_type: Charity
+                owner_id: 42
+                copied_from_id: 311
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /outcome_indicators:
     get:
@@ -4085,6 +4149,14 @@ paths:
         type has no criteria keys, `criteria` saying what counts as done; see
         `GET /checklists/action_types`. Actions keep the order sent. Requires an editor or reporter
         of the Organisation.
+
+        Each action may say who is responsible for it ("Who is responsible?"): `owner_kind` is `none`
+        (nobody in particular, the default), `adder` (the colleague who added the Checklist to the
+        Contact, or the Project's Project Managers when a Project added it automatically), `user`
+        (`owner_user_id`, a colleague), `team` (`owner_team_id`, anyone in one of the Organisation's
+        Teams who can see the Contact) or `relationship` (`owner_relationship_side`
+        "<relationship_category_id>:parent|child", any colleague with that kind of Relationship with
+        the Contact, e.g. their Therapist). See `GET /checklists/owner_options`.
       operationId: createChecklist
       security: [{tokenAuth: []}]
       requestBody:
@@ -4107,6 +4179,8 @@ paths:
                       project_event_categories: ["301:7"]
                   - action_type: "create_task"
                     title: "Set a follow-up task"
+                    owner_kind: "team"
+                    owner_team_id: 18
       responses:
         "201":
           description: The Checklist, with its actions, projects and contacts_count
@@ -4138,11 +4212,42 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /checklists/owner_options:
+    get:
+      tags: [Checklists]
+      summary: List the choices for who is responsible for a Checklist action
+      description: |
+        The "Who is responsible?" dropdown on the Create / Edit Checklist page: the kinds of owner, the
+        Organisation's Teams and its relationship sides ("Therapist from Therapist & Client"). Colleagues
+        for `owner_kind: user` come from `GET /users`. Visible to anyone who can see the Organisation's
+        Checklists.
+      operationId: listChecklistOwnerOptions
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: "`{kinds: [{owner_kind, name}], teams: [{id, name}], relationship_sides: [{owner_relationship_side, name}]}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user has no role in the Organisation that lets them see Checklists
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /checklists/{id}:
     get:
       tags: [Checklists]
       summary: Get a Checklist
-      description: A Checklist with its ordered actions, the Projects that offer it and how many Contacts have it.
+      description: |
+        A Checklist with its ordered actions, the Projects that offer it and how many Contacts have it.
+        Each action includes who is responsible for it: `owner_kind`, `owner_user_id`, `owner_team_id`,
+        `owner_relationship_side` and a readable `owner_description`.
       operationId: getChecklist
       security: [{tokenAuth: []}]
       parameters:
@@ -4189,6 +4294,8 @@ paths:
                       beneficiary_role_ids: ["12"]
                   - id: 56
                     _destroy: true
+                  - id: 57
+                    owner_kind: "adder"
       responses:
         "200":
           description: The updated Checklist
@@ -4248,6 +4355,13 @@ paths:
       description: |
         The Checklists box on a Contact's profile: each Checklist with `done_count` of `actions_count`,
         and every action with `done: true|false`. Only Contacts the user can see are returned.
+
+        Each action also says who is responsible for it for this Contact: the owner fields
+        (`owner_kind`, `owner_user_id`, `owner_team_id`, `owner_relationship_side`), `owner_overridden`
+        (true when a colleague changed it for this Contact only), `owner_description` (e.g.
+        "Safeguarding Team"), `responsible_user_ids` (only colleagues who can see the Contact) and
+        `owner_warning` when nobody responsible can see them (e.g. "No one in Safeguarding Team can see
+        this contact").
       operationId: listContactChecklists
       security: [{tokenAuth: []}]
       parameters:
@@ -4295,6 +4409,84 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner:
+    patch:
+      tags: [Checklists]
+      summary: Change who is responsible for an action for one Contact
+      description: |
+        The Change link under an action in a Contact's Checklists box. Sets who is responsible for this
+        action for this Contact only; other Contacts keep the Checklist's default. Choosing the
+        Checklist's own default removes the change. Takes the same owner fields as an action of
+        `POST /checklists`. Requires edit access to the Contact.
+      operationId: setContactChecklistActionOwner
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: checklist_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: action_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              owner_kind: "user"
+              owner_user_id: 5021
+      responses:
+        "200":
+          description: "`{checklist_id, action_id, owner_kind, owner_user_id, owner_team_id, owner_relationship_side, owner_overridden, owner_description, responsible_user_ids, owner_warning}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can see the Contact but can't edit it
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Checklists]
+      summary: Go back to the Checklist's own owner for one Contact
+      description: Removes a change made with the PATCH above, so this Contact follows the Checklist's default again. Requires edit access to the Contact.
+      operationId: resetContactChecklistActionOwner
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: checklist_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: action_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The action's owner fields, as for the PATCH
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can see the Contact but can't edit it
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /beneficiaries/{beneficiary_id}/checklists/available:
     get:
@@ -8340,10 +8532,11 @@ components:
           type: integer
         record_type:
           type: string
+          enum: [Contact, Story]
           example: Contact
         record_id:
           type: integer
-          description: The Contact (Beneficiary) ID
+          description: The Contact (Beneficiary) ID or the Story ID
         charity_id:
           type: integer
         event:
@@ -9478,13 +9671,19 @@ components:
           description: Show the result as a number of Contacts, or a percentage of the denominator
         denominator:
           type: string
-          enum: [members, enough_data]
+          enum: [members, enough_data, filtered]
           nullable: true
           description: |
-            For a percentage, what it is out of: `members` (Contacts in this Project / Album) or
+            For a percentage, what it is out of: `members` (Contacts in this Project / Album),
             `enough_data` (Contacts with enough data to be judged on every data-based criterion: invited
             to an event in scope for Attendance Rate, two or more Choice Tracker responses for Distance
-            Travelled Direction, a response to the question for an answer-based criterion). null for a number.
+            Travelled Direction, a response to the question for an answer-based criterion), or `filtered`
+            (members who also meet `denominator_criteria`). null for a number.
+        denominator_criteria:
+          type: object
+          description: For a `filtered` denominator, the Contact Filter criteria the members must meet. `{}` otherwise
+          example:
+            group_ids: ["12"]
         criteria:
           type: object
           description: Contact Filter criteria, in the shape a Saved Filter uses
@@ -9538,8 +9737,13 @@ components:
               description: Default number
             denominator:
               type: string
-              enum: [members, enough_data]
+              enum: [members, enough_data, filtered]
               description: For a percentage. Defaults to members
+            denominator_criteria:
+              type: object
+              description: |
+                Required when denominator is `filtered`: Contact Filter criteria, the same keys as `criteria`,
+                for the Contacts the percentage is out of. Cleared for any other denominator
         confirm_clear_targets:
           type: boolean
           description: |
@@ -9642,7 +9846,7 @@ components:
           enum: [number, percentage]
         denominator:
           type: string
-          enum: [members, enough_data]
+          enum: [members, enough_data, filtered]
           nullable: true
         denominator_count:
           type: integer
