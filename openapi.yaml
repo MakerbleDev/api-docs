@@ -224,6 +224,11 @@ tags:
       Indicator (Choice, Achievement or Numerical tracker) counted again for only some responses
       and Contacts, e.g. "Session attendances — Female, under 21". Each has its own row, name,
       column and targets on a Project's or Album's Results Canvas.
+  - name: Add Metric To
+    description: |
+      The Add metric to popup: the places a metric (a Change, Outcome or Indicator) can be added
+      to, and adding or removing it there. Projects are the first destination; an Indicator is only
+      ever added to a Project through one of its Outcomes.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
   - name: Webhooks
@@ -6322,6 +6327,213 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /metrics/{metric_type}/{metric_id}/destinations:
+    get:
+      tags: [Add Metric To]
+      summary: List where a metric can be added
+      description: |
+        The options of "What would you like to add this to?" in the Add metric to popup, for a Change,
+        Outcome or Indicator the user can see. An Indicator has no Projects option: it reaches a
+        Project only through one of its Outcomes. A Cohort or Workflow Tracker gets `projects` (its own
+        Organisation's) and `impact_frameworks`. `progress_boards` is offered for a Change or an Indicator only with `project_id`
+        or `bundle_id`, as the popup offers Progress Boards only from a Project's or Album's Results Canvas.
+      operationId: listMetricDestinations
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
+      responses:
+        "200":
+          description: The destination types offered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: {type: string, example: projects}
+                        label: {type: string, example: Projects}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /metrics/{metric_type}/{metric_id}/destinations/{destination}:
+    get:
+      tags: [Add Metric To]
+      summary: List the places a metric can be added to
+      description: |
+        A page of the places of one destination type the user can add the metric to, alphabetically,
+        each with `added: true` if the metric is already there. For `projects`: the open Projects whose
+        metrics the user can edit (as a Project editor or an editor of its Organisation), with their
+        Organisation. For `impact_frameworks`: the Impact Frameworks the user created, the only ones
+        they can edit. For `collections`: the user's own Collections and those of Organisations they
+        are an editor of; each item has `owner` ({type, id, name}) instead of `organisation`, as do
+        `surveys` (the Surveys the user can edit; `removable` is false once the Survey asks the metric). For
+        `outcomes` (an Indicator's): the Outcomes the user can edit, with `stage_id`. For `indicators`
+        (an Outcome's, offered only if the user can edit it): the Indicators they can see, including the
+        public library, with `indicator_type`. For `progress_boards`: the open Progress Boards the user
+        created or is a Board Admin of, with `board_type` (`managed` or `basic`); `added` is for the given
+        Project's or Album's card. For a tracker, each item has `column`: the Impact Scorecard column it is
+        in, or null.
+      operationId: listMetricDestinationTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
+        - $ref: '#/components/parameters/MetricDestination'
+        - name: q
+          in: query
+          required: false
+          schema: {type: string}
+          description: Search by name (`outcomes` and `indicators` only)
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated places
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: {type: integer}
+                  page_size: {type: integer}
+                  page_count: {type: integer}
+                  total_count: {type: integer}
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: integer}
+                        name: {type: string}
+                        added: {type: boolean}
+                        removable:
+                          type: boolean
+                          description: False when it can't be removed here (a Survey that asks the metric, or an Outcome/Indicator link that stories have used)
+                        organisation:
+                          type: object
+                          properties:
+                            id: {type: integer}
+                            name: {type: string}
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - {id: 41, name: Albany, added: false, organisation: {id: 7, name: Bambanani Trust}}
+                  - {id: 12, name: Bambanani, added: true, organisation: {id: 7, name: Bambanani Trust}}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Add Metric To]
+      summary: Create a Progress Board with a metric on it
+      description: |
+        "+ Create a new Progress Board and add this to it" in the Add metric to popup. Creates a Managed
+        Progress Board named "<your name>'s Progress Board" for the Organisation of the Project (or Album)
+        given by `project_id` or `bundle_id`, with that Project (or the Album's Projects) on it, "Colleagues
+        have their own personalised version of the board" ticked, and the metric as its card. Only
+        `progress_boards` supports this. There is no request body.
+      operationId: createMetricDestination
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
+        - $ref: '#/components/parameters/MetricDestination'
+      responses:
+        "201":
+          description: Created, with the card on it
+          content:
+            application/json:
+              example: {added: true, data: {id: 88, name: "Thandi Mokoena's Progress Board"}}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /metrics/{metric_type}/{metric_id}/destinations/{destination}/{target_id}:
+    post:
+      tags: [Add Metric To]
+      summary: Add a metric to a Project, Impact Framework or Collection
+      description: |
+        Adds a Change or Outcome. To a Project, as Edit Project Metrics does: in the Impact Scorecard column
+        of the metric's own stage, after the metrics already there; it is also added to the Project's
+        Default Survey and, if the Organisation uses one, its default Progress Board. Requires rights to
+        edit the Project's metrics. To an Impact Framework: in the metric's own stage, which is added to
+        the framework if missing; only the framework's creator can. To a Collection (which also takes an
+        Indicator): at the end; you must own the Collection or edit the Organisation that owns it. With
+        `outcomes` or `indicators`: makes the Outcome a parent of the Indicator; you must be able to edit
+        the Outcome. To a Survey: as its last, optional question (a scale Indicator is Single Choice;
+        an Outcome adds each of its Indicators, as a grid when they share answer choices). To a Progress
+        Board (with `project_id` or `bundle_id`): as its last card, showing that Project's or Album's
+        results; you must have created the board or be a Board Admin. A Cohort or Workflow Tracker goes in
+        the `column` given (default `engagement`) of a Project in its own Organisation or of an Impact
+        Framework you created. There is no request body.
+      operationId: addMetricToDestination
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricDestinationColumn'
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
+        - $ref: '#/components/parameters/MetricDestination'
+        - $ref: '#/components/parameters/MetricDestinationTargetId'
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              example: {added: true}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Add Metric To]
+      summary: Remove a metric from a Project, Impact Framework or Collection
+      description: Removes a metric from a Project's metrics, an Impact Framework, a Collection or a Progress Board (only the card for the given `project_id` or `bundle_id`), or unlinks an Indicator from an Outcome (refused with 422 once stories have recorded the Indicator under that Outcome). A Survey's questions are removed by editing the Survey, so `surveys` always answers 422. Requires the same rights as adding it.
+      operationId: removeMetricFromDestination
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/MetricType'
+        - $ref: '#/components/parameters/MetricId'
+        - $ref: '#/components/parameters/MetricDestinationProjectId'
+        - $ref: '#/components/parameters/MetricDestinationBundleId'
+        - $ref: '#/components/parameters/MetricDestination'
+        - $ref: '#/components/parameters/MetricDestinationTargetId'
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              example: {added: false}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
 components:
 
   securitySchemes:
@@ -6349,6 +6561,57 @@ components:
       schema:
         type: integer
       description: Unique integer identifier
+    MetricType:
+      name: metric_type
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [change, outcome, indicator, cohort_tracker, workflow_tracker]
+      description: The kind of metric. A Cohort or Workflow Tracker can go to `projects` and `impact_frameworks` only.
+    MetricDestinationColumn:
+      name: column
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [activities, engagement, potential, behaviour, growth]
+        default: engagement
+      description: For a Cohort or Workflow Tracker, the Impact Scorecard column to put it in.
+    MetricId:
+      name: metric_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Change, Outcome or Indicator ID
+    MetricDestination:
+      name: destination
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [projects, impact_frameworks, surveys, collections, outcomes, indicators, progress_boards]
+      description: Where to add the metric (`impact_frameworks` are Templates, `surveys` are Story Categories; `outcomes` is for an Indicator, `indicators` for an Outcome; `progress_boards` needs `project_id` or `bundle_id`)
+    MetricDestinationProjectId:
+      name: project_id
+      in: query
+      required: false
+      schema: {type: integer}
+      description: The Project whose results a Progress Board card shows. Offers `progress_boards`; you need a role on the Project.
+    MetricDestinationBundleId:
+      name: bundle_id
+      in: query
+      required: false
+      schema: {type: integer}
+      description: The Album (Bundle) whose results a Progress Board card shows, instead of a Project. You must be able to see the Album.
+    MetricDestinationTargetId:
+      name: target_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The ID of the Project (or other destination) to add the metric to
     CohortTrackerAlbumId:
       name: bundle_id
       in: path
