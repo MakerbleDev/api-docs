@@ -954,6 +954,7 @@ function buildDocsPage() {
         <div class="nav-section-label">Events</div>
         <a href="#events"          class="nav-link"><span class="nav-method method-GET">GET</span>Events</a>
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
+        <a href="#event-catalogues" class="nav-link"><span class="nav-method method-GET">GET</span>Event Catalogues</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
@@ -2523,6 +2524,71 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "Has events or is added to projects — error gives the reason and counts" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Event Catalogues -->
+      <section class="section" id="event-catalogues">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Event Catalogues</h2>
+        <div class="section-desc">
+          <p>An Event Catalogue is a public page listing an organisation's upcoming events that people can book onto, at its <code>public_url</code>, which can also be embedded on a website. It shows only events that haven't started, have a Signup Page and have their listing turned on, narrowed by its filters. Organisation Admins, Organisation Reporters and Project Managers can list and read catalogues; Organisation Admins and Project Managers can create and edit them.</p>
+          <p>Contacts can also see a catalogue on their Contacts' Portal. Each project decides who: every Contact enrolled in the project, or only the Contacts ticked. The project's Project Managers and the organisation's Admins can change it.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/event_catalogues", "List an organisation's Event Catalogues", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list by name — each with filters and public_url" },
+            { code: "403", cls: "response-4xx", desc: "You can't see this organisation's catalogues" },
+            { code: "404", cls: "response-4xx", desc: "Organisation not found, or you are not in it" }
+          ])}
+          ${endpointCard("GET", "/event_catalogues/{id}", "Get an Event Catalogue", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Catalogue ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The catalogue, with upcoming_events_count" },
+            { code: "403", cls: "response-4xx", desc: "You can't see this organisation's catalogues" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("POST", "/event_catalogues", "Create an Event Catalogue", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation that will own it" },
+            { name: "name", type: "string", required: true, desc: "e.g. Drop-ins" },
+            { name: "filters", type: "object", required: false, desc: "project_ids, event_category_ids, user_ids, beneficiary_ids, event_types, date_from" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created — returns the catalogue with its public_url" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin or Project Manager" },
+            { code: "422", cls: "response-4xx", desc: "errors lists every problem" }
+          ])}
+          ${endpointCard("PATCH", "/event_catalogues/{id}", "Edit an Event Catalogue", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Catalogue ID" },
+            { name: "name", type: "string", required: false, desc: "Give only what changes" },
+            { name: "filters", type: "object", required: false, desc: "Replaces all its filters" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Updated — the public_url stays the same" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin or Project Manager" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("GET", "/event_catalogues/{id}/projects/{project_id}/access", "Get who can see an Event Catalogue in a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Catalogue ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "mode (every_enrolled or specific) and the ticked contact_ids" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or the catalogue doesn't show this project's events" }
+          ])}
+          ${endpointCard("PATCH", "/event_catalogues/{id}/projects/{project_id}/access", "Change who can see an Event Catalogue in a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Catalogue ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "mode", type: "string", required: false, desc: "every_enrolled (drops the ticks) or specific" },
+            { name: "add_contact_ids", type: "array", required: false, desc: "Contacts in the project to tick, under specific" },
+            { name: "remove_contact_ids", type: "array", required: false, desc: "Contacts to untick" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Who can now see it" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Manager of the project or an Organisation Admin" },
+            { code: "422", cls: "response-4xx", desc: "e.g. a Contact who isn't in the project, or ticks under every_enrolled" }
           ])}
         </div>
       </section>

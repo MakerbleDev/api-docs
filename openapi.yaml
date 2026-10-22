@@ -231,6 +231,8 @@ tags:
       ever added to a Project through one of its Outcomes.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
+  - name: Event Catalogues
+    description: Public, bookable lists of an organisation's upcoming events, and who can see them on the Contacts' Portal
   - name: Webhooks
     description: |
       HTTPS endpoints an Organisation's admins register to receive signed events when
@@ -4055,6 +4057,259 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /event_catalogues:
+    get:
+      tags: [Event Catalogues]
+      summary: List an organisation's Event Catalogues
+      operationId: listEventCatalogues
+      description: |
+        Lists an organisation's Event Catalogues, as on the Manage Event Catalogues page. An Event
+        Catalogue is a public, bookable list of the organisation's upcoming events, chosen by its
+        filters, at its `public_url` (which can also be embedded on a website). Contacts can also
+        see a catalogue on their Contacts' Portal, if the project allows it (see **Get who can see
+        an Event Catalogue in a project**).
+
+        Organisation Admins, Organisation Reporters and Project Managers of the organisation's
+        projects can list them; anyone else in the organisation gets `403`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity)
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Event Catalogues, by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventCatalogues'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Event Catalogues]
+      summary: Create an Event Catalogue
+      operationId: createEventCatalogue
+      description: |
+        Creates an Event Catalogue, as **New Event Catalogue** on the Manage Event Catalogues page
+        does. Organisation Admins and Project Managers of the organisation's projects may.
+
+        A catalogue only ever shows events that haven't started yet, that have a Signup Page and
+        whose listing is turned on, and that match `filters`. With no filters it shows every such
+        event in the organisation.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, name]
+              properties:
+                charity_id:
+                  type: integer
+                name:
+                  type: string
+                filters:
+                  $ref: '#/components/schemas/EventCatalogueFilters'
+            example:
+              charity_id: 123
+              name: "Drop-ins"
+              filters:
+                project_ids: [301]
+                event_category_ids: [4530]
+      responses:
+        "201":
+          description: The Event Catalogue was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /event_catalogues/{id}:
+    get:
+      tags: [Event Catalogues]
+      summary: Get an Event Catalogue
+      operationId: getEventCatalogue
+      description: |
+        Reads one Event Catalogue, with `upcoming_events_count`, the number of events its public
+        page shows now. Same permissions as **List an organisation's Event Catalogues**; a
+        catalogue of an organisation you are not in returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Event Catalogue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueDetail'
+              example:
+                id: 77
+                name: "Drop-ins"
+                charity_id: 123
+                filters:
+                  project_ids: [301]
+                public_url: "https://makerble.com/events-catalogue/Zx9s1Qk2vB7nT4pR"
+                created_at: "2026-10-22T12:00:00.000Z"
+                updated_at: "2026-10-22T12:00:00.000Z"
+                upcoming_events_count: 9
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Event Catalogues]
+      summary: Edit an Event Catalogue
+      operationId: updateEventCatalogue
+      description: |
+        Renames an Event Catalogue or replaces its filters. Give only what changes; `filters`,
+        when given, replaces them all. Its `public_url` stays the same. Same permissions as
+        **Create an Event Catalogue**.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                filters:
+                  $ref: '#/components/schemas/EventCatalogueFilters'
+            example:
+              name: "Evening drop-ins"
+      responses:
+        "200":
+          description: The Event Catalogue was changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /event_catalogues/{id}/projects/{project_id}/access:
+    get:
+      tags: [Event Catalogues]
+      summary: Get who can see an Event Catalogue in a project
+      operationId: getEventCatalogueAccess
+      description: |
+        Says which of a project's Contacts can see an Event Catalogue on their Contacts' Portal, as
+        the project's Event Catalogues page shows it: `every_enrolled` (every Contact currently
+        Enrolled in the project) or `specific` (only the Contacts in `contact_ids`). Project
+        Managers and Reporters of the project, and the organisation's Admins and Reporters, may
+        read it. A catalogue that doesn't show the project's events, or isn't the project's
+        organisation's, returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Who can see the catalogue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueAccess'
+              example:
+                event_catalogue_id: 77
+                project_id: 301
+                mode: specific
+                contact_ids: [9001, 9002]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Event Catalogues]
+      summary: Change who can see an Event Catalogue in a project
+      operationId: updateEventCatalogueAccess
+      description: |
+        Changes who in a project can see an Event Catalogue on the Contacts' Portal. Only the
+        project's Project Managers and the organisation's Admins may. Switching to
+        `every_enrolled` drops the ticked Contacts. Contacts can only be ticked under `specific`,
+        and must be in the project.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [every_enrolled, specific]
+                add_contact_ids:
+                  type: array
+                  items:
+                    type: integer
+                remove_contact_ids:
+                  type: array
+                  items:
+                    type: integer
+            example:
+              mode: specific
+              add_contact_ids: [9001]
+      responses:
+        "200":
+          description: Who can now see the catalogue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueAccess'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /library/search:
     get:
       tags: [Library]
@@ -6955,6 +7210,14 @@ components:
       description: Also include Indicators from the public library shared by all organisations (default false)
 
   responses:
+    EventCatalogueForbidden:
+      description: You don't have permission for this organisation's or project's Event Catalogues
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You don't have permission to manage this organisation's Event Catalogues."
     EventFormatAdminOnly:
       description: You are not an Organisation Admin of the organisation that owns the Event Format
       content:
@@ -10766,6 +11029,96 @@ components:
         status:
           type: string
           enum: [added, already_added, removed]
+
+    EventCatalogueFilters:
+      type: object
+      description: Which upcoming events the catalogue shows. Every filter given must match.
+      properties:
+        project_ids:
+          type: array
+          items:
+            type: integer
+        event_category_ids:
+          type: array
+          items:
+            type: integer
+          description: Event Formats
+        user_ids:
+          type: array
+          items:
+            type: integer
+          description: Events these users are Event Managers or Workers of
+        beneficiary_ids:
+          type: array
+          items:
+            type: integer
+          description: Events these Contacts are guests of
+        event_types:
+          type: array
+          items:
+            type: string
+            enum: [one-off, master, subsequent]
+        date_from:
+          type: string
+          nullable: true
+          description: A date range, "DD/MM/YYYY - DD/MM/YYYY"
+
+    EventCatalogue:
+      type: object
+      description: An Event Catalogue, a public, bookable list of an organisation's upcoming events.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        charity_id:
+          type: integer
+        filters:
+          $ref: '#/components/schemas/EventCatalogueFilters'
+        public_url:
+          type: string
+          description: The public page people book from, which can also be embedded on a website
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EventCatalogueDetail:
+      allOf:
+        - $ref: '#/components/schemas/EventCatalogue'
+        - type: object
+          properties:
+            upcoming_events_count:
+              type: integer
+              description: How many events its public page shows now
+
+    PaginatedEventCatalogues:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventCatalogue'
+
+    EventCatalogueAccess:
+      type: object
+      properties:
+        event_catalogue_id:
+          type: integer
+        project_id:
+          type: integer
+        mode:
+          type: string
+          enum: [every_enrolled, specific]
+        contact_ids:
+          type: array
+          description: The Contacts ticked, under specific
+          items:
+            type: integer
 
     PaginatedEventFormats:
       allOf:
