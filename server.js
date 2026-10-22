@@ -955,6 +955,7 @@ function buildDocsPage() {
         <a href="#events"          class="nav-link"><span class="nav-method method-GET">GET</span>Events</a>
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
         <a href="#event-catalogues" class="nav-link"><span class="nav-method method-GET">GET</span>Event Catalogues</a>
+        <a href="#contacts-portal" class="nav-link"><span class="nav-method method-POST">POST</span>Contacts' Portal</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
@@ -2589,6 +2590,36 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Who can now see it" },
             { code: "403", cls: "response-4xx", desc: "Not a Project Manager of the project or an Organisation Admin" },
             { code: "422", cls: "response-4xx", desc: "e.g. a Contact who isn't in the project, or ticks under every_enrolled" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Contacts' Portal -->
+      <section class="section" id="contacts-portal">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Contacts' Portal</h2>
+        <div class="section-desc">
+          <p>Each Contact has their own link to the Contacts' Portal, where they see the Event Catalogues their project lets them see and book onto events. These endpoints do what a project's Portal Links page does: list the Contacts who can see at least one Event Catalogue, and send them their link by email or SMS. The link itself is never returned, because it signs the Contact in to their Portal.</p>
+          <p>To give a Contact Portal access, first let them see an Event Catalogue (<code>PATCH /event_catalogues/{id}/projects/{project_id}/access</code>), then send them their link. Project Managers, Reporters and Organisation Admins and Reporters can list; only Project Managers and Organisation Admins can send.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/projects/{project_id}/portal_links", "List Contacts' Portal links in a project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Each Contact's link_status (active, deactivated or none), last_sent_at, last_sent_channel, can_email and can_sms" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Manager or Reporter of the project, or an Organisation Admin or Reporter" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+          ${endpointCard("POST", "/projects/{project_id}/portal_links/send", "Send Contacts their Portal link", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "contact_ids", type: "array", required: true, desc: "Contacts in the project who can see an Event Catalogue" },
+            { name: "channel", type: "string", required: true, desc: "email or sms" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "sent (how many) and skipped (names of Contacts with no email address or mobile number)" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Manager of the project or an Organisation Admin" },
+            { code: "422", cls: "response-4xx", desc: "e.g. a Contact who can't see any Event Catalogue yet, or none can receive it" }
           ])}
         </div>
       </section>

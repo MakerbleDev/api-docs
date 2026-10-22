@@ -233,6 +233,8 @@ tags:
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
   - name: Event Catalogues
     description: Public, bookable lists of an organisation's upcoming events, and who can see them on the Contacts' Portal
+  - name: Contacts' Portal
+    description: Each Contact's own link to the Contacts' Portal, where they book onto events from Event Catalogues
   - name: Webhooks
     description: |
       HTTPS endpoints an Organisation's admins register to receive signed events when
@@ -4310,6 +4312,120 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /projects/{project_id}/portal_links:
+    get:
+      tags: [Contacts' Portal]
+      summary: List Contacts' Portal links in a project
+      operationId: listPortalLinks
+      description: |
+        Lists the project's Contacts who can see at least one Event Catalogue on the Contacts'
+        Portal, where Contacts book onto events, as the project's Portal Links page shows them:
+        whether each has a Portal link, when it was last sent and how, and whether they can be
+        sent it by email or SMS. The link itself is never returned, because it signs the Contact
+        in to their Portal. Project Managers and Reporters of the project, and the organisation's
+        Admins and Reporters, may read it. To give a Contact access, change who can see an Event
+        Catalogue in the project (`PATCH /event_catalogues/{id}/projects/{project_id}/access`).
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: One page of Contacts, by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPortalLinks'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - contact_id: 9001
+                    name: Amara Diallo
+                    link_status: active
+                    last_sent_at: "2026-10-20T09:15:00Z"
+                    last_sent_channel: email
+                    can_email: true
+                    can_sms: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/PortalLinksForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/portal_links/send:
+    post:
+      tags: [Contacts' Portal]
+      summary: Send Contacts their Portal link
+      operationId: sendPortalLinks
+      description: |
+        Sends each Contact their own link to the Contacts' Portal by email or SMS, as the Send
+        button on the project's Portal Links page does, creating the link if they don't have one
+        yet. Every Contact must be in the project and able to see at least one of its Event
+        Catalogues; otherwise nothing is sent and the response says why. Contacts with no email
+        address (or, for SMS, no mobile number) are skipped and named in `skipped`. Only the
+        project's Project Managers and the organisation's Admins may send links.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_ids, channel]
+              properties:
+                contact_ids:
+                  type: array
+                  items:
+                    type: integer
+                channel:
+                  type: string
+                  enum: [email, sms]
+            example:
+              contact_ids: [9001, 9002]
+              channel: email
+      responses:
+        "200":
+          description: The links were queued to send
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent:
+                    type: integer
+                    description: How many Contacts were sent their link
+                  skipped:
+                    type: array
+                    description: Names of the Contacts with no way to receive it
+                    items:
+                      type: string
+              example:
+                sent: 1
+                skipped: [Ben Okafor]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/PortalLinksForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /library/search:
     get:
       tags: [Library]
@@ -7218,6 +7334,14 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: "You don't have permission to manage this organisation's Event Catalogues."
+    PortalLinksForbidden:
+      description: You don't have permission for this project's Portal links
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You don't have permission to send Portal links in this project."
     EventFormatAdminOnly:
       description: You are not an Organisation Admin of the organisation that owns the Event Format
       content:
@@ -11119,6 +11243,40 @@ components:
           description: The Contacts ticked, under specific
           items:
             type: integer
+
+    PortalLink:
+      type: object
+      properties:
+        contact_id:
+          type: integer
+        name:
+          type: string
+        link_status:
+          type: string
+          enum: [active, deactivated, none]
+          description: none means the Contact has never been sent a link
+        last_sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_sent_channel:
+          type: string
+          enum: [email, sms]
+          nullable: true
+        can_email:
+          type: boolean
+        can_sms:
+          type: boolean
+
+    PaginatedPortalLinks:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/PortalLink'
 
     PaginatedEventFormats:
       allOf:
