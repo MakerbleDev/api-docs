@@ -2969,6 +2969,59 @@ paths:
               example:
                 error: "Only an Organisation Admin can list Event Formats."
 
+    post:
+      tags: [Event Formats]
+      summary: Create an Event Format
+      operationId: createEventFormat
+      description: |
+        Creates an Event Format (Event Category in the API) in an organisation, as **New Event
+        Format** on the Manage Event Formats page does, and through the same permission and
+        validation rules.
+
+        - Only an **Organisation Admin** of the organisation may create one. Other members get
+          `403`; an organisation you are not a member of returns `404`.
+        - `guest_status_ids` are the Guest Statuses its events' guests can have, in the order
+          shown, and must be the organisation's. The first is the status new guests get.
+        - Event Role ids must be the organisation's Event Roles, and take effect only with
+          `enable_event_roles`. `attendance_form_id` is the Survey used to record attendance, and
+          must be one the organisation can use.
+        - The new Event Format can't be used for events until it is added to a project with
+          **Add an Event Format to a project**.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/EventFormatInput'
+                - type: object
+                  required: [charity_id, name]
+                  properties:
+                    charity_id:
+                      type: integer
+                      description: The Organisation (Charity) that will own it
+            example:
+              charity_id: 123
+              name: "Drop-in"
+              guest_status_ids: [55, 56]
+              survey_kiosk_enabled: true
+      responses:
+        "201":
+          description: The Event Format was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /event_categories/{id}:
     delete:
       tags: [Event Formats]
@@ -3025,6 +3078,183 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: "This Event Format can't be deleted because it has 3 events. Delete or move those events first. This Event Format can't be deleted because it is added to 2 projects. Remove it from those projects first."
+    get:
+      tags: [Event Formats]
+      summary: Get an Event Format
+      operationId: getEventFormat
+      description: |
+        Reads one Event Format (Event Category in the API) with its settings, its Guest Statuses
+        in order and the projects it is added to. Only an Organisation Admin of the organisation
+        that owns it may; other members get `403`, and anyone outside the organisation `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Event Format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatDetail'
+              example:
+                id: 4530
+                name: "Drop-in"
+                is_default: false
+                charity_id: 123
+                attendance_form_id: null
+                survey_kiosk_enabled: true
+                survey_kiosk_registration_enabled: false
+                enable_guest_fields: false
+                enable_guest_booking_form: false
+                assign_guests_to_workers_setting: "default"
+                suggest_shortened_address: false
+                apply_shortened_address: false
+                enable_event_roles: false
+                event_role_ids_for_event_managers_and_workers: []
+                event_role_ids_for_guests: []
+                guest_statuses:
+                  - id: 55
+                    name: "Invited"
+                  - id: 56
+                    name: "Attended"
+                project_ids: [301]
+                created_at: "2026-10-01T12:00:00.000Z"
+                updated_at: "2026-10-22T09:30:00.000Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Event Formats]
+      summary: Edit an Event Format
+      operationId: updateEventFormat
+      description: |
+        Changes an Event Format's name or settings, as **Edit** on the Manage Event Formats page
+        does. Give only what changes. `guest_status_ids`, when given, replaces the Guest Statuses
+        and their order. The same rules as **Create an Event Format** apply.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventFormatInput'
+            example:
+              name: "Evening Drop-in"
+      responses:
+        "200":
+          description: The Event Format was changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /event_categories/{id}/projects:
+    post:
+      tags: [Event Formats]
+      summary: Add an Event Format to a project
+      operationId: addEventFormatToProject
+      description: |
+        Adds an Event Format (Event Category in the API) to a project, so the project's events can
+        use it, as **Add to projects** on the Manage Event Formats page does. It also turns events
+        on for the project. Adding one that is already added does nothing and returns `200`.
+
+        - Only an **Organisation Admin** of the organisation that owns the Event Format may (`403`).
+        - The project must be in the same organisation (`422`). An Event Format or project in an
+          organisation you are not a member of returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id]
+              properties:
+                project_id:
+                  type: integer
+            example:
+              project_id: 301
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+              example:
+                event_category_id: 4530
+                project_id: 301
+                status: added
+        "200":
+          description: It was already added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: The project isn't in the Event Format's organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "That project isn't in the Event Format's organisation."
+
+  /event_categories/{id}/projects/{project_id}:
+    delete:
+      tags: [Event Formats]
+      summary: Remove an Event Format from a project
+      operationId: removeEventFormatFromProject
+      description: |
+        Takes an Event Format off a project, so new events in the project can't use it. Events
+        that already use it keep it. Same permissions as **Add an Event Format to a project**;
+        an Event Format that isn't added to the project returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+              example:
+                event_category_id: 4530
+                project_id: 301
+                status: removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /events:
     get:
@@ -6900,6 +7130,14 @@ components:
       description: Also include Indicators from the public library shared by all organisations (default false)
 
   responses:
+    EventFormatAdminOnly:
+      description: You are not an Organisation Admin of the organisation that owns the Event Format
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Only an Organisation Admin can manage Event Formats."
     Unauthorized:
       description: Missing or invalid authentication credentials
       content:
@@ -10586,6 +10824,123 @@ components:
           type: string
           nullable: true
           description: Why it can't be deleted yet, or null
+
+    EventFormatInput:
+      type: object
+      description: An Event Format's name and settings. Every field is optional when editing.
+      properties:
+        name:
+          type: string
+        guest_status_ids:
+          type: array
+          items:
+            type: integer
+          description: The organisation's Guest Statuses for its events' guests, in order. The first is given to new guests.
+        attendance_form_id:
+          type: integer
+          nullable: true
+          description: The Survey used to record attendance at its events
+        survey_kiosk_enabled:
+          type: boolean
+          description: Self Check-in
+        survey_kiosk_registration_enabled:
+          type: boolean
+          description: Let new people register at Self Check-in
+        enable_guest_fields:
+          type: boolean
+        enable_guest_booking_form:
+          type: boolean
+        assign_guests_to_workers_setting:
+          type: string
+          enum: [default, skill, limit]
+        suggest_shortened_address:
+          type: boolean
+        apply_shortened_address:
+          type: boolean
+        enable_event_roles:
+          type: boolean
+        event_role_ids_for_event_managers_and_workers:
+          type: array
+          items:
+            type: integer
+          description: The organisation's Event Roles that Event Managers and Workers can have
+        event_role_ids_for_guests:
+          type: array
+          items:
+            type: integer
+          description: The organisation's Event Roles that guests can have
+
+    EventFormatDetail:
+      type: object
+      description: One Event Format (Event Category in the API) with its settings.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        is_default:
+          type: boolean
+        charity_id:
+          type: integer
+        attendance_form_id:
+          type: integer
+          nullable: true
+        survey_kiosk_enabled:
+          type: boolean
+        survey_kiosk_registration_enabled:
+          type: boolean
+        enable_guest_fields:
+          type: boolean
+        enable_guest_booking_form:
+          type: boolean
+        assign_guests_to_workers_setting:
+          type: string
+        suggest_shortened_address:
+          type: boolean
+        apply_shortened_address:
+          type: boolean
+        enable_event_roles:
+          type: boolean
+        event_role_ids_for_event_managers_and_workers:
+          type: array
+          items:
+            type: integer
+        event_role_ids_for_guests:
+          type: array
+          items:
+            type: integer
+        guest_statuses:
+          type: array
+          description: Its Guest Statuses, in order
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+        project_ids:
+          type: array
+          description: The projects it is added to
+          items:
+            type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EventFormatProject:
+      type: object
+      properties:
+        event_category_id:
+          type: integer
+        project_id:
+          type: integer
+        status:
+          type: string
+          enum: [added, already_added, removed]
 
     PaginatedEventFormats:
       allOf:

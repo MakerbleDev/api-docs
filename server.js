@@ -2477,7 +2477,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Events</div>
         <h2 class="section-title">Event Formats</h2>
         <div class="section-desc">
-          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin can list an organisation's Event Formats or delete one. An Event Format can be deleted only once it has no events and is not added to any project; the list says which ones can be deleted and why not. Default formats can be deleted under the same rules.</p>
+          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin can list, read, create, edit or delete an organisation's Event Formats, or add one to a project. A project's events can only use the Event Formats added to it, so add a new Event Format to its projects after creating it. An Event Format can be deleted only once it has no events and is not added to any project; the list says which ones can be deleted and why not. Default formats can be deleted under the same rules.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/event_categories", "List Event Formats", true, [
@@ -2488,6 +2488,54 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list — each with events_count, projects_count, can_delete and delete_blocked_reason" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin (of charity_id, if given)" }
+          ])}
+          ${endpointCard("GET", "/event_categories/{id}", "Get an Event Format", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Its settings, guest_statuses in order and project_ids" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("POST", "/event_categories", "Create an Event Format", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation that will own it" },
+            { name: "name", type: "string", required: true, desc: "e.g. Drop-in" },
+            { name: "guest_status_ids", type: "array", required: false, desc: "The organisation's Guest Statuses, in order; the first is given to new guests" },
+            { name: "survey_kiosk_enabled", type: "boolean", required: false, desc: "Self Check-in at its events" },
+            { name: "attendance_form_id", type: "integer", required: false, desc: "The Survey used to record attendance" },
+            { name: "enable_event_roles", type: "boolean", required: false, desc: "Turn on Event Roles; event_role_ids_for_event_managers_and_workers and event_role_ids_for_guests choose them" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created — returns the Event Format" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" },
+            { code: "404", cls: "response-4xx", desc: "Organisation not found, or you are not in it" },
+            { code: "422", cls: "response-4xx", desc: "errors lists every problem, e.g. a Guest Status or Event Role that isn't the organisation's" }
+          ])}
+          ${endpointCard("PATCH", "/event_categories/{id}", "Edit an Event Format", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "name", type: "string", required: false, desc: "Give only what changes" },
+            { name: "guest_status_ids", type: "array", required: false, desc: "Replaces the Guest Statuses and their order" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Updated — returns the Event Format" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "errors lists every problem" }
+          ])}
+          ${endpointCard("POST", "/event_categories/{id}/projects", "Add an Event Format to a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "project_id", type: "integer", required: true, desc: "A project in the same organisation; adding one also turns events on for it" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Added — status: added" },
+            { code: "200", cls: "response-2xx", desc: "It was already added — status: already_added" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Event Format or project not found, or in an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "The project isn't in the Event Format's organisation" }
+          ])}
+          ${endpointCard("DELETE", "/event_categories/{id}/projects/{project_id}", "Remove an Event Format from a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Removed — status: removed. Events already using it keep it" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or the Event Format isn't added to the project" }
           ])}
           ${endpointCard("DELETE", "/event_categories/{id}", "Delete an Event Format", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
