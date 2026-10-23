@@ -2303,12 +2303,33 @@ function buildDocsPage() {
             { name: "start_date", type: "string", required: false, desc: "Events starting on or after this date (YYYY-MM-DD)" },
             { name: "end_date", type: "string", required: false, desc: "Events starting on or before this date (YYYY-MM-DD)" },
             { name: "master_event_id", type: "integer", required: false, desc: "Every event in this recurring series" },
+            { name: "form_field_filters", type: "object", required: false, desc: "Event Creation Form answers to match, keyed by the filter_keys of GET /event_filter_fields, e.g. form_field_filters[custom_field_12]=archery. Text for a Text or Email Address field, digits for a Telephone field, yes or no for a Tickbox, Attachment or Signature field, &lt;key&gt;_from / &lt;key&gt;_to for a Number, Date (YYYY-MM-DD) or Time (HH:MM) range, and a list of answer choice ids for a Dropdown" },
+            { name: "sort", type: "string", required: false, desc: "Sort the whole list by Event Creation Form fields: sort_key values from GET /event_filter_fields, each optionally followed by asc or desc, e.g. custom_field_12 desc. Blank answers come last" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated list of events, soonest first" },
+            { code: "200", cls: "response-2xx", desc: "Paginated list of events, soonest first unless sorted" },
+            { code: "404", cls: "response-4xx", desc: "charity_id is an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "An unknown form_field_filters or sort key" }
+          ])}
+          ${endpointCard("GET", "/event_filter_fields", "List the fields events can be filtered and sorted by", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only this Organisation's Event Creation Forms" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of the custom fields and Dropdowns on your Event Creation Forms, alphabetically, each with its key, data_type, filter_keys, filter_hint and sort_key" },
             { code: "404", cls: "response-4xx", desc: "charity_id is an organisation you are not in" }
+          ])}
+          ${endpointCard("GET", "/event_filter_fields/{id}/choices", "List a Dropdown's answer choices for filtering events", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Dropdown (Ratio Set) ID" },
+            { name: "query", type: "string", required: false, desc: "Only answer choices whose name contains this" },
+            { name: "charity_id", type: "integer", required: false, desc: "Only this Organisation's Event Creation Forms" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of answer choices {id, name}, alphabetically" },
+            { code: "404", cls: "response-4xx", desc: "The Dropdown isn't on an Event Creation Form of your organisations" }
           ])}
           ${endpointCard("GET", "/events/{id}", "Get an event", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" }
