@@ -4332,6 +4332,11 @@ paths:
         Teams who can see the Contact) or `relationship` (`owner_relationship_side`
         "<relationship_category_id>:parent|child", any colleague with that kind of Relationship with
         the Contact, e.g. their Therapist). See `GET /checklists/owner_options`.
+
+        "Only count records in this project": set `only_this_project: true` on an action whose type has
+        `project_scopable: true` in `GET /checklists/action_types` (surveys, events, labelled stories,
+        cases, project states). Then only records made in the Project through which the Checklist was
+        added to the Contact count towards it. It is ignored for other types.
       operationId: createChecklist
       security: [{tokenAuth: []}]
       requestBody:
@@ -4350,6 +4355,7 @@ paths:
                       beneficiary_role_ids: ["12", "14"]
                   - action_type: "invite_to_event"
                     title: "Invite them to an induction event"
+                    only_this_project: true
                     criteria:
                       project_event_categories: ["301:7"]
                   - action_type: "create_task"
@@ -4570,6 +4576,9 @@ paths:
       description: |
         Add a Checklist on the Contact's profile. Only a Checklist that one of the Contact's Projects
         lets the user add by hand is allowed; see `GET /beneficiaries/{beneficiary_id}/checklists/available`.
+        It is added through a Project, the one whose records count for actions set to "Only count
+        records in this project": the only Project that allows it, or `project_id` when more than one
+        does (required then).
       operationId: addContactChecklist
       security: [{tokenAuth: []}]
       parameters:
@@ -4584,9 +4593,10 @@ paths:
           application/json:
             example:
               checklist_id: 42
+              project_id: 301
       responses:
         "201":
-          description: "`{checklist_id, beneficiary_id, added_by_user_id, created_at}`"
+          description: "`{checklist_id, beneficiary_id, added_by_user_id, project_id, created_at}`"
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -4676,7 +4686,10 @@ paths:
     get:
       tags: [Checklists]
       summary: List the Checklists that can be added to a Contact
-      description: The Checklists the user may add to this Contact by hand, other than those it already has.
+      description: |
+        The Checklists the user may add to this Contact by hand, other than those it already has, each
+        with the Projects it can be added through (`projects: [{id, name}]`). When there is more than
+        one, pass the chosen one as `project_id` to `POST /beneficiaries/{beneficiary_id}/checklists`.
       operationId: listAvailableContactChecklists
       security: [{tokenAuth: []}]
       parameters:
@@ -4687,7 +4700,7 @@ paths:
             type: integer
       responses:
         "200":
-          description: "`{data: [{id, name}]}`"
+          description: "`{data: [{id, name, projects: [{id, name}]}]}`"
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
