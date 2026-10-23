@@ -10114,6 +10114,21 @@ components:
               type: integer
               nullable: true
               description: "Cases sources only: count only the Cases created with this one of the Organisation's Case Forms"
+        contact_criteria:
+          $ref: '#/components/schemas/WorkflowTrackerContactCriteria'
+
+    WorkflowTrackerContactCriteria:
+      type: object
+      description: >-
+        "Only count contacts who match": Contact Filters criteria, in the same shape as a Cohort Tracker's criteria
+        and a Saved Filter's, that a Contact must meet for their items to count. Matched on each Contact's current
+        details, so editing a Contact can change past results. {} counts every Contact. Keys a Contacts filter
+        doesn't read, and blank values, are dropped.
+      additionalProperties: true
+      example:
+        age_to:
+          year: "17"
+        beneficiary_types: ["3"]
 
     WorkflowTracker:
       type: object
@@ -10146,6 +10161,8 @@ components:
           example:
             destinations: "except"
             project_ids: [4512]
+        contact_criteria:
+          $ref: '#/components/schemas/WorkflowTrackerContactCriteria'
         created_at:
           type: string
           format: date-time
