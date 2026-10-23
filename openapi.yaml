@@ -4531,6 +4531,15 @@ paths:
         The Checklists box on a Contact's profile: each Checklist with `done_count` of `actions_count`,
         and every action with `done: true|false`. Only Contacts the user can see are returned.
 
+        A done action has a `completion` (null while it isn't done) saying when, by whom and with what
+        record it was done: `completed_at` (when that record was made, e.g. the survey's date),
+        `completed_by_user_id` and `completed_by_name` (null when the record doesn't say who made it),
+        `completion_method` (`detected`, or `manual` when a colleague ticked it), `proof_type` and
+        `proof_id` (the record, e.g. `Story` 123, `BeneficiariesBeneficiaryRole`, `EventBeneficiary`)
+        and `proof_deleted` (true once that record has been deleted). An action stays done even if
+        its record is later edited or deleted. Actions are marked done in the background a few seconds
+        after the record that completes them is saved.
+
         Each action also says who is responsible for it for this Contact: the owner fields
         (`owner_kind`, `owner_user_id`, `owner_team_id`, `owner_relationship_side`), `owner_overridden`
         (true when a colleague changed it for this Contact only), `owner_description` (e.g.

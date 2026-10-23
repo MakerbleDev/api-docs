@@ -1872,7 +1872,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code>, owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code> and <code>completion</code> (<code>completed_at</code>, <code>completed_by_user_id</code>, <code>completed_by_name</code>, <code>completion_method</code>, <code>proof_type</code>, <code>proof_id</code>, <code>proof_deleted</code>; null until done), owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
             { code: "404", cls: "response-4xx", desc: "A Contact the user can't see" }
           ])}
           ${endpointCard("PATCH", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner", "Change who is responsible for an action for one Contact", true, [
