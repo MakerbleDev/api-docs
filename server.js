@@ -1843,7 +1843,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "No role in the Organisation that can see Checklists" }
           ])}
           ${endpointCard("GET", "/checklists/action_types", "List the actions a Checklist can contain", true, [], [
-            { code: "200", cls: "response-2xx", desc: "<code>{data: [{action_type, name, criteria_keys}]}</code>" }
+            { code: "200", cls: "response-2xx", desc: "<code>{data: [{action_type, name, criteria_keys, project_scopable}]}</code>; <code>project_scopable</code> types can take <code>only_this_project</code>" }
           ], "Criteria values are strings: IDs, or pairs such as <code>project_states</code> \"&lt;project_id&gt;:&lt;state_id&gt;\", <code>project_event_categories</code> \"&lt;project_id&gt;:&lt;event_category_id&gt;\", <code>relationship_sides</code> \"&lt;category_id&gt;:parent|child\" and <code>survey_waves</code> \"&lt;Survey Campaign id&gt;:&lt;Wave id, or 0&gt;\".")}
           ${endpointCard("GET", "/checklists/owner_options", "List the choices for who is responsible for an action", true, [
             { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
@@ -1861,7 +1861,7 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "The new Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "e.g. an action with every option unticked" }
-          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. The owner fields are optional.")}
+          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria, only_this_project, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. The owner fields are optional. <code>only_this_project: true</code> (\"Only count records in this project\") counts only records made in the Project the Checklist was added to the Contact through.")}
           ${endpointCard("PATCH", "/checklists/{id}", "Update a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
@@ -1879,7 +1879,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code>, owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code> and <code>completion</code> (<code>completed_at</code>, <code>completed_by_user_id</code>, <code>completed_by_name</code>, <code>completion_method</code>, <code>proof_type</code>, <code>proof_id</code>, <code>proof_deleted</code>; null until done), owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
             { code: "404", cls: "response-4xx", desc: "A Contact the user can't see" }
           ])}
           ${endpointCard("PATCH", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner", "Change who is responsible for an action for one Contact", true, [
@@ -1906,14 +1906,15 @@ function buildDocsPage() {
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/available", "List the Checklists that can be added to a Contact", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "<code>{data: [{id, name}]}</code>" }
+            { code: "200", cls: "response-2xx", desc: "<code>{data: [{id, name, projects: [{id, name}]}]}</code>: the Projects each can be added through" }
           ])}
           ${endpointCard("POST", "/beneficiaries/{beneficiary_id}/checklists", "Add a Checklist to a Contact", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
-            { name: "checklist_id", type: "integer", required: true, desc: "A Checklist from the available list" }
+            { name: "checklist_id", type: "integer", required: true, desc: "A Checklist from the available list" },
+            { name: "project_id", type: "integer", required: false, desc: "The Project to add it through, from its <code>projects</code>; required when there is more than one" }
           ], [
-            { code: "201", cls: "response-2xx", desc: "<code>{checklist_id, beneficiary_id, added_by_user_id, created_at}</code>" },
-            { code: "422", cls: "response-4xx", desc: "That Checklist can't be added to this Contact" }
+            { code: "201", cls: "response-2xx", desc: "<code>{checklist_id, beneficiary_id, added_by_user_id, project_id, created_at}</code>" },
+            { code: "422", cls: "response-4xx", desc: "That Checklist can't be added to this Contact, or no <code>project_id</code> when it can be added through several Projects" }
           ])}
         </div>
       </section>
