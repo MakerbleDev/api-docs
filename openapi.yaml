@@ -238,6 +238,11 @@ tags:
       Metrics worked out from other trackers with + − × ÷, numbers and brackets, e.g. Referrals
       completed = External referrals + Internal referrals, or a percentage of one tracker in another.
       Placed in an Impact Scorecard column like other metrics.
+  - name: Seats
+    description: |
+      Seats per Colleague: which seat each colleague holds on each of an Organisation's current
+      Contracts, and changing one. A colleague's roles decide the lowest seat (Billing Role) they
+      need on Role-based Pricing. Only the Organisation's admins can change seats.
   - name: Webhooks
     description: |
       HTTPS endpoints an Organisation's admins register to receive signed events when
@@ -7287,6 +7292,96 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /organisations/{organisation_id}/seats:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+    get:
+      tags: [Seats]
+      summary: List an Organisation's seats per colleague
+      description: |
+        The Organisation's (Charity's) current Contracts, with seats bought and used per Billing Role
+        (Organiser, Practitioner, Helper) on Role-based Pricing or in total on Flat Pricing, and a page
+        of colleagues. Each colleague has the seat they hold on each Contract, the lowest seat their
+        roles allow, and a status: `covered`, `no_seat` (a role that needs a seat but no seat),
+        `seat_too_low` (a seat below what their roles need) or `no_seat_needed` (they still hold a
+        seat but no longer have a role that needs one).
+
+        This is the Seats per Colleague page under Our Account › Seats. Organisation Admins and
+        Makerble staff can read it. Nobody loses access because of their seat.
+      operationId: listSeats
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The Contracts and a page of colleagues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSeats'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /organisations/{organisation_id}/seats/{user_id}:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The colleague's user ID
+    put:
+      tags: [Seats]
+      summary: Change a colleague's seat on one Contract
+      description: |
+        Gives a colleague a seat on one of the Organisation's current Contracts, changes it or takes it
+        away. On a Role-based Pricing Contract send the Billing Role to give, or `null` to take the seat
+        away. On a Flat Pricing Contract send `has_seat` instead. The old seat is kept in Seat History.
+        Nothing stops you going over the seats bought; the Organisation then shows as over its seat count.
+
+        Only the Organisation's admins (and Makerble admins) can change seats. The colleague must have a
+        role in the Organisation or still hold a seat there. Returns the colleague as the list does.
+      operationId: changeSeat
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeatChangeRequest'
+            examples:
+              roleBased:
+                value:
+                  contract_id: 31
+                  billing_role_id: 2
+              takeAway:
+                value:
+                  contract_id: 31
+                  billing_role_id: null
+              flat:
+                value:
+                  contract_id: 32
+                  has_seat: true
+      responses:
+        "200":
+          description: The colleague's seats after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatColleague'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /webhook_endpoints:
     get:
       tags: [Webhooks]
@@ -7864,6 +7959,13 @@ components:
         type: string
         format: date
       description: The deadline the window ends on. Defaults to the next Target Deadline, or today when there is none.
+    OrganisationId:
+      name: organisation_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The Organisation (Charity) ID
     Page:
       name: page
       in: query
@@ -12324,6 +12426,125 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/EventFormat'
+
+    SeatBillingRole:
+      type: object
+      nullable: true
+      description: A Billing Role (seat), e.g. Organiser, Practitioner or Helper. `null` on Flat Pricing.
+      properties:
+        id:
+          type: integer
+          example: 2
+        name:
+          type: string
+          example: Helper
+
+    SeatContract:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 31
+        component:
+          type: string
+          example: Makerble CRM
+        price_plan:
+          type: string
+          nullable: true
+          example: Standard
+        pricing_model:
+          type: string
+          enum: [flat, role_based]
+        status:
+          type: string
+          enum: [pending, trial, active, notice_given]
+        default_for_new_colleagues:
+          type: boolean
+          description: New colleagues are given seats on this Contract automatically
+        lines:
+          type: array
+          description: One line per Billing Role on Role-based Pricing, one line in all on Flat Pricing
+          items:
+            type: object
+            properties:
+              billing_role:
+                $ref: '#/components/schemas/SeatBillingRole'
+              bought:
+                type: integer
+                example: 3
+              assigned:
+                type: integer
+                example: 4
+              over:
+                type: integer
+                description: Seats in use beyond those bought
+                example: 1
+
+    SeatColleague:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 7
+        name:
+          type: string
+          example: Amira Khan
+        roles:
+          type: string
+          description: The colleague's roles that need a seat, in words
+          example: Event Worker on 6 events
+        lowest_seat_allowed:
+          $ref: '#/components/schemas/SeatBillingRole'
+        status:
+          type: string
+          enum: [covered, no_seat, seat_too_low, no_seat_needed]
+        seats:
+          type: array
+          items:
+            type: object
+            properties:
+              contract_id:
+                type: integer
+                example: 31
+              billing_role:
+                $ref: '#/components/schemas/SeatBillingRole'
+              seat_too_low:
+                type: boolean
+              assigned_at:
+                type: string
+                format: date-time
+              assigned_by_system:
+                type: boolean
+                description: Makerble gave the seat automatically when the colleague was given a role
+
+    SeatChangeRequest:
+      type: object
+      required: [contract_id]
+      properties:
+        contract_id:
+          type: integer
+          description: One of the Organisation's current Contracts
+        billing_role_id:
+          type: integer
+          nullable: true
+          description: Role-based Pricing only. The Billing Role to give, or `null` to take the seat away.
+        has_seat:
+          type: boolean
+          description: Flat Pricing only. `true` gives a seat, `false` takes it away.
+
+    PaginatedSeats:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            contracts:
+              type: array
+              items:
+                $ref: '#/components/schemas/SeatContract'
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SeatColleague'
 
     PaginatedWebhookEndpoints:
       allOf:
