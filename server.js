@@ -1176,8 +1176,10 @@ function buildDocsPage() {
           ${endpointCard("POST", "/projects/add_colleague.json", "Add users to a Project", true, [], [
             { code: "200", cls: "response-2xx", desc: "Users added successfully" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Grant one or more users a role on a Project. A user can hold Editor, Reporter, and Observer simultaneously. Pass user IDs in <code>role_data[].editor_ids</code>, <code>reporter_ids</code>, or <code>observer_ids</code>.")}
+            { code: "403", cls: "response-4xx", desc: "Not a Project Manager of one of the Projects or an Organisation Admin of its Organisation (e.g. a Changemaker)" },
+            { code: "404", cls: "response-4xx", desc: "A Project wasn't found" },
+            { code: "422", cls: "response-4xx", desc: "A user can't be added: not a colleague in the Project's Organisation" }
+          ], "Adds users to Projects' teams, as the Project's <b>Add Users</b> page does: as Project Managers (<code>role_data[].editor_ids</code>), Changemakers (<code>reporter_ids</code>) or Analysts (<code>observer_ids</code>). A user can hold more than one role. You must be a Project Manager of every listed Project or an Organisation Admin of its Organisation, and the users must already be colleagues in that Organisation unless its preference lets Project Managers add users from outside it. It's all or nothing: on any error nobody is added.")}
           ${endpointCard("GET", "/project_results", "Get Results Canvas figures for Projects", true, [
             { name: "project_ids", type: "integer[]", required: false, desc: "Projects to include, as <code>project_ids[]=619</code> or a JSON array string. Defaults to every Project you can view" },
             { name: "start_date", type: "string", required: false, desc: "First Story date to include, YYYY-MM-DD. Omit both dates for all time" },
