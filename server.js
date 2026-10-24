@@ -1854,20 +1854,20 @@ function buildDocsPage() {
           ${endpointCard("GET", "/checklists/{id}", "Get a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>actions</code> (each with its owner fields and <code>owner_description</code>), <code>projects</code> and <code>contacts_count</code>" },
+            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>actions</code> (each with <code>due_within_days</code>, its owner fields and <code>owner_description</code>), <code>projects</code> and <code>contacts_count</code>" },
             { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
           ])}
           ${endpointCard("POST", "/checklists", "Create a Checklist", true, [], [
             { code: "201", cls: "response-2xx", desc: "The new Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "e.g. an action with every option unticked" }
-          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria, only_this_project, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. The owner fields are optional. <code>only_this_project: true</code> (\"Only count records in this project\") counts only records made in the Project the Checklist was added to the Contact through.")}
+          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria, only_this_project, due_within_days, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. The owner fields are optional. <code>only_this_project: true</code> (\"Only count records in this project\") counts only records made in the Project the Checklist was added to the Contact through. <code>due_within_days</code> (\"Due within N days of the checklist being added\", 0 to 3650) gives the action a deadline; leave it out for none.")}
           ${endpointCard("PATCH", "/checklists/{id}", "Update a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The updated Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" }
-          ], "Actions with an <code>id</code> change; <code>{id, _destroy: true}</code> removes one; actions without an <code>id</code> are added.")}
+          ], "Actions with an <code>id</code> change; <code>{id, _destroy: true}</code> removes one; actions without an <code>id</code> are added. <code>due_within_days: null</code> removes an action's deadline.")}
           ${endpointCard("PATCH", "/checklists/{id}/projects/{project_id}", "Set how a Project offers a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
             { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
@@ -1879,7 +1879,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code> and <code>completion</code> (<code>completed_at</code>, <code>completed_by_user_id</code>, <code>completed_by_name</code>, <code>completion_method</code>, <code>proof_type</code>, <code>proof_id</code>, <code>proof_deleted</code>; null until done), owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code> and <code>completion</code> (<code>completed_at</code>, <code>completed_by_user_id</code>, <code>completed_by_name</code>, <code>completion_method</code>, <code>proof_type</code>, <code>proof_id</code>, <code>proof_deleted</code>; null until done), <code>due_on</code>, <code>done_late</code> and <code>overdue</code> (when the Checklist gives the action a deadline), owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
             { code: "404", cls: "response-4xx", desc: "A Contact the user can't see" }
           ])}
           ${endpointCard("PATCH", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner", "Change who is responsible for an action for one Contact", true, [
