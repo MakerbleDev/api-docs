@@ -185,7 +185,7 @@ tags:
   - name: Library
     description: Search the organisation's library and the public library of reusable building blocks, read an item in full, and see where it is used
   - name: ImpactStore
-    description: Search the Makerble ImpactStore (the Explore pages) for published Surveys, Contact Forms, Impact Frameworks, Report Templates and Toolkits to reuse
+    description: Search the Makerble ImpactStore (the Explore pages) for published Surveys, Contact Forms, Case Forms, Impact Frameworks, Report Templates, Toolkits and Project Types to reuse
   - name: Ratio Sets
     description: Dropdown / List field definitions
   - name: Sub Ratios
@@ -4295,26 +4295,29 @@ paths:
       summary: Search the ImpactStore
       operationId: searchImpactStore
       description: |
-        Searches the Makerble ImpactStore: the ready-made Surveys, Contact Forms, Impact Frameworks,
-        Report Templates and Toolkits shown on the Explore pages, published for any organisation to
+        Searches the Makerble ImpactStore: the ready-made Surveys, Contact Forms, Case Forms, Impact
+        Frameworks, Report Templates, Toolkits and Project Types published for any organisation to
         reuse. Use it before making one of these from scratch.
 
-        - Only published items are searched: approved, shared with everyone, and with a name and a
-          description. Withdrawn Report Templates never appear.
+        - Only published items are searched: those the Explore pages list (approved, shared with
+          everyone, and with a name and, except for Contact and Case Forms, a description), and every
+          Project Type, since only Makerble makes them. Withdrawn Report Templates never appear.
         - Items matching more of the words in `query` come first; an item matching none of them is
           left out. Common words such as "a", "for" and "the" are ignored. `matched_words` says how
           many words each item matched.
         - `item_type` limits the search to one kind: `survey` (Survey), `contact_form` (Contact
-          Form), `impact_framework` (Impact Framework), `report_template` (Report Template) or
-          `toolkit` (Toolkit). Front-end names such as `Contact form` work too. Default: every kind.
+          Form), `case_form` (Case Form), `impact_framework` (Impact Framework), `report_template`
+          (Report Template), `toolkit` (Toolkit) or `project_type` (Project Type). Front-end names
+          such as `Contact form` work too. Default: every kind.
         - `cause` keeps items tagged with that cause or subcause from the Explore page (a cause takes
-          in its subcauses). Contact Forms and Report Templates have no causes, so a cause leaves
-          them out. With a `cause`, `query` may be left out to list everything for the cause.
+          in its subcauses). Contact Forms, Case Forms, Report Templates and Project Types have no
+          causes, so a cause leaves them out. With a `cause`, `query` may be left out to list everything for the cause.
         - `used_by_count` is how many organisations use the item: those with a Project using the
-          Survey, Impact Framework or Toolkit, those that added the Contact Form, and those with the
-          Report Template in their library.
-        - Read a Survey, Contact Form, Impact Framework or Toolkit in full with **Get a library
-          item**, using the same `type` and `id`.
+          Survey, Impact Framework, Toolkit or Project Type, those that added the Contact Form, those
+          with a Case made from the Case Form, and those with the Report Template in their library.
+        - `explore_url` is null for a Project Type, which has no Explore page.
+        - Read any item but a Report Template in full with **Get a library item**, using the same
+          `type` and `id`.
       security: [{tokenAuth: []}]
       parameters:
         - name: query
@@ -4329,7 +4332,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [survey, contact_form, impact_framework, report_template, toolkit]
+            enum: [survey, contact_form, case_form, impact_framework, report_template, toolkit, project_type]
           description: Only this kind of item (default every kind)
         - name: cause
           in: query
@@ -7347,7 +7350,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [survey, contact_form, impact_framework, report_template, toolkit]
+          enum: [survey, contact_form, case_form, impact_framework, report_template, toolkit, project_type]
         type_label:
           type: string
           description: The front-end name of the type, e.g. Contact Form
@@ -7356,7 +7359,7 @@ components:
         description:
           type: string
           nullable: true
-          description: One line of plain text
+          description: One line of plain text (always null for a Case Form)
         causes:
           type: array
           items:
@@ -7367,7 +7370,8 @@ components:
           description: How many organisations use it
         explore_url:
           type: string
-          description: Its page on Explore
+          nullable: true
+          description: Its page on Explore (null for a Project Type)
         matched_words:
           type: integer
           description: How many of the query's words it matched

@@ -1739,19 +1739,19 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">ImpactStore</h2>
         <div class="section-desc">
-          <p>The Makerble ImpactStore is what the Explore pages show: ready-made, well-tested Surveys, Contact Forms, Impact Frameworks, Report Templates and Toolkits published for any organisation to reuse. Search it before making one of these from scratch. Only published items are searched, and withdrawn ones never appear, so every user gets the same results.</p>
-          <p>Each item has a <code>type</code>: <code>survey</code>, <code>contact_form</code>, <code>impact_framework</code>, <code>report_template</code> or <code>toolkit</code>. Items matching more of the words in <code>query</code> come first, and <code>matched_words</code> says how many each matched. Read a Survey, Contact Form, Impact Framework or Toolkit in full with <a href="#library">Get a library item</a>, using the same <code>type</code> and <code>id</code>.</p>
+          <p>The Makerble ImpactStore is what the Explore pages show: ready-made, well-tested Surveys, Contact Forms, Case Forms, Impact Frameworks, Report Templates, Toolkits and Project Types published for any organisation to reuse. Search it before making one of these from scratch. Only published items are searched, and withdrawn ones never appear, so every user gets the same results.</p>
+          <p>Each item has a <code>type</code>: <code>survey</code>, <code>contact_form</code>, <code>case_form</code>, <code>impact_framework</code>, <code>report_template</code>, <code>toolkit</code> or <code>project_type</code>. Project Types are made only by Makerble, so every one is listed; they have no Explore page. Items matching more of the words in <code>query</code> come first, and <code>matched_words</code> says how many each matched. Read any item but a Report Template in full with <a href="#library">Get a library item</a>, using the same <code>type</code> and <code>id</code>.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/impact_store/search", "Search the ImpactStore", true, [
             { name: "query", type: "string", required: false, desc: "Words to look for in the name and description. Common words such as \"a\" and \"for\" are ignored; an item matching none of the words is left out" },
-            { name: "item_type", type: "string", required: false, desc: "<code>survey</code>, <code>contact_form</code>, <code>impact_framework</code>, <code>report_template</code> or <code>toolkit</code> (default every kind)" },
-            { name: "cause", type: "string", required: false, desc: "A cause or subcause name from the Explore page, in any case. A cause takes in its subcauses; Contact Forms and Report Templates have no causes, so a cause leaves them out" },
+            { name: "item_type", type: "string", required: false, desc: "<code>survey</code>, <code>contact_form</code>, <code>case_form</code>, <code>impact_framework</code>, <code>report_template</code>, <code>toolkit</code> or <code>project_type</code> (default every kind)" },
+            { name: "cause", type: "string", required: false, desc: "A cause or subcause name from the Explore page, in any case. A cause takes in its subcauses; Contact Forms, Case Forms, Report Templates and Project Types have no causes, so a cause leaves them out" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Results per page (default 10, max 200)" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only items updated after this" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Matching published items, best match first, with <code>id</code>, <code>type</code>, <code>type_label</code>, <code>name</code>, <code>description</code>, <code>causes</code>, <code>used_by_count</code> (how many organisations use it), <code>explore_url</code> and <code>matched_words</code>" },
+            { code: "200", cls: "response-2xx", desc: "Matching published items, best match first, with <code>id</code>, <code>type</code>, <code>type_label</code>, <code>name</code>, <code>description</code>, <code>causes</code>, <code>used_by_count</code> (how many organisations use it), <code>explore_url</code> (null for a Project Type) and <code>matched_words</code>" },
             { code: "422", cls: "response-4xx", desc: "Unknown <code>item_type</code> or <code>cause</code>" }
           ])}
         </div>
