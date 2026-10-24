@@ -534,6 +534,96 @@ paths:
                 $ref: '#/components/schemas/PaginatedProjects'
         "401":
           $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Projects]
+      summary: Create a Project
+      description: |
+        Creates a Project in an Organisation, as the **Create Project** page does, with the same permissions:
+        you must be allowed to create projects there (an Organisation Admin, or a colleague with project creation
+        switched on). Project Reporters and Observers can't. You become the Project's Manager unless you send
+        `project.editor_ids`. The Project Category's Surveys are added to the Project, and any Project Automation
+        the new Project matches is applied.
+
+        Get the Project Types and the Organisation's Project Categories, with each category's form fields, from
+        `GET /projects/form` first. Before creating a Project, check with `GET /projects` that the Organisation
+        doesn't already have it.
+      operationId: createProject
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - type: object
+                  required: [charity_id, project]
+                  properties:
+                    charity_id:
+                      type: integer
+                      description: The Organisation to create the Project in.
+                      example: 31
+                - $ref: '#/components/schemas/ProjectSaveRequest'
+            example:
+              charity_id: 31
+              project:
+                name: "Youth Mentoring"
+                project_type_id: 4
+                project_category_id: 88
+                help_statement: "Weekly mentoring for 14 to 18 year olds"
+                reporter_ids: [237]
+              story_category_ids: [1203]
+              privacy: only_charity_colleagues
+      responses:
+        "201":
+          description: The new Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /projects/form:
+    get:
+      tags: [Projects]
+      summary: Get the Create Project form
+      description: |
+        What the **Create Project** form offers in an Organisation: the Project Types (each with its solutions)
+        and the Organisation's Project Categories. Each category lists its form fields in order:
+
+        - `standard` fields, with the `parameter` that sets them (e.g. `project[help_statement]` for Short
+          Description, `project[reporter_ids]` for Changemakers);
+        - `custom_field` questions, answered under `custom_fields` by their `field_id`;
+        - `dropdown` fields, whose choices go under `sub_ratios` by their `field_id`.
+
+        `is_mandatory` marks the fields the form requires. Returns 404 for an Organisation you don't work in.
+      operationId: getProjectForm
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          description: The Organisation the Project is for.
+          schema:
+            type: integer
+            example: 31
+      responses:
+        "200":
+          description: The Create Project form
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectForm'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /projects/{id}:
     get:
@@ -549,11 +639,52 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Project'
+                $ref: '#/components/schemas/ProjectDetail'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Projects]
+      summary: Edit a Project
+      description: |
+        Edits a Project's details, as the **Edit Project** page does, with the same permissions: a Manager of the
+        Project or an Organisation Admin. A Changemaker (Project Reporter) gets 403; a Project in an Organisation
+        you don't work in reads as 404.
+
+        Only what you send changes. A colleague list you send (`editor_ids`, `reporter_ids` or `observer_ids`)
+        replaces that role's colleagues; one you leave out is kept. `story_category_ids` adds Surveys to the
+        Project and never removes or stops any. Saving applies any Project Automation the Project matches, as the
+        page does.
+      operationId: updateProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectSaveRequest'
+            example:
+              project:
+                help_statement: "Fortnightly mentoring for 14 to 18 year olds"
+                observer_ids: [412]
+      responses:
+        "200":
+          description: The Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
 
   /projects/add_colleague.json:
     post:
@@ -978,6 +1109,137 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+    post:
+      tags: [Beneficiaries]
+      summary: Add existing Contacts to a Project
+      description: |
+        Adds existing Contacts (Beneficiaries) to a Project, all with one status (Beneficiary State,
+        e.g. Enrolled or Waiting List). This is the same as "Assign Contacts to projects" on the
+        Contacts page: each Contact added gets an entry on their activity timeline, and the Project's
+        team is notified. It doesn't create Contacts: use `POST /beneficiaries` for that.
+
+        Use it before `POST /project_story_categories/{id}/survey_links` with `beneficiary_ids`, when
+        the Contacts aren't in the Survey Campaign's Project yet.
+
+        - `beneficiary_state_id` is optional. Without it the Contacts are Enrolled, or get the
+          Project's first status if Enrolled is switched off. `GET /projects/{id}` lists the
+          statuses switched on in `beneficiary_states`.
+        - A Contact already in the Project is left as they are (their status doesn't change) and is
+          returned with `already_in_project: true`.
+        - Nothing is added if any Contact is refused.
+        - The Project must be open (not closed).
+
+        Requires an Organisation Editor, Reporter or Observer, or a user who may edit the Contact
+        (a Project Editor, or a Project Reporter if the organisation allows it, of a Project the
+        Contact is in).
+      operationId: addProjectBeneficiaries
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, beneficiary_ids]
+              properties:
+                project_id:
+                  type: integer
+                  description: The Project to add the Contacts to
+                beneficiary_ids:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: integer
+                  description: Contacts of the Project's organisation, at most 200
+                beneficiary_state_id:
+                  type: integer
+                  description: Optional Contact status, from `beneficiary_states` in GET /projects/{id}
+            example:
+              project_id: 572
+              beneficiary_ids: [160498, 160499]
+              beneficiary_state_id: 3
+      responses:
+        "201":
+          description: One entry per Contact, in the order given
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: The Project–Contact link
+                        project_id:
+                          type: integer
+                        beneficiary_id:
+                          type: integer
+                        beneficiary_state_id:
+                          type: integer
+                          nullable: true
+                          description: The Contact's status in the Project
+                        already_in_project:
+                          type: boolean
+                          description: The Contact was already in the Project and was left as they were
+                        created_at:
+                          type: string
+                          format: date-time
+                        updated_at:
+                          type: string
+                          format: date-time
+              example:
+                data:
+                  - id: 88121
+                    project_id: 572
+                    beneficiary_id: 160498
+                    beneficiary_state_id: 3
+                    already_in_project: false
+                    created_at: "2026-10-22T10:15:00.000Z"
+                    updated_at: "2026-10-22T10:15:00.000Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not move these Contacts between Projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: string
+              example:
+                errors: ["You do not have permission to move these contacts between projects: 160498."]
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: |
+            Invalid request: ids that aren't Contacts of the Project's organisation (listed in
+            `beneficiary_ids_not_found`; the same whether the Contact is in another organisation or
+            doesn't exist), a status not switched on for the Project, a closed Project, no ids, or more
+            than 200.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                  beneficiary_ids_not_found:
+                    type: array
+                    items:
+                      type: integer
+              example:
+                errors: ["These contacts were not found in the project's organisation: 9876."]
+                beneficiary_ids_not_found: [9876]
+
 
   /beneficiary_categories:
     get:
@@ -1563,6 +1825,14 @@ paths:
             Invalid request: Contacts outside the Project (listed in `invalid_beneficiary_ids`),
             more than 200 recipients, no recipients, an unknown `link_expiry`, or a Wave that
             is not available for this Survey Campaign.
+
+            Refused Contacts are also split in two. `beneficiary_ids_not_in_project` are Contacts of
+            the organisation who aren't in the Survey Campaign's Project: add them with
+            `POST /project_beneficiaries`, then try again, or pass their email addresses in `emails`.
+            `beneficiary_ids_not_found` aren't Contacts of the organisation (the same answer whether
+            the id belongs to another organisation or doesn't exist). A Contact created from an
+            email address joins the organisation but not the Project. The three lists are only
+            present when Contacts were refused.
           content:
             application/json:
               schema:
@@ -1576,9 +1846,26 @@ paths:
                     type: array
                     items:
                       type: integer
+                  beneficiary_ids_not_in_project:
+                    type: array
+                    items:
+                      type: integer
+                  beneficiary_ids_not_found:
+                    type: array
+                    items:
+                      type: integer
               example:
-                errors: ["These contacts are not in this project: 9876."]
-                invalid_beneficiary_ids: [9876]
+                errors:
+                  - >-
+                    These contacts are in your organisation but not in the project "Understanding Italian": 9876.
+                    Add them to the project first (API: POST /api/v2/project_beneficiaries; MCP:
+                    makerble_add_contacts_to_project; in Makerble: Contacts page, More options, Assign Contacts
+                    to projects), then try again. Or pass their email addresses in emails instead, which doesn't
+                    need them to be in the project.
+                  - "These contacts were not found in your organisation: 9877."
+                invalid_beneficiary_ids: [9876, 9877]
+                beneficiary_ids_not_in_project: [9876]
+                beneficiary_ids_not_found: [9877]
     get:
       tags: [Project Story Categories]
       summary: List personal survey links for a Survey Campaign
@@ -4337,6 +4624,11 @@ paths:
         Teams who can see the Contact) or `relationship` (`owner_relationship_side`
         "<relationship_category_id>:parent|child", any colleague with that kind of Relationship with
         the Contact, e.g. their Therapist). See `GET /checklists/owner_options`.
+
+        "Only count records in this project": set `only_this_project: true` on an action whose type has
+        `project_scopable: true` in `GET /checklists/action_types` (surveys, events, labelled stories,
+        cases, project states). Then only records made in the Project through which the Checklist was
+        added to the Contact count towards it. It is ignored for other types.
       operationId: createChecklist
       security: [{tokenAuth: []}]
       requestBody:
@@ -4355,6 +4647,7 @@ paths:
                       beneficiary_role_ids: ["12", "14"]
                   - action_type: "invite_to_event"
                     title: "Invite them to an induction event"
+                    only_this_project: true
                     criteria:
                       project_event_categories: ["301:7"]
                   - action_type: "create_task"
@@ -4536,6 +4829,15 @@ paths:
         The Checklists box on a Contact's profile: each Checklist with `done_count` of `actions_count`,
         and every action with `done: true|false`. Only Contacts the user can see are returned.
 
+        A done action has a `completion` (null while it isn't done) saying when, by whom and with what
+        record it was done: `completed_at` (when that record was made, e.g. the survey's date),
+        `completed_by_user_id` and `completed_by_name` (null when the record doesn't say who made it),
+        `completion_method` (`detected`, or `manual` when a colleague ticked it), `proof_type` and
+        `proof_id` (the record, e.g. `Story` 123, `BeneficiariesBeneficiaryRole`, `EventBeneficiary`)
+        and `proof_deleted` (true once that record has been deleted). An action stays done even if
+        its record is later edited or deleted. Actions are marked done in the background a few seconds
+        after the record that completes them is saved.
+
         Each action also says who is responsible for it for this Contact: the owner fields
         (`owner_kind`, `owner_user_id`, `owner_team_id`, `owner_relationship_side`), `owner_overridden`
         (true when a colleague changed it for this Contact only), `owner_description` (e.g.
@@ -4566,6 +4868,9 @@ paths:
       description: |
         Add a Checklist on the Contact's profile. Only a Checklist that one of the Contact's Projects
         lets the user add by hand is allowed; see `GET /beneficiaries/{beneficiary_id}/checklists/available`.
+        It is added through a Project, the one whose records count for actions set to "Only count
+        records in this project": the only Project that allows it, or `project_id` when more than one
+        does (required then).
       operationId: addContactChecklist
       security: [{tokenAuth: []}]
       parameters:
@@ -4580,9 +4885,10 @@ paths:
           application/json:
             example:
               checklist_id: 42
+              project_id: 301
       responses:
         "201":
-          description: "`{checklist_id, beneficiary_id, added_by_user_id, created_at}`"
+          description: "`{checklist_id, beneficiary_id, added_by_user_id, project_id, created_at}`"
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -4672,7 +4978,10 @@ paths:
     get:
       tags: [Checklists]
       summary: List the Checklists that can be added to a Contact
-      description: The Checklists the user may add to this Contact by hand, other than those it already has.
+      description: |
+        The Checklists the user may add to this Contact by hand, other than those it already has, each
+        with the Projects it can be added through (`projects: [{id, name}]`). When there is more than
+        one, pass the chosen one as `project_id` to `POST /beneficiaries/{beneficiary_id}/checklists`.
       operationId: listAvailableContactChecklists
       security: [{tokenAuth: []}]
       parameters:
@@ -4683,7 +4992,7 @@ paths:
             type: integer
       responses:
         "200":
-          description: "`{data: [{id, name}]}`"
+          description: "`{data: [{id, name, projects: [{id, name}]}]}`"
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -8232,6 +8541,28 @@ components:
               type: string
               example: "Greenfield Community Trust"
 
+    ProjectDetail:
+      description: A Project as returned by `GET /projects/{id}`.
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            beneficiary_states:
+              type: array
+              description: |
+                The Contact statuses (Beneficiary States) switched on for the
+                Project, e.g. Enrolled or Waiting List. Pass an `id` as `beneficiary_state_id` to
+                `POST /project_beneficiaries`.
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 3
+                  name:
+                    type: string
+                    example: "Enrolled"
+
     Project:
       allOf:
         - $ref: '#/components/schemas/Timestamps'
@@ -8254,6 +8585,173 @@ components:
                 The Impact Framework (Template) the Project's Results Canvas shows by default, chosen on Project
                 Preferences. `null` means All metrics. Pass it as `template_id` to `GET /project_results` for the
                 same figures.
+            help_statement:
+              type: string
+              nullable: true
+              description: Short Description.
+              example: "Weekly mentoring for 14 to 18 year olds"
+            help_description:
+              type: string
+              nullable: true
+              description: Long Description.
+            location:
+              type: string
+              nullable: true
+              example: "Leeds"
+            project_type_id:
+              type: integer
+              nullable: true
+              example: 4
+            solution_group_id:
+              type: integer
+              nullable: true
+            project_category_id:
+              type: integer
+              example: 88
+            is_closed:
+              type: boolean
+              example: false
+            beneficiary_category_ids:
+              type: array
+              items:
+                type: integer
+              description: The Contact Forms used to create Contacts in the Project.
+
+    ProjectSaveRequest:
+      type: object
+      properties:
+        project:
+          type: object
+          properties:
+            name:
+              type: string
+              example: "Youth Mentoring"
+            project_type_id:
+              type: integer
+              description: One of the Project Types from `GET /projects/form`. Required when creating.
+            solution_group_id:
+              type: integer
+              description: One of the chosen Project Type's solutions.
+            project_category_id:
+              type: integer
+              description: One of the Organisation's Project Categories. Defaults to its default category.
+            help_statement:
+              type: string
+              description: Short Description.
+            help_description:
+              type: string
+              description: Long Description.
+            location:
+              type: string
+            custom_colour:
+              type: string
+              description: Only saved for someone who may change the Project's privacy.
+              example: "#f96d67"
+            editor_ids:
+              type: array
+              items:
+                type: integer
+              description: Managers (Project Editors), by user id.
+            reporter_ids:
+              type: array
+              items:
+                type: integer
+              description: Changemakers (Project Reporters), by user id.
+            observer_ids:
+              type: array
+              items:
+                type: integer
+              description: Analysts (Project Observers), by user id.
+        story_category_ids:
+          type: array
+          items:
+            type: integer
+          description: Surveys (Story Categories) to add to the Project.
+        privacy:
+          type: string
+          enum: [only_charity_colleagues, only_project_colleagues, only_certain_individual, charity_plus_network, everyone]
+          description: Who can see the Project.
+        individual_list:
+          type: array
+          items:
+            type: integer
+          description: User ids the Project is shared with, for `only_certain_individual`.
+        custom_fields:
+          type: object
+          additionalProperties: true
+          description: Answers to the Project Category's custom questions, keyed by `field_id`.
+          example: {"512": "14-18"}
+        sub_ratios:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: integer
+          description: Choices in the Project Category's dropdowns, keyed by `field_id`.
+
+    ProjectForm:
+      type: object
+      properties:
+        charity_id:
+          type: integer
+          example: 31
+        project_types:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 4
+              name:
+                type: string
+                example: "Youth work"
+              solutions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+        project_categories:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 88
+              name:
+                type: string
+                example: "Youth clubs"
+              is_default:
+                type: boolean
+              fields:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      example: "Short Description"
+                    kind:
+                      type: string
+                      enum: [standard, custom_field, dropdown]
+                    field_id:
+                      type: integer
+                      description: For `custom_field` and `dropdown` fields.
+                    data_type:
+                      type: string
+                      nullable: true
+                      description: For `custom_field` fields, e.g. `text`, `number`, `date`.
+                    is_mandatory:
+                      type: boolean
+                    parameter:
+                      type: string
+                      example: "project[help_statement]"
+
 
     User:
       allOf:
