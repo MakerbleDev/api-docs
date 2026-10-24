@@ -1176,6 +1176,47 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
+          ${endpointCard("GET", "/projects/form", "Get the Create Project form", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation the Project is for" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>project_types</code> (each with its <code>solutions</code>) and the Organisation's <code>project_categories</code>, each with its form <code>fields</code>: <code>standard</code> fields with the <code>parameter</code> that sets them, <code>custom_field</code> questions answered under <code>custom_fields</code> by <code>field_id</code>, and <code>dropdown</code> fields whose choices go under <code>sub_ratios</code> by <code>field_id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not an Organisation you work in" }
+          ], "What the <b>Create Project</b> form offers in an Organisation. Use it before <code>POST /projects</code> to choose a Project Type and Project Category and see which fields the category asks for.")}
+          ${endpointCard("POST", "/projects", "Create a Project", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation to create the Project in" },
+            { name: "project[name]", type: "string", required: true, desc: "The Project's name" },
+            { name: "project[project_type_id]", type: "integer", required: true, desc: "A Project Type from <code>GET /projects/form</code>" },
+            { name: "project[project_category_id]", type: "integer", required: false, desc: "One of the Organisation's Project Categories (default: its default category)" },
+            { name: "project[solution_group_id]", type: "integer", required: false, desc: "One of the Project Type's solutions" },
+            { name: "project[help_statement]", type: "string", required: false, desc: "Short Description" },
+            { name: "project[help_description]", type: "string", required: false, desc: "Long Description" },
+            { name: "project[location]", type: "string", required: false, desc: "Location" },
+            { name: "project[editor_ids]", type: "integer[]", required: false, desc: "Managers (default: you)" },
+            { name: "project[reporter_ids]", type: "integer[]", required: false, desc: "Changemakers" },
+            { name: "project[observer_ids]", type: "integer[]", required: false, desc: "Analysts" },
+            { name: "story_category_ids", type: "integer[]", required: false, desc: "Surveys to add, on top of the Project Category's own" },
+            { name: "privacy", type: "string", required: false, desc: "<code>only_charity_colleagues</code>, <code>only_project_colleagues</code>, <code>only_certain_individual</code> (with <code>individual_list</code>), <code>charity_plus_network</code> or <code>everyone</code>" },
+            { name: "custom_fields", type: "object", required: false, desc: "Answers to the category's custom questions, keyed by <code>field_id</code>" },
+            { name: "sub_ratios", type: "object", required: false, desc: "Choices in the category's dropdowns, keyed by <code>field_id</code>" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The new Project" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You may not create projects in this Organisation (e.g. a Project Reporter)" },
+            { code: "404", cls: "response-4xx", desc: "Not an Organisation you work in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. no Project Type, or another Organisation's Project Category" }
+          ], "Creates a Project as the <b>Create Project</b> page does, with the same permissions. Any Project Automation the new Project matches is applied. Check with <code>GET /projects</code> that the Organisation doesn't already have the Project before creating it.")}
+          ${endpointCard("PATCH", "/projects/{id}", "Edit a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "project[...]", type: "object", required: false, desc: "Any of the fields <code>POST /projects</code> takes" },
+            { name: "story_category_ids", type: "integer[]", required: false, desc: "Surveys to add. Never removes or stops a Survey" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Project" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not a Manager of the Project or an Organisation Admin (e.g. a Changemaker)" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or in an Organisation you don't work in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>" }
+          ], "Edits a Project's details as the <b>Edit Project</b> page does, with the same permissions. Only what you send changes: a colleague list you send replaces that role's colleagues, and one you leave out is kept.")}
           ${endpointCard("POST", "/projects/add_colleague.json", "Add users to a Project", true, [], [
             { code: "200", cls: "response-2xx", desc: "Users added successfully" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },

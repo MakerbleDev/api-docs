@@ -529,6 +529,96 @@ paths:
                 $ref: '#/components/schemas/PaginatedProjects'
         "401":
           $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Projects]
+      summary: Create a Project
+      description: |
+        Creates a Project in an Organisation, as the **Create Project** page does, with the same permissions:
+        you must be allowed to create projects there (an Organisation Admin, or a colleague with project creation
+        switched on). Project Reporters and Observers can't. You become the Project's Manager unless you send
+        `project.editor_ids`. The Project Category's Surveys are added to the Project, and any Project Automation
+        the new Project matches is applied.
+
+        Get the Project Types and the Organisation's Project Categories, with each category's form fields, from
+        `GET /projects/form` first. Before creating a Project, check with `GET /projects` that the Organisation
+        doesn't already have it.
+      operationId: createProject
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - type: object
+                  required: [charity_id, project]
+                  properties:
+                    charity_id:
+                      type: integer
+                      description: The Organisation to create the Project in.
+                      example: 31
+                - $ref: '#/components/schemas/ProjectSaveRequest'
+            example:
+              charity_id: 31
+              project:
+                name: "Youth Mentoring"
+                project_type_id: 4
+                project_category_id: 88
+                help_statement: "Weekly mentoring for 14 to 18 year olds"
+                reporter_ids: [237]
+              story_category_ids: [1203]
+              privacy: only_charity_colleagues
+      responses:
+        "201":
+          description: The new Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /projects/form:
+    get:
+      tags: [Projects]
+      summary: Get the Create Project form
+      description: |
+        What the **Create Project** form offers in an Organisation: the Project Types (each with its solutions)
+        and the Organisation's Project Categories. Each category lists its form fields in order:
+
+        - `standard` fields, with the `parameter` that sets them (e.g. `project[help_statement]` for Short
+          Description, `project[reporter_ids]` for Changemakers);
+        - `custom_field` questions, answered under `custom_fields` by their `field_id`;
+        - `dropdown` fields, whose choices go under `sub_ratios` by their `field_id`.
+
+        `is_mandatory` marks the fields the form requires. Returns 404 for an Organisation you don't work in.
+      operationId: getProjectForm
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          description: The Organisation the Project is for.
+          schema:
+            type: integer
+            example: 31
+      responses:
+        "200":
+          description: The Create Project form
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectForm'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /projects/{id}:
     get:
@@ -549,6 +639,47 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Projects]
+      summary: Edit a Project
+      description: |
+        Edits a Project's details, as the **Edit Project** page does, with the same permissions: a Manager of the
+        Project or an Organisation Admin. A Changemaker (Project Reporter) gets 403; a Project in an Organisation
+        you don't work in reads as 404.
+
+        Only what you send changes. A colleague list you send (`editor_ids`, `reporter_ids` or `observer_ids`)
+        replaces that role's colleagues; one you leave out is kept. `story_category_ids` adds Surveys to the
+        Project and never removes or stops any. Saving applies any Project Automation the Project matches, as the
+        page does.
+      operationId: updateProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectSaveRequest'
+            example:
+              project:
+                help_statement: "Fortnightly mentoring for 14 to 18 year olds"
+                observer_ids: [412]
+      responses:
+        "200":
+          description: The Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
 
   /projects/add_colleague.json:
     post:
@@ -7787,6 +7918,172 @@ components:
                 The Impact Framework (Template) the Project's Results Canvas shows by default, chosen on Project
                 Preferences. `null` means All metrics. Pass it as `template_id` to `GET /project_results` for the
                 same figures.
+            help_statement:
+              type: string
+              nullable: true
+              description: Short Description.
+              example: "Weekly mentoring for 14 to 18 year olds"
+            help_description:
+              type: string
+              nullable: true
+              description: Long Description.
+            location:
+              type: string
+              nullable: true
+              example: "Leeds"
+            project_type_id:
+              type: integer
+              nullable: true
+              example: 4
+            solution_group_id:
+              type: integer
+              nullable: true
+            project_category_id:
+              type: integer
+              example: 88
+            is_closed:
+              type: boolean
+              example: false
+            beneficiary_category_ids:
+              type: array
+              items:
+                type: integer
+              description: The Contact Forms used to create Contacts in the Project.
+
+    ProjectSaveRequest:
+      type: object
+      properties:
+        project:
+          type: object
+          properties:
+            name:
+              type: string
+              example: "Youth Mentoring"
+            project_type_id:
+              type: integer
+              description: One of the Project Types from `GET /projects/form`. Required when creating.
+            solution_group_id:
+              type: integer
+              description: One of the chosen Project Type's solutions.
+            project_category_id:
+              type: integer
+              description: One of the Organisation's Project Categories. Defaults to its default category.
+            help_statement:
+              type: string
+              description: Short Description.
+            help_description:
+              type: string
+              description: Long Description.
+            location:
+              type: string
+            custom_colour:
+              type: string
+              description: Only saved for someone who may change the Project's privacy.
+              example: "#f96d67"
+            editor_ids:
+              type: array
+              items:
+                type: integer
+              description: Managers (Project Editors), by user id.
+            reporter_ids:
+              type: array
+              items:
+                type: integer
+              description: Changemakers (Project Reporters), by user id.
+            observer_ids:
+              type: array
+              items:
+                type: integer
+              description: Analysts (Project Observers), by user id.
+        story_category_ids:
+          type: array
+          items:
+            type: integer
+          description: Surveys (Story Categories) to add to the Project.
+        privacy:
+          type: string
+          enum: [only_charity_colleagues, only_project_colleagues, only_certain_individual, charity_plus_network, everyone]
+          description: Who can see the Project.
+        individual_list:
+          type: array
+          items:
+            type: integer
+          description: User ids the Project is shared with, for `only_certain_individual`.
+        custom_fields:
+          type: object
+          additionalProperties: true
+          description: Answers to the Project Category's custom questions, keyed by `field_id`.
+          example: {"512": "14-18"}
+        sub_ratios:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: integer
+          description: Choices in the Project Category's dropdowns, keyed by `field_id`.
+
+    ProjectForm:
+      type: object
+      properties:
+        charity_id:
+          type: integer
+          example: 31
+        project_types:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 4
+              name:
+                type: string
+                example: "Youth work"
+              solutions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+        project_categories:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 88
+              name:
+                type: string
+                example: "Youth clubs"
+              is_default:
+                type: boolean
+              fields:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      example: "Short Description"
+                    kind:
+                      type: string
+                      enum: [standard, custom_field, dropdown]
+                    field_id:
+                      type: integer
+                      description: For `custom_field` and `dropdown` fields.
+                    data_type:
+                      type: string
+                      nullable: true
+                      description: For `custom_field` fields, e.g. `text`, `number`, `date`.
+                    is_mandatory:
+                      type: boolean
+                    parameter:
+                      type: string
+                      example: "project[help_statement]"
 
     User:
       allOf:
