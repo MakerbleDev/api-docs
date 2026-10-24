@@ -5883,6 +5883,119 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /formula_trackers/{id}/projects/{project_id}/results:
+    get:
+      tags: [Formula Trackers]
+      summary: Get a Formula Tracker's result on a Project
+      description: |
+        A Formula Tracker's result on a Project's Results Canvas: what its card shows, and what its popup
+        opens. The tracker must be on the Project.
+
+        Each timeframe is worked out from that timeframe's own tracker numbers, so a Year to Date
+        percentage is the Year to Date numerator ÷ the Year to Date denominator, never an average of the
+        periods. `number` is null, and `display_value` is "–", when a tracker the formula uses has no
+        result or it divides by 0 (the canvas says "Not enough data to work this out yet").
+        `display_value` is the result as the canvas shows it, from the tracker's display format, decimal
+        places and unit label.
+
+        `result_kind` `additive` (only + and − of trackers that add up) adds up across periods.
+        `snapshot` (× ÷ or a number) is read as of `as_of`: the window's last day, or today while that is
+        still to come. `target` is the deadline targets dated in the window, added up (for a snapshot,
+        the one on its last day), or else the one-off target, or null.
+
+        `trackers` lists each tracker the formula uses with its number for the window; `formula` writes
+        the formula out in words and `formula_with_values` with those numbers in place.
+
+        When the formula only adds Workflow Trackers that count items (`itemised: true`, e.g. External
+        referrals + Internal referrals), `data` lists one page of the items counted, newest first. An item
+        the user may not see is counted in `hidden_count` for that page but never listed. Otherwise `data`
+        is empty and the counts are 0. Requires the same rights as viewing that Results Canvas.
+      operationId: getFormulaTrackerProjectResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the trackers behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerResult'
+              example:
+                formula_tracker_id: 12
+                name: "% of children receiving support"
+                project_id: 34
+                timeframe: year_to_date
+                starts_on: "2026-01-01"
+                ends_on: "2026-12-31"
+                result_kind: snapshot
+                as_of: "2026-10-13"
+                display_format: percentage
+                decimal_places: 1
+                unit: percentage
+                number: 50
+                display_value: "50.0%"
+                target: 60
+                formula: "% of children receiving support = Children supported ÷ Children flagged × 100"
+                formula_with_values: "4 ÷ 8 × 100"
+                trackers:
+                  - { type: Change, id: 81, name: Children supported, type_name: Engagement tracker, unit: count, number: 4 }
+                  - { type: Change, id: 82, name: Children flagged, type_name: Engagement tracker, unit: count, number: 8 }
+                itemised: false
+                page: 1
+                page_size: 0
+                page_count: 0
+                total_count: 0
+                hidden_count: 0
+                data: []
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /formula_trackers/{id}/albums/{bundle_id}/results:
+    get:
+      tags: [Formula Trackers]
+      summary: Get a Formula Tracker's result on an Album
+      description: |
+        As for a Project, with each tracker the formula uses worked out on the Album as a whole (its open
+        Projects together) before the formula is applied, so an Album percentage is the Album's numerator
+        ÷ the Album's denominator, not the Projects' percentages added up. The tracker must be on one of
+        the Album's Projects. Requires rights to see the Album.
+      operationId: getFormulaTrackerAlbumResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the trackers behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /workflow_trackers:
     get:
       tags: [Workflow Trackers]
@@ -11513,6 +11626,119 @@ components:
                 charity_id:
                   type: integer
                   description: Required when creating
+
+    FormulaTrackerResult:
+      type: object
+      properties:
+        formula_tracker_id:
+          type: integer
+        name:
+          type: string
+        project_id:
+          type: integer
+          description: Present for a Project's result
+        album_id:
+          type: integer
+          description: Present for an Album's result
+        timeframe:
+          type: string
+          enum: [period, year_to_date, all_time]
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+          description: Null when the window runs from the start
+        ends_on:
+          type: string
+          format: date
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+        as_of:
+          type: string
+          format: date
+          nullable: true
+          description: For a snapshot, the date it is read at
+        display_format:
+          type: string
+          enum: [number, percentage]
+        decimal_places:
+          type: integer
+        unit:
+          type: string
+          description: '"percentage", the unit label (e.g. "h per child"), or "count"'
+        number:
+          type: number
+          nullable: true
+          description: Null when a tracker the formula uses has no result, or it divides by 0
+        display_value:
+          type: string
+          description: The result as the Results Canvas shows it, e.g. "37.5%" or "2.4 h per child"; "–" when number is null
+        target:
+          type: number
+          nullable: true
+        formula:
+          type: string
+          description: e.g. "Referrals completed = External referrals + Internal referrals"
+        formula_with_values:
+          type: string
+          description: The formula with each tracker's number in place, e.g. "2 + 3"; "–" for a tracker with no number
+        trackers:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                description: Change, Indicator, CohortTracker, WorkflowTracker, FilteredMetric or FormulaTracker
+              id:
+                type: integer
+              name:
+                type: string
+              type_name:
+                type: string
+                description: e.g. "Engagement tracker" or "Workflow Tracker"
+              unit:
+                type: string
+              number:
+                type: number
+                nullable: true
+        itemised:
+          type: boolean
+          description: Whether the formula only adds Workflow Trackers that count items, so data lists them
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+          description: Every item counted, when itemised; otherwise 0
+        hidden_count:
+          type: integer
+          description: How many more on this page are counted but not listed, because the user can't see them
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              contact_id:
+                type: integer
+              contact_name:
+                type: string
+              detail:
+                type: string
+                nullable: true
+              project_id:
+                type: integer
+                nullable: true
+              case_id:
+                type: integer
+                nullable: true
+              happened_at:
+                type: string
+                format: date-time
 
     FormulaTrackerTimeframeResults:
       type: object
