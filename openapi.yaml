@@ -950,6 +950,142 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /projects/{id}/preferences:
+    get:
+      tags: [Projects]
+      summary: Get a Project's Project Preferences
+      description: |
+        What the Project's Project Preferences page shows: which Contact Forms create and edit
+        Contacts, which Contact statuses (Waiting List, Enrolled, Alumni, Declined) are switched on
+        with each one's form and baseline Surveys, editorial control, Case, Event and timesheet
+        settings, the Case Form, Event Formats, the default privacy of new Stories and the Mailchimp
+        list. Requires rights to change the Project's preferences (a Manager or an Organisation Admin).
+      operationId: getProjectPreferences
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Project Preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPreferences'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't change this Project's preferences (e.g. a Changemaker)
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Projects]
+      summary: Change a Project's Project Preferences
+      description: |
+        Saves what the Project Preferences page saves, with the same permissions. Only the settings
+        sent change; a list sent replaces that list (send `[]` to empty it). Contact Forms, Case
+        Forms, Event Formats and Surveys must be the Project's Organisation's. `event_category_ids`
+        sets the Project's Event Formats; it can't be emptied here.
+      operationId: updateProjectPreferences
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectPreferences'
+            example:
+              beneficiary_state_ids: [1, 2]
+              enable_waiting_list_state_contact_form: true
+              waiting_list_state_contact_form_id: 77
+              contact_form_ids: [77]
+              is_creation_of_events_required: true
+              default_story_privacy: only_project_colleagues
+      responses:
+        "200":
+          description: The Project Preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPreferences'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't change this Project's preferences
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects/{id}/targets:
+    get:
+      tags: [Projects]
+      summary: Get a Project's targets
+      description: |
+        What the Project's Set Targets page shows: the day its target year starts, the one-off target
+        on each Activity and Outcome metric on the Project (Changes and Indicators) and on each of its
+        Cohort, Workflow and Formula Trackers and filtered versions, and its deadline targets.
+        Requires rights to edit the Project's targets.
+      operationId: getProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Projects]
+      summary: Set a Project's targets
+      description: |
+        Saves what the Set Targets page saves. Only metrics and trackers already on the Project can be
+        given a target (adding metrics is Edit Project Metrics' job); anything else is refused with 422
+        and nothing is saved. `deadlines`, when sent, replaces all the Project's deadline targets
+        (send `[]` to clear them). Same request as `PATCH /albums/{id}/targets`, without `target_type`.
+      operationId: setProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectTargetsRequest'
+            example:
+              year_start_date: "2026-04-01"
+              metrics:
+                - { metric_type: Change, metric_id: 55, target: 300 }
+              deadlines:
+                - { metric_type: Change, metric_id: 55, date: "2026-12-31", number: 150 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /projects/add_colleague.json:
     post:
       tags: [Projects]
@@ -9159,6 +9295,341 @@ components:
         deadlines:
           type: array
           description: Replaces all of the Album's manual deadline targets
+          items:
+            type: object
+            required: [metric_type, metric_id, date, number]
+            properties:
+              metric_type:
+                type: string
+              metric_id:
+                type: integer
+              date:
+                type: string
+                format: date
+              number:
+                type: integer
+                minimum: 0
+
+    ProjectPreferences:
+      type: object
+      description: A Project's Project Preferences. In a request, send only the settings to change.
+      properties:
+        project_id:
+          type: integer
+          readOnly: true
+        add_enrolled_contacts_to_upcoming_events:
+          type: boolean
+          nullable: true
+          description: "Automatically add all enrolled Contacts to all upcoming Events in the Project"
+        allow_stories_to_be_copied:
+          type: boolean
+          nullable: true
+          description: "Allow Stories to be copied"
+        alumni_state_contact_form_id:
+          type: integer
+          nullable: true
+          description: The Contact Form for Contacts with the Alumni status
+        automate_following_between_beneficiary:
+          type: boolean
+          nullable: true
+          description: "Contacts in the Project who have Participation Access automatically follow each other"
+        automatically_create_survey_progress_board:
+          type: boolean
+          nullable: true
+          description: "Create a board for every Survey used on the Project"
+        automatically_launch_create_case:
+          type: boolean
+          nullable: true
+          description: "Automatically launch the Create Case page when a Contact is created"
+        beneficiary_creation_ticked:
+          type: boolean
+          nullable: true
+          description: "Allow users to create Contacts inside the Add Guests popup of an Event"
+        declined_state_contact_form_id:
+          type: integer
+          nullable: true
+          description: The Contact Form for Contacts with the Declined status
+        edit_story_on_event_attendance:
+          type: boolean
+          nullable: true
+          description: "When an Event's Story already exists, edit it rather than create a new one when adding attendance"
+        enable_alumni_state_baseline_survey:
+          type: boolean
+          nullable: true
+          description: Send a baseline Survey to Contacts who get the Alumni status
+        enable_alumni_state_contact_form:
+          type: boolean
+          nullable: true
+          description: Use a Contact Form for Contacts who get the Alumni status
+        enable_declined_state_baseline_survey:
+          type: boolean
+          nullable: true
+          description: Send a baseline Survey to Contacts who get the Declined status
+        enable_declined_state_contact_form:
+          type: boolean
+          nullable: true
+          description: Use a Contact Form for Contacts who get the Declined status
+        enable_enrolled_state_baseline_survey:
+          type: boolean
+          nullable: true
+          description: Send a baseline Survey to Contacts who get the Enrolled status
+        enable_enrolled_state_contact_form:
+          type: boolean
+          nullable: true
+          description: Use a Contact Form for Contacts who get the Enrolled status
+        enable_financial_value:
+          type: boolean
+          nullable: true
+          description: "Enable Financial Values"
+        enable_waiting_list_state_baseline_survey:
+          type: boolean
+          nullable: true
+          description: Send a baseline Survey to Contacts who get the Waiting List status
+        enable_waiting_list_state_contact_form:
+          type: boolean
+          nullable: true
+          description: Use a Contact Form for Contacts who get the Waiting List status
+        enable_waiting_list_state_public_referral_link:
+          type: boolean
+          nullable: true
+          description: Waiting List has a public Signup Page
+        enrolled_state_contact_form_id:
+          type: integer
+          nullable: true
+          description: The Contact Form for Contacts with the Enrolled status
+        hide_anonymous_participants_section:
+          type: boolean
+          nullable: true
+          description: "Hide the Manual Headcount section when there are Contacts in the Project"
+        is_contact_outside_project_enabled:
+          type: boolean
+          nullable: true
+          description: "Add Contacts from outside the Project to an Event"
+        is_creation_of_events_required:
+          type: boolean
+          nullable: true
+          description: "Enable Events"
+        is_creation_of_new_cases_enabled:
+          type: boolean
+          nullable: true
+          description: "Enable Cases"
+        is_creation_of_timesheets_required:
+          type: boolean
+          nullable: true
+          description: "Enable Timesheets"
+        prevent_project_reporters_changing_story_privacy:
+          type: boolean
+          nullable: true
+          description: "Prevent Project Changemakers from changing a Story's privacy level"
+        share_story_with_other_active_beneficiary:
+          type: boolean
+          nullable: true
+          description: "By default, share Stories with Contacts who have Participation Access"
+        share_story_with_tagged_active_beneficiary:
+          type: boolean
+          nullable: true
+          description: "Share Stories with Active Participants"
+        story_beneficiary_checkbox_option:
+          type: string
+          description: "How the Tickbox tracker for a single Contact shows on the Quick Update popup: displayed_unticked or hidden_ticked"
+        waiting_list_state_contact_form_id:
+          type: integer
+          nullable: true
+          description: The Contact Form for Contacts with the Waiting List status
+        alumni_state_baseline_survey_ids:
+          type: array
+          items:
+            type: integer
+          description: Baseline Surveys for Contacts who become Alumni
+        beneficiary_state_ids:
+          type: array
+          items:
+            type: integer
+          description: The Contact statuses switched on (Waiting List, Enrolled, Alumni, Declined)
+        case_creator_ids:
+          type: array
+          items:
+            type: integer
+          description: "Users (Project Changemakers and Analysts) who may create Cases; Project Managers already may"
+        contact_form_ids:
+          type: array
+          items:
+            type: integer
+          description: "Bio forms (Contact Forms) to use when creating a Contact"
+        custom_form_cases_ids:
+          type: array
+          items:
+            type: integer
+          description: "Case Forms to use when creating Cases"
+        declined_state_baseline_survey_ids:
+          type: array
+          items:
+            type: integer
+          description: Baseline Surveys for Contacts who become Declined
+        edit_contact_form_ids:
+          type: array
+          items:
+            type: integer
+          description: "Bio forms that can be added to or edited on a Contact's bio"
+        enrolled_state_baseline_survey_ids:
+          type: array
+          items:
+            type: integer
+          description: Baseline Surveys for Contacts who become Enrolled
+        event_creator_ids:
+          type: array
+          items:
+            type: integer
+          description: "Users who may create Events in addition to Project Managers"
+        organisation_admin_form_ids:
+          type: array
+          items:
+            type: integer
+          description: "Editorial control: bio forms Organisation Admins may edit on Contacts they didn't create"
+        project_manager_form_ids:
+          type: array
+          items:
+            type: integer
+          description: "Editorial control: bio forms Project Managers may edit on Contacts they didn't create"
+        project_observers_form_ids:
+          type: array
+          items:
+            type: integer
+          description: "Editorial control: bio forms Project Analysts may edit on Contacts they didn't create"
+        project_reporter_form_ids:
+          type: array
+          items:
+            type: integer
+          description: "Editorial control: bio forms Project Changemakers may edit on Contacts they didn't create"
+        waiting_list_state_baseline_survey_ids:
+          type: array
+          items:
+            type: integer
+          description: Baseline Surveys for Contacts who join the Waiting List
+        default_results_template_id:
+          type: integer
+          nullable: true
+          description: The Impact Framework the Results Canvas shows by default; null for All metrics
+        default_story_privacy:
+          type: string
+          nullable: true
+          enum: [only_charity_colleagues, only_project_colleagues, only_certain_individual, charity_plus_network, everyone, null]
+          description: Who sees a new Story by default
+        individual_list:
+          type: array
+          items:
+            type: integer
+          description: The users who see new Stories, for only_certain_individual
+        custom_field_category_id:
+          type: integer
+          nullable: true
+          description: The Case Form used for the Project's Cases
+        event_category_ids:
+          type: array
+          items:
+            type: integer
+          description: The Project's Event Formats
+        required_case_story_category_ids:
+          type: array
+          items:
+            type: integer
+          description: Surveys a Case needs before it can be closed
+        mailchimp_list_id:
+          type: string
+          nullable: true
+          description: The Mailchimp list the Project's Contacts are added to
+
+    ProjectTargets:
+      type: object
+      properties:
+        project_id:
+          type: integer
+        year_start_date:
+          type: string
+          format: date
+          nullable: true
+        metrics:
+          type: array
+          description: The Project's Activity and Outcome metrics and their one-off targets
+          items:
+            type: object
+            properties:
+              metric_type:
+                type: string
+                enum: [Change, Indicator]
+              metric_id:
+                type: integer
+              name:
+                type: string
+              target:
+                type: integer
+        trackers:
+          type: array
+          description: The Project's Cohort, Workflow and Formula Trackers and filtered versions, and their one-off targets
+          items:
+            type: object
+            properties:
+              tracker_type:
+                type: string
+                enum: [CohortTracker, WorkflowTracker, FormulaTracker, FilteredMetric]
+              tracker_id:
+                type: integer
+              name:
+                type: string
+              target:
+                type: integer
+        deadlines:
+          type: array
+          items:
+            type: object
+            properties:
+              metric_type:
+                type: string
+              metric_id:
+                type: integer
+              date:
+                type: string
+                format: date
+              number:
+                type: integer
+
+    ProjectTargetsRequest:
+      type: object
+      properties:
+        year_start_date:
+          type: string
+          format: date
+        metrics:
+          type: array
+          items:
+            type: object
+            required: [metric_type, metric_id, target]
+            properties:
+              metric_type:
+                type: string
+                enum: [Change, Indicator]
+              metric_id:
+                type: integer
+              target:
+                type: integer
+                minimum: 0
+        trackers:
+          type: array
+          items:
+            type: object
+            required: [tracker_type, tracker_id, target]
+            properties:
+              tracker_type:
+                type: string
+                enum: [CohortTracker, WorkflowTracker, FormulaTracker, FilteredMetric]
+              tracker_id:
+                type: integer
+              target:
+                type: integer
+                minimum: 0
+        deadlines:
+          type: array
+          description: Replaces all the Project's deadline targets
           items:
             type: object
             required: [metric_type, metric_id, date, number]
