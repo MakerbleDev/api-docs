@@ -231,6 +231,11 @@ tags:
       ever added to a Project through one of its Outcomes.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
+  - name: Formula Trackers
+    description: |
+      Metrics worked out from other trackers with + − × ÷, numbers and brackets, e.g. Referrals
+      completed = External referrals + Internal referrals, or a percentage of one tracker in another.
+      Placed in an Impact Scorecard column like other metrics.
   - name: Webhooks
     description: |
       HTTPS endpoints an Organisation's admins register to receive signed events when
@@ -5407,6 +5412,468 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CohortTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /formula_trackers:
+    get:
+      tags: [Formula Trackers]
+      summary: List an Organisation's Formula Trackers
+      description: |
+        The Formula Trackers of an Organisation (Charity). Visible to the Organisation's editors and
+        reporters, and to managers (editors) of its Projects.
+      operationId: listFormulaTrackers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Formula Trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFormulaTrackers'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user has no editor or reporter role in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Formula Trackers]
+      summary: Create a Formula Tracker
+      description: |
+        Creates a Formula Tracker (Create a metric > Formula Tracker): a metric worked out from the
+        Organisation's other trackers. `expression` is the formula as an ordered list of tokens, never
+        free text:
+
+        - `{kind: tracker, type, id}`: one of the Organisation's trackers that has a number. `type` is
+          `Change` (Activity or Engagement tracker), `Indicator` (Achievement or Numerical tracker; not a
+          Choice tracker), `CohortTracker`, `WorkflowTracker`, `FilteredMetric` (a filtered version) or
+          `FormulaTracker`. List them with `GET /formula_trackers/operands`.
+        - `{kind: operator, value}`: `+`, `-`, `*` or `/`. × and ÷ are worked out before + and −.
+        - `{kind: number, value}`, e.g. 100.
+        - `{kind: open}` and `{kind: close}`: brackets, worked out first.
+
+        Refused (422) when the formula is empty, starts or ends with an operator, has two operators
+        or two values in a row, unmatched or empty brackets, uses another Organisation's tracker, or
+        uses itself (directly or through other Formula Trackers).
+
+        Each timeframe's result is worked out from each tracker's result for the same Project or Album
+        and timeframe, then the formula: a Year to Date percentage is Year to Date numerator ÷ Year to
+        Date denominator. `result_kind` is `additive` only when the formula adds and subtracts trackers
+        that add up, with no numbers; otherwise `snapshot`. Dividing by 0 gives no result (null).
+        Requires an editor or reporter of the Organisation.
+      operationId: createFormulaTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FormulaTrackerRequest'
+            examples:
+              referralsCompleted:
+                summary: Referrals completed = External referrals + Internal referrals
+                value:
+                  formula_tracker:
+                    charity_id: 913
+                    name: "Referrals completed"
+                    expression:
+                      - { kind: tracker, type: Change, id: 5120 }
+                      - { kind: operator, value: "+" }
+                      - { kind: tracker, type: WorkflowTracker, id: 41 }
+              percentageSupported:
+                summary: "% of children receiving support = Children supported ÷ Children enrolled × 100"
+                value:
+                  formula_tracker:
+                    charity_id: 913
+                    name: "% of children receiving support"
+                    display_format: "percentage"
+                    decimal_places: 1
+                    expression:
+                      - { kind: tracker, type: Change, id: 5121 }
+                      - { kind: operator, value: "/" }
+                      - { kind: tracker, type: CohortTracker, id: 77 }
+                      - { kind: operator, value: "*" }
+                      - { kind: number, value: 100 }
+      responses:
+        "201":
+          description: Formula Tracker created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Formula Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /formula_trackers/operands:
+    get:
+      tags: [Formula Trackers]
+      summary: List the trackers a formula can use
+      description: |
+        The Organisation's trackers that have a number, by name, with the `type` and `id` to send in a
+        tracker token: its Activity, Engagement, Achievement and Numerical trackers (owned by it or used
+        on its Projects), Cohort, Workflow and Formula Trackers, and filtered versions. Choice trackers
+        aren't listed.
+      operationId: listFormulaTrackerOperands
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFormulaTrackerOperands'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Formula Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /formula_trackers/preview:
+    post:
+      tags: [Formula Trackers]
+      summary: Preview a Formula Tracker
+      description: |
+        What a formula gives on one of the Organisation's Projects, before it is saved: the result for
+        the current Period (ending at the Project's next deadline, or today when it has none ahead), Year
+        to Date and All-time, each tracker's own result, and warnings worth checking (a tracker used
+        twice, a Numerical tracker added to a count, different units added together, dividing by a
+        tracker that could be 0). A formula with errors is refused (422) with `errors` and `warnings`.
+        Send `formula_tracker_id` when editing a tracker, so a formula that uses it is caught.
+      operationId: previewFormulaTracker
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, project_id]
+              properties:
+                charity_id:
+                  type: integer
+                project_id:
+                  type: integer
+                formula_tracker_id:
+                  type: integer
+                  description: The Formula Tracker being edited, if any
+                formula_tracker:
+                  $ref: '#/components/schemas/FormulaTrackerAttributes'
+            example:
+              charity_id: 913
+              project_id: 4510
+              formula_tracker:
+                expression:
+                  - { kind: tracker, type: Change, id: 5120 }
+                  - { kind: operator, value: "+" }
+                  - { kind: tracker, type: WorkflowTracker, id: 41 }
+      responses:
+        "200":
+          description: The results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerPreview'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Formula Trackers for this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /formula_trackers/{id}:
+    get:
+      tags: [Formula Trackers]
+      summary: Get a Formula Tracker
+      description: A Formula Tracker with where it is used and any warnings about its formula.
+      operationId: getFormulaTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Formula Tracker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Formula Trackers]
+      summary: Update a Formula Tracker
+      description: |
+        Updates the fields sent; `expression` replaces the whole formula. Changes apply everywhere the
+        tracker is used. Requires an Organisation editor, or the reporter who created it.
+      operationId: updateFormulaTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FormulaTrackerRequest'
+            example:
+              formula_tracker:
+                decimal_places: 1
+      responses:
+        "200":
+          description: Formula Tracker updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Formula Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Formula Trackers]
+      summary: Delete a Formula Tracker
+      description: Refused (422) while the tracker is used on any Project, Album or Scorecard Template.
+      operationId: deleteFormulaTracker
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't delete this Formula Tracker
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /formula_trackers/{id}/projects/{project_id}:
+    get:
+      tags: [Formula Trackers]
+      summary: Get a Formula Tracker's targets on a Project
+      description: The one-off target and deadline targets (the Project's Set Targets page). Requires rights to edit the Project's targets.
+      operationId: getFormulaTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Formula Trackers]
+      summary: Add a Formula Tracker to a Project
+      description: |
+        Places the tracker in a column of the Project's Impact Scorecard (Edit Project Metrics),
+        optionally with a one-off target. The Project's Albums pick it up automatically. The tracker
+        and Project must belong to the same Organisation, and the user needs rights to edit the
+        Project's metrics.
+      operationId: addFormulaTrackerToProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [column]
+              properties:
+                column:
+                  type: string
+                  enum: [activities, engagement, potential, behaviour, growth]
+                target:
+                  type: integer
+            example:
+              column: engagement
+              target: 40
+      responses:
+        "201":
+          description: Placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    patch:
+      tags: [Formula Trackers]
+      summary: Set a Formula Tracker's targets on a Project
+      description: |
+        Sets the one-off target and/or replaces this tracker's deadline targets on the Project (Set
+        Targets). An additive tracker adds its targets up across deadlines; a snapshot uses each
+        deadline's target on its own. A percentage tracker's targets are whole percentages from 0 to
+        100. `deadlines: []` clears the deadline targets. Requires rights to edit the Project's targets.
+      operationId: setFormulaTrackerProjectTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 40
+              deadlines:
+                - { date: "2026-06-30", number: 20 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerPlacement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Formula Trackers]
+      summary: Remove a Formula Tracker from a Project
+      operationId: removeFormulaTrackerFromProject
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Project's metrics
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /formula_trackers/{id}/albums/{bundle_id}:
+    get:
+      tags: [Formula Trackers]
+      summary: Get a Formula Tracker's targets on an Album
+      description: |
+        An Album inherits the Formula Trackers on its Projects. Returns the Album's one-off and
+        deadline targets for the tracker, and `album_target_type`: the Album's Set Targets page shows
+        Formula Tracker targets under manual targets. Requires rights to edit the Album's targets.
+      operationId: getFormulaTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerAlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Formula Trackers]
+      summary: Set a Formula Tracker's targets on an Album
+      description: |
+        Sets the Album's one-off target and/or replaces its deadline targets (saved as manual targets)
+        for the tracker. An Album's result is worked out from the Album's own results, so its target is
+        never the sum of its Projects'. Requires rights to edit the Album's targets.
+      operationId: setFormulaTrackerAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortTrackerTargetsRequest'
+            example:
+              target: 120
+              deadlines:
+                - { date: "2026-12-31", number: 100 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerAlbumTargets'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -10832,6 +11299,254 @@ components:
               happened_at:
                 type: string
                 format: date-time
+
+    FormulaToken:
+      type: object
+      required: [kind]
+      description: "One part of a formula: a tracker, an operator, a number or a bracket"
+      properties:
+        kind:
+          type: string
+          enum: [tracker, operator, number, open, close]
+        type:
+          type: string
+          enum: [Change, Indicator, CohortTracker, WorkflowTracker, FilteredMetric, FormulaTracker]
+          description: "tracker only: the tracker's type"
+        id:
+          type: integer
+          description: "tracker only: the tracker's id"
+        value:
+          description: "operator: +, -, * or /. number: the number."
+          oneOf:
+            - type: string
+            - type: number
+
+    FormulaTracker:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "Referrals completed"
+        description:
+          type: string
+          nullable: true
+        charity_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        expression:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormulaToken'
+        formula_text:
+          type: string
+          example: "External referrals + Internal referrals"
+        display_format:
+          type: string
+          enum: [number, percentage]
+        decimal_places:
+          type: integer
+          minimum: 0
+          maximum: 3
+        unit_label:
+          type: string
+          nullable: true
+          example: "h per child"
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+          description: additive adds up across periods (only + and − of trackers that add up); snapshot works each timeframe out from its own totals
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FormulaTrackerAlbumTargets:
+      type: object
+      properties:
+        formula_tracker_id:
+          type: integer
+        album_id:
+          type: integer
+        album_target_type:
+          type: string
+          enum: [manual_target, automatic_target]
+        target:
+          type: integer
+          example: 120
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    FormulaTrackerAttributes:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        expression:
+          type: array
+          description: The formula, in order
+          items:
+            $ref: '#/components/schemas/FormulaToken'
+        display_format:
+          type: string
+          enum: [number, percentage]
+          description: "Show result as: number (default) or percentage"
+        decimal_places:
+          type: integer
+          minimum: 0
+          maximum: 3
+        unit_label:
+          type: string
+          maxLength: 50
+          description: e.g. "h per child", shown after a number
+
+    FormulaTrackerDetail:
+      allOf:
+        - $ref: '#/components/schemas/FormulaTracker'
+        - type: object
+          properties:
+            usage:
+              type: object
+              properties:
+                projects:
+                  type: integer
+                albums:
+                  type: integer
+                templates:
+                  type: integer
+            warnings:
+              type: array
+              description: Things worth checking that don't stop it being saved, e.g. a tracker used twice
+              items:
+                type: string
+
+    FormulaTrackerOperand:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [Change, Indicator, CohortTracker, WorkflowTracker, FilteredMetric, FormulaTracker]
+        id:
+          type: integer
+        name:
+          type: string
+          example: "External referrals"
+        type_name:
+          type: string
+          example: "Engagement tracker"
+        unit:
+          type: string
+          example: "count"
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+
+    FormulaTrackerPlacement:
+      type: object
+      properties:
+        formula_tracker_id:
+          type: integer
+        project_id:
+          type: integer
+        column:
+          type: string
+          enum: [activities, engagement, potential, behaviour, growth]
+        target:
+          type: integer
+          example: 40
+        deadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortTrackerDeadline'
+
+    FormulaTrackerPreview:
+      type: object
+      properties:
+        project_id:
+          type: integer
+        period_end:
+          type: string
+          format: date
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+        results:
+          $ref: '#/components/schemas/FormulaTrackerTimeframeResults'
+        warnings:
+          type: array
+          items:
+            type: string
+        trackers:
+          type: array
+          description: Each tracker the formula uses, with its own results
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              id:
+                type: integer
+              name:
+                type: string
+              type_name:
+                type: string
+              results:
+                $ref: '#/components/schemas/FormulaTrackerTimeframeResults'
+
+    FormulaTrackerRequest:
+      type: object
+      properties:
+        formula_tracker:
+          allOf:
+            - $ref: '#/components/schemas/FormulaTrackerAttributes'
+            - type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: Required when creating
+
+    FormulaTrackerTimeframeResults:
+      type: object
+      description: Each timeframe's result; null where it can't be worked out (e.g. dividing by 0)
+      properties:
+        period:
+          type: number
+          nullable: true
+        year_to_date:
+          type: number
+          nullable: true
+        all_time:
+          type: number
+          nullable: true
+
+    PaginatedFormulaTrackerOperands:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FormulaTrackerOperand'
+
+    PaginatedFormulaTrackers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FormulaTracker'
 
     PaginatedWorkflowTrackers:
       allOf:

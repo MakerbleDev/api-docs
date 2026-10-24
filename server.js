@@ -903,6 +903,7 @@ function buildDocsPage() {
         <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Add Metric To</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
         <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Workflow Trackers</a>
+        <a href="#formula-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Formula Trackers</a>
         <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Filtered Metrics</a>
       </div>
       <div class="nav-section">
@@ -2205,6 +2206,110 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "No Project in the Album uses the tracker" }
           ])}
           ${endpointCard("DELETE", "/workflow_trackers/{id}/projects/{project_id}", "Remove a Workflow Tracker from a Project", true, [], [
+            { code: "204", cls: "response-2xx", desc: "Removed" },
+            { code: "404", cls: "response-4xx", desc: "Not on the Project" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Formula Trackers -->
+      <section class="section" id="formula-trackers">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Formula Trackers</h2>
+        <div class="section-desc">
+          <p>A Formula Tracker is a metric worked out from the Organisation's other trackers with + − × ÷, numbers and brackets, e.g. Referrals completed = External referrals + Internal referrals, or % of children receiving support = Children supported ÷ Children enrolled × 100. Its <code>expression</code> is the formula as an ordered list of tokens, never free text: <code>{kind: "tracker", type, id}</code>, <code>{kind: "operator", value: "+" | "-" | "*" | "/"}</code>, <code>{kind: "number", value}</code>, <code>{kind: "open"}</code> and <code>{kind: "close"}</code>. × and ÷ are worked out before + and −, brackets first. A tracker token's <code>type</code> is <code>Change</code> (Activity or Engagement tracker), <code>Indicator</code> (Achievement or Numerical tracker; not a Choice tracker), <code>CohortTracker</code>, <code>WorkflowTracker</code>, <code>FilteredMetric</code> or <code>FormulaTracker</code>.</p>
+          <p>For each timeframe, each tracker's result is worked out first, then the formula, so a Year to Date percentage is Year to Date numerator ÷ Year to Date denominator. <code>result_kind</code> is <code>additive</code> only when the formula adds and subtracts trackers that add up, with no numbers; otherwise <code>snapshot</code>. Dividing by 0 gives no result. It is placed in an Impact Scorecard column like other metrics.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> List the trackers a formula can use with <code>GET /formula_trackers/operands</code>, check the result with <code>POST /formula_trackers/preview</code>, create the tracker, then place it on a Project with <code>POST /formula_trackers/{id}/projects/{project_id}</code>. Albums pick it up from their Projects.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/formula_trackers", "List an Organisation's Formula Trackers", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Formula Trackers, each with <code>expression</code>, <code>formula_text</code>, <code>display_format</code>, <code>decimal_places</code>, <code>unit_label</code> and <code>result_kind</code>" },
+            { code: "403", cls: "response-4xx", desc: "No editor or reporter role in the Organisation" }
+          ])}
+          ${endpointCard("GET", "/formula_trackers/operands", "List the trackers a formula can use", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated <code>data: [{type, id, name, type_name, unit, result_kind}]</code>, by name: the <code>type</code> and <code>id</code> to send in a tracker token" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" }
+          ])}
+          ${endpointCard("GET", "/formula_trackers/{id}", "Get a Formula Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Formula Tracker ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The tracker, with <code>usage</code> and <code>warnings</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
+          ])}
+          ${endpointCard("POST", "/formula_trackers/preview", "Preview a Formula Tracker", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>results: {period, year_to_date, all_time}</code> on the Project (null where it divides by 0), each tracker's own <code>results</code> under <code>trackers</code>, <code>result_kind</code> and <code>warnings</code>" },
+            { code: "404", cls: "response-4xx", desc: "The Project isn't the Organisation's" },
+            { code: "422", cls: "response-4xx", desc: "The formula has errors: <code>{errors, warnings}</code>" }
+          ], "Body: <code>charity_id</code>, <code>project_id</code>, <code>formula_tracker: {expression, display_format}</code>, and <code>formula_tracker_id</code> when editing one. Warnings don't stop it being saved: a tracker used twice is counted twice; a Numerical tracker added to a count; trackers with different units added together; dividing by a tracker that could be 0.")}
+          ${endpointCard("POST", "/formula_trackers", "Create a Formula Tracker", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Formula Tracker created" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "The formula is empty, starts or ends with an operator, has two operators or values in a row, unmatched or empty brackets, uses another Organisation's tracker, or uses itself" }
+          ], "Body: <code>formula_tracker: {charity_id, name, description, expression, display_format, decimal_places, unit_label}</code>. <code>display_format</code> is <code>number</code> (default) or <code>percentage</code>; <code>decimal_places</code> 0 to 3; <code>unit_label</code> e.g. \"h per child\".")}
+          ${endpointCard("PATCH", "/formula_trackers/{id}", "Update a Formula Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Formula Tracker ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Formula Tracker updated" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation editor or the reporter who created it" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Only the fields sent change; <code>expression</code> replaces the whole formula. Changes apply everywhere the tracker is used.")}
+          ${endpointCard("DELETE", "/formula_trackers/{id}", "Delete a Formula Tracker", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Formula Tracker ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Deleted" },
+            { code: "422", cls: "response-4xx", desc: "Still used on a Project, Album or Scorecard Template" }
+          ])}
+          ${endpointCard("POST", "/formula_trackers/{id}/projects/{project_id}", "Add a Formula Tracker to a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Formula Tracker ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "column", type: "string", required: true, desc: "<code>activities</code>, <code>engagement</code>, <code>potential</code>, <code>behaviour</code> or <code>growth</code>" },
+            { name: "target", type: "integer", required: false, desc: "One-off target (a whole percentage, 0 to 100, for a percentage tracker)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Placed: <code>{formula_tracker_id, project_id, column, target}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's metrics" },
+            { code: "422", cls: "response-4xx", desc: "Unknown column, or already on the Project" }
+          ])}
+          ${endpointCard("GET", "/formula_trackers/{id}/projects/{project_id}", "Get a Formula Tracker's targets on a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Formula Tracker ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{formula_tracker_id, project_id, column, target, deadlines: [{date, number}]}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" }
+          ])}
+          ${endpointCard("PATCH", "/formula_trackers/{id}/projects/{project_id}", "Set a Formula Tracker's targets on a Project", true, [
+            { name: "target", type: "integer", required: false, desc: "One-off target" },
+            { name: "deadlines", type: "array", required: false, desc: "<code>[{date: \"YYYY-MM-DD\", number}]</code>, replacing this tracker's deadline targets; <code>[]</code> clears them. An additive tracker adds them up across deadlines; a snapshot uses each on its own. A percentage tracker's targets are whole percentages, 0 to 100." }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Targets saved" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Project's targets" },
+            { code: "422", cls: "response-4xx", desc: "Bad deadlines, or neither field sent" }
+          ])}
+          ${endpointCard("GET", "/formula_trackers/{id}/albums/{bundle_id}", "Get a Formula Tracker's targets on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{formula_tracker_id, album_id, album_target_type, target, deadlines}</code>" },
+            { code: "404", cls: "response-4xx", desc: "The Album has no Project using the tracker" }
+          ])}
+          ${endpointCard("PATCH", "/formula_trackers/{id}/albums/{bundle_id}", "Set a Formula Tracker's targets on an Album", true, [
+            { name: "target", type: "integer", required: false, desc: "One-off target for the Album; never the sum of its Projects'" },
+            { name: "deadlines", type: "array", required: false, desc: "<code>[{date, number}]</code>, saved as the Album's manual targets" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Targets saved" },
+            { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
+          ])}
+          ${endpointCard("DELETE", "/formula_trackers/{id}/projects/{project_id}", "Remove a Formula Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
           ])}
