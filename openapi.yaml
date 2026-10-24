@@ -150,6 +150,8 @@ tags:
     description: Organisations — the top-level entity that owns Projects
   - name: Projects
     description: The primary organisational unit — every Story and Case belongs to a Project
+  - name: Albums
+    description: Albums (Bundles; being renamed Portfolios on screen) group Projects so their results can be seen together
   - name: Beneficiaries
     description: Contacts — the people your organisation works with
   - name: Beneficiary Categories
@@ -504,6 +506,263 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+
+  /albums:
+    get:
+      tags: [Albums]
+      summary: List Albums (Portfolios)
+      description: |
+        The Albums the user's Albums list shows: those they made, manage or are an Album Analyst of,
+        and the Albums of the Organisations they are an editor of. An Album (Bundle in the database;
+        being renamed Portfolio on screen) groups Projects so their results can be seen together.
+      operationId: listAlbums
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Albums
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlbumList'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Albums]
+      summary: Make an Album (Portfolio)
+      description: |
+        Makes an Album, as the Make an Album form does. Its owner is either the user (`owner_type:
+        User`, a personal Album) or one of their Organisations (`owner_type: Charity` with that
+        Organisation's ID); the user must be an editor of that Organisation. The user becomes the
+        Album's manager. Projects in `project_ids` join straight away when they're the Organisation's
+        or the user's own; another Organisation's Project is invited instead and shows in
+        `pending_project_ids` until its managers accept.
+      operationId: createAlbum
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlbumCreateRequest'
+            example:
+              name: "Youth programmes 2027"
+              owner_type: Charity
+              owner_id: 42
+              project_ids: [101, 102]
+      responses:
+        "201":
+          description: The Album
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /albums/{id}:
+    get:
+      tags: [Albums]
+      summary: Get an Album (Portfolio)
+      description: |
+        One Album, if the user can see it (its visibility setting decides who can). An Album the user
+        can't see returns 404.
+      operationId: getAlbum
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Album
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Albums]
+      summary: Change an Album's (Portfolio's) settings
+      description: |
+        Changes the settings on the Edit Album and Album Edit pages. Only the fields sent change;
+        `manager_ids` and `analyst_ids` replace the Album's managers and Album Analysts (the Album's
+        maker always stays a manager). Projects are added and removed with `/albums/{id}/projects`.
+        Only the Album's managers may change it.
+      operationId: updateAlbum
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlbumUpdateRequest'
+            example:
+              name: "Youth programmes 2027"
+              description: "Every after-school club we run"
+              analyst_ids: [7]
+      responses:
+        "200":
+          description: The Album
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't one of the Album's managers
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /albums/{id}/projects:
+    post:
+      tags: [Albums]
+      summary: Add Projects to an Album (Portfolio)
+      description: |
+        Adds Projects to the Album, keeping the ones already in it. A Project the user can't add
+        directly (another Organisation's) is invited instead and shows in `pending_project_ids`.
+        Only the Album's managers may add Projects.
+      operationId: addAlbumProjects
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlbumProjectsRequest'
+            example:
+              project_ids: [103]
+      responses:
+        "200":
+          description: The Album
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't one of the Album's managers
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Albums]
+      summary: Remove Projects from an Album (Portfolio)
+      description: |
+        Takes Projects out of the Album. The Projects themselves aren't changed. Only the Album's
+        managers may remove Projects.
+      operationId: removeAlbumProjects
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlbumProjectsRequest'
+            example:
+              project_ids: [102]
+      responses:
+        "200":
+          description: The Album
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't one of the Album's managers
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /albums/{id}/targets:
+    get:
+      tags: [Albums]
+      summary: Get an Album's (Portfolio's) targets
+      description: |
+        What the Album's Set Targets page shows. With `target_type: automatic_target` the Album adds
+        up its Projects' targets from `year_start_date`; with `manual_target` it has its own one-off
+        targets on its Activity and Outcome metrics (Changes and Indicators) and its trackers, and its
+        own deadline targets. Requires rights to edit the Album's targets.
+      operationId: getAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Albums]
+      summary: Set an Album's (Portfolio's) targets
+      description: |
+        Sets what the Album's Set Targets page saves. Only metrics and trackers already on the Album
+        can be given a target; anything else is refused with 422 and nothing is saved. `deadlines`,
+        when sent, replaces all of the Album's manual deadline targets (send `[]` to clear them).
+        Metric, tracker and deadline targets are only saved while the Album uses manual targets.
+        Requires rights to edit the Album's targets.
+      operationId: setAlbumTargets
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlbumTargetsRequest'
+            example:
+              target_type: manual_target
+              year_start_date: "2026-04-01"
+              metrics:
+                - { metric_type: Change, metric_id: 55, target: 300 }
+              trackers:
+                - { tracker_type: CohortTracker, tracker_id: 9, target: 40 }
+              deadlines:
+                - { metric_type: Change, metric_id: 55, date: "2026-12-31", number: 150 }
+      responses:
+        "200":
+          description: Targets saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlbumTargets'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /projects:
     get:
@@ -8562,6 +8821,256 @@ components:
                   name:
                     type: string
                     example: "Enrolled"
+
+    Album:
+      type: object
+      description: An Album (Bundle; Portfolio on screen) groups Projects so their results can be seen together.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        owner_type:
+          type: string
+          enum: [Charity, User]
+          description: "`Charity` for an Organisation's Album, `User` for a personal one"
+        owner_id:
+          type: integer
+        creator_id:
+          type: integer
+          description: The user who made the Album
+        manager_ids:
+          type: array
+          items:
+            type: integer
+          description: The Album's managers, who may change it
+        analyst_ids:
+          type: array
+          items:
+            type: integer
+          description: The Album's Album Analysts, who may see its results
+        project_ids:
+          type: array
+          items:
+            type: integer
+        pending_project_ids:
+          type: array
+          items:
+            type: integer
+          description: Projects invited to join, until their managers accept. Not in list responses.
+        target_type:
+          type: string
+          nullable: true
+          enum: [manual_target, automatic_target, null]
+        year_start_date:
+          type: string
+          format: date
+          nullable: true
+        automatically_create_survey_progress_board:
+          type: boolean
+          description: Whether each Survey on the Album's Projects gets a progress board
+        default_results_template_id:
+          type: integer
+          nullable: true
+          description: The Impact Framework the Album's Progress Panel opens on; null for All metrics
+        cover_image_url:
+          type: string
+          nullable: true
+        url:
+          type: string
+          description: The Album's page in Makerble
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AlbumList:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Album'
+
+    AlbumCreateRequest:
+      type: object
+      required: [name, owner_type]
+      properties:
+        name:
+          type: string
+        owner_type:
+          type: string
+          enum: [Charity, User]
+        owner_id:
+          type: integer
+          description: The Organisation's ID when `owner_type` is `Charity`
+        project_ids:
+          type: array
+          items:
+            type: integer
+
+    AlbumUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        owner_type:
+          type: string
+          enum: [Charity, User]
+        owner_id:
+          type: integer
+        manager_ids:
+          type: array
+          items:
+            type: integer
+        analyst_ids:
+          type: array
+          items:
+            type: integer
+        automatically_create_survey_progress_board:
+          type: boolean
+        default_results_template_id:
+          type: integer
+          nullable: true
+          description: One of the Organisation's Impact Frameworks; null for All metrics
+
+    AlbumProjectsRequest:
+      type: object
+      required: [project_ids]
+      properties:
+        project_ids:
+          type: array
+          items:
+            type: integer
+
+    AlbumTargets:
+      type: object
+      properties:
+        album_id:
+          type: integer
+        target_type:
+          type: string
+          nullable: true
+          enum: [manual_target, automatic_target, null]
+        year_start_date:
+          type: string
+          format: date
+          nullable: true
+        metrics:
+          type: array
+          description: The Album's Activity and Outcome metrics and their one-off targets
+          items:
+            type: object
+            properties:
+              metric_type:
+                type: string
+                enum: [Change, Indicator]
+              metric_id:
+                type: integer
+              name:
+                type: string
+              target:
+                type: integer
+        trackers:
+          type: array
+          description: The Album's Cohort, Workflow and Formula Trackers and filtered versions, and their one-off targets
+          items:
+            type: object
+            properties:
+              tracker_type:
+                type: string
+                enum: [CohortTracker, WorkflowTracker, FormulaTracker, FilteredMetric]
+              tracker_id:
+                type: integer
+              name:
+                type: string
+              target:
+                type: integer
+        deadlines:
+          type: array
+          description: The deadline targets the Album uses now (its own with manual targets, its Projects' added up with automatic ones)
+          items:
+            type: object
+            properties:
+              metric_type:
+                type: string
+              metric_id:
+                type: integer
+              date:
+                type: string
+                format: date
+              number:
+                type: integer
+
+    AlbumTargetsRequest:
+      type: object
+      properties:
+        target_type:
+          type: string
+          enum: [manual_target, automatic_target]
+        year_start_date:
+          type: string
+          format: date
+        metrics:
+          type: array
+          items:
+            type: object
+            required: [metric_type, metric_id, target]
+            properties:
+              metric_type:
+                type: string
+                enum: [Change, Indicator]
+              metric_id:
+                type: integer
+              target:
+                type: integer
+                minimum: 0
+        trackers:
+          type: array
+          items:
+            type: object
+            required: [tracker_type, tracker_id, target]
+            properties:
+              tracker_type:
+                type: string
+                enum: [CohortTracker, WorkflowTracker, FormulaTracker, FilteredMetric]
+              tracker_id:
+                type: integer
+              target:
+                type: integer
+                minimum: 0
+        deadlines:
+          type: array
+          description: Replaces all of the Album's manual deadline targets
+          items:
+            type: object
+            required: [metric_type, metric_id, date, number]
+            properties:
+              metric_type:
+                type: string
+              metric_id:
+                type: integer
+              date:
+                type: string
+                format: date
+              number:
+                type: integer
+                minimum: 0
 
     Project:
       allOf:

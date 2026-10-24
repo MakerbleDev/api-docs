@@ -877,6 +877,7 @@ function buildDocsPage() {
         <div class="nav-section-label">Core resources</div>
         <a href="#organisations"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Organisations</a>
         <a href="#projects"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Projects</a>
+        <a href="#albums"          class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Albums (Portfolios)</a>
         <a href="#users"           class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Users</a>
         <a href="#contacts"        class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Contacts</a>
         <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Contact Bio Forms</a>
@@ -1192,6 +1193,98 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "422", cls: "response-4xx", desc: "Invalid project_ids, date, tracker_types, group_by, per_page or template_id" }
           ], "Returns the figures on each Project's Results Canvas (the Results panel on a Project page), one entry per tracker, for the Projects you can view. Activity and Engagement trackers (Changes) give <code>times_recorded</code> and <code>contacts</code>; Achievement trackers (Binary Indicators) give <code>times_recorded</code> and <code>contacts_achieved</code>; Choice trackers (Scale Indicators) give <code>answers</code> with a count and contacts per Sub Ratio; Numerical trackers (Value Indicators) give <code>total</code> and <code>average_per_contact</code>. <code>times_recorded</code> counts records, not people; <code>contacts</code> counts distinct Contacts tagged. <code>anonymous_count</code> is what was recorded with no Contact tagged. <code>target</code>, <code>target_deadline</code> and <code>percent_of_target</code> appear when the Project has a target.")}
+        </div>
+      </section>
+
+      <!-- Albums -->
+      <section class="section" id="albums">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Albums (Portfolios)</h2>
+        <div class="section-desc">
+          <p>An Album groups Projects so their results can be seen together. Albums are being renamed <strong>Portfolios</strong> on screen; the API keeps the name <code>albums</code>. An Album belongs to an Organisation (<code>owner_type: Charity</code>) or to one user (<code>owner_type: User</code>). Its <strong>managers</strong> can change it; its <strong>Album Analysts</strong> can see its results. Another Organisation's Project can't be added directly: it is invited, and shows in <code>pending_project_ids</code> until its managers accept.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/albums", "List Albums", true, [
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — return only Albums updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Albums" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" }
+          ], "The Albums you made, manage or are an Album Analyst of, and the Albums of the Organisations you are an editor of.")}
+          ${endpointCard("GET", "/albums/{id}", "Get an Album", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Album ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Album: its settings, <code>manager_ids</code>, <code>analyst_ids</code>, <code>project_ids</code> and <code>pending_project_ids</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" }
+          ])}
+          ${endpointCard("POST", "/albums", "Make an Album", true, [
+            { name: "name", type: "string", required: true, desc: "The Album's name" },
+            { name: "owner_type", type: "string", required: true, desc: "<code>Charity</code> for an Organisation's Album, <code>User</code> for a personal one" },
+            { name: "owner_id", type: "integer", required: false, desc: "The Organisation's ID, when <code>owner_type</code> is <code>Charity</code>. You must be an editor of it" },
+            { name: "project_ids", type: "integer[]", required: false, desc: "Projects to put in the Album" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The new Album, with you as its manager" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. no name, or an Organisation you aren't an editor of" }
+          ], "Makes an Album as the <b>Make an Album</b> form does. Check with <code>GET /albums</code> that the Organisation doesn't already have it first.")}
+          ${endpointCard("PATCH", "/albums/{id}", "Change an Album's settings", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "name", type: "string", required: false, desc: "The Album's name" },
+            { name: "description", type: "string", required: false, desc: "The Album's description" },
+            { name: "owner_type / owner_id", type: "string / integer", required: false, desc: "Move the Album to another of your Organisations, or make it personal" },
+            { name: "manager_ids", type: "integer[]", required: false, desc: "Replaces the managers (the Album's maker always stays one)" },
+            { name: "analyst_ids", type: "integer[]", required: false, desc: "Replaces the Album Analysts" },
+            { name: "automatically_create_survey_progress_board", type: "boolean", required: false, desc: "Give each Survey on the Album's Projects a progress board" },
+            { name: "default_results_template_id", type: "integer", required: false, desc: "The Impact Framework the Progress Panel opens on; <code>null</code> for All metrics" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Album" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not one of the Album's managers" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>" }
+          ], "Changes what the <b>Edit Album</b> and Album <b>Edit</b> pages change. Only what you send changes. Projects are added and removed with <code>/albums/{id}/projects</code>.")}
+          ${endpointCard("POST", "/albums/{id}/projects", "Add Projects to an Album", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "project_ids", type: "integer[]", required: true, desc: "Projects to add" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Album" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not one of the Album's managers" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" }
+          ], "Keeps the Projects already in the Album. Another Organisation's Project is invited instead and shows in <code>pending_project_ids</code>.")}
+          ${endpointCard("DELETE", "/albums/{id}/projects", "Remove Projects from an Album", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "project_ids", type: "integer[]", required: true, desc: "Projects to take out, in the JSON body" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Album" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not one of the Album's managers" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" }
+          ], "The Projects themselves don't change.")}
+          ${endpointCard("GET", "/albums/{id}/targets", "Get an Album's targets", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Album ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>target_type</code>, <code>year_start_date</code>, and the one-off targets on its <code>metrics</code> (Changes and Indicators) and <code>trackers</code>, and its <code>deadlines</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You can't edit this Album's targets" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" }
+          ], "What the Album's <b>Set Targets</b> page shows. With <code>automatic_target</code> the Album adds up its Projects' targets from <code>year_start_date</code>; with <code>manual_target</code> it has its own.")}
+          ${endpointCard("PATCH", "/albums/{id}/targets", "Set an Album's targets", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "target_type", type: "string", required: false, desc: "<code>manual_target</code> or <code>automatic_target</code>" },
+            { name: "year_start_date", type: "string", required: false, desc: "YYYY-MM-DD" },
+            { name: "metrics", type: "object[]", required: false, desc: "<code>[{metric_type: Change|Indicator, metric_id, target}]</code>" },
+            { name: "trackers", type: "object[]", required: false, desc: "<code>[{tracker_type: CohortTracker|WorkflowTracker|FormulaTracker|FilteredMetric, tracker_id, target}]</code>" },
+            { name: "deadlines", type: "object[]", required: false, desc: "<code>[{metric_type, metric_id, date, number}]</code>. Replaces all the Album's deadline targets; <code>[]</code> clears them" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The targets" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You can't edit this Album's targets" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. a metric or tracker that isn't on the Album; nothing is saved" }
+          ], "Saves what the Album's <b>Set Targets</b> page saves. Only metrics and trackers already on the Album can be given a target. Metric, tracker and deadline targets are only saved while the Album uses manual targets.")}
         </div>
       </section>
 
