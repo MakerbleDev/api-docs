@@ -915,6 +915,7 @@ function buildDocsPage() {
       <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
         <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Webhooks</a>
+        <a href="#seats"           class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Seats</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
@@ -2823,6 +2824,43 @@ function buildDocsPage() {
           ], [
             { code: "202", cls: "response-2xx", desc: "Queued again, with the same event id" },
             { code: "404", cls: "response-4xx", desc: "No such delivery for this endpoint" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Seats -->
+      <section class="section" id="seats">
+        <div class="section-eyebrow">Billing</div>
+        <h2 class="section-title">Seats</h2>
+        <div class="section-desc">
+          <p>Seats per Colleague: which seat each colleague holds on each of an Organisation's current Contracts (what it has bought, e.g. Makerble CRM · Standard), and changing one. This is the <strong>Our Account › Seats</strong> page. On Role-based Pricing seats come in Billing Roles (Organiser, Practitioner, Helper), and a colleague's roles decide the lowest one they need; on Flat Pricing any seat covers any role.</p>
+          <p>Each colleague's <code>status</code> is <code>covered</code>, <code>no_seat</code> (a role that needs a seat but no seat), <code>seat_too_low</code> (a seat below what their roles need) or <code>no_seat_needed</code> (they still hold a seat but no longer have a role that needs one). Nobody loses access because of their seat. When a colleague is given a role, Makerble gives them a free seat on the Contract marked <code>default_for_new_colleagues</code>, or records that the Organisation is over its seat count.</p>
+          <p>Only the Organisation's admins can read or change seats; anyone else gets <code>404</code>.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Call <code>GET /organisations/{organisation_id}/seats</code> for the <code>contract_id</code>, the Billing Role ids in each Contract's <code>lines</code> and the colleague's <code>user_id</code>, then <code>PUT</code> the change.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/organisations/{organisation_id}/seats", "List an Organisation's seats per colleague", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Colleagues per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "contracts (seats bought, assigned and over per Billing Role) and a paginated data list of colleagues with their seats, lowest_seat_allowed and status" },
+            { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation" }
+          ])}
+          ${endpointCard("PUT", "/organisations/{organisation_id}/seats/{user_id}", "Change a colleague's seat on one Contract", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague's user ID" },
+            { name: "contract_id", in: "body", type: "integer", required: true, desc: "One of the Organisation's current Contracts" },
+            { name: "billing_role_id", in: "body", type: "integer", required: false, desc: "Role-based Pricing: the Billing Role to give, or null to take the seat away" },
+            { name: "has_seat", in: "body", type: "boolean", required: false, desc: "Flat Pricing: true gives a seat, false takes it away" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The colleague with their seats after the change" },
+            { code: "403", cls: "response-4xx", desc: "Makerble Support, who can only look" },
+            { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation, or the Contract, colleague or Billing Role isn't one of its own" },
+            { code: "422", cls: "response-4xx", desc: "A billing_role_id on a Flat Pricing Contract" }
           ])}
         </div>
       </section>
