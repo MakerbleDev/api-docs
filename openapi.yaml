@@ -184,6 +184,8 @@ tags:
     description: Groups of Impact Frameworks (e.g. the SDGs) that organisations report their contribution towards
   - name: Library
     description: Search the organisation's library and the public library of reusable building blocks, read an item in full, and see where it is used
+  - name: ImpactStore
+    description: Search the Makerble ImpactStore (the Explore pages) for published Surveys, Contact Forms, Case Forms, Impact Frameworks, Report Templates, Toolkits and Project Types to reuse
   - name: Ratio Sets
     description: Dropdown / List field definitions
   - name: Sub Ratios
@@ -4292,6 +4294,91 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /impact_store/search:
+    get:
+      tags: [ImpactStore]
+      summary: Search the ImpactStore
+      operationId: searchImpactStore
+      description: |
+        Searches the Makerble ImpactStore: the ready-made Surveys, Contact Forms, Case Forms, Impact
+        Frameworks, Report Templates, Toolkits and Project Types published for any organisation to
+        reuse. Use it before making one of these from scratch.
+
+        - Only published items are searched: those the Explore pages list (approved, shared with
+          everyone, and with a name and, except for Contact and Case Forms, a description), and every
+          Project Type, since only Makerble makes them. Withdrawn Report Templates never appear.
+        - Items matching more of the words in `query` come first; an item matching none of them is
+          left out. Common words such as "a", "for" and "the" are ignored. `matched_words` says how
+          many words each item matched.
+        - `item_type` limits the search to one kind: `survey` (Survey), `contact_form` (Contact
+          Form), `case_form` (Case Form), `impact_framework` (Impact Framework), `report_template`
+          (Report Template), `toolkit` (Toolkit) or `project_type` (Project Type). Front-end names
+          such as `Contact form` work too. Default: every kind.
+        - `cause` keeps items tagged with that cause or subcause from the Explore page (a cause takes
+          in its subcauses). Contact Forms, Case Forms, Report Templates and Project Types have no
+          causes, so a cause leaves them out. With a `cause`, `query` may be left out to list everything for the cause.
+        - `used_by_count` is how many organisations use the item: those with a Project using the
+          Survey, Impact Framework, Toolkit or Project Type, those that added the Contact Form, those
+          with a Case made from the Case Form, and those with the Report Template in their library.
+        - `explore_url` is null for a Project Type, which has no Explore page.
+        - Read any item but a Report Template in full with **Get a library item**, using the same
+          `type` and `id`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: wellbeing young people
+          description: Words to look for in the name and description
+        - name: item_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [survey, contact_form, case_form, impact_framework, report_template, toolkit, project_type]
+          description: Only this kind of item (default every kind)
+        - name: cause
+          in: query
+          required: false
+          schema:
+            type: string
+          example: Mental health
+          description: Only items tagged with this cause or subcause, by name, in any case
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Matching published items, best match first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedImpactStoreSearch'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 431
+                    type: survey
+                    type_label: Survey
+                    name: Youth wellbeing check-in
+                    description: A short wellbeing survey for young people aged 11 to 18
+                    causes: [Health, Mental health]
+                    used_by_count: 12
+                    explore_url: https://www.makerble.com/story_categories/431
+                    matched_words: 3
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          description: An unknown `item_type` or `cause`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /library/search:
     get:
       tags: [Library]
@@ -7743,6 +7830,56 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+
+    ImpactStoreSearchResult:
+      type: object
+      description: A published ImpactStore item found by **Search the ImpactStore**.
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [survey, contact_form, case_form, impact_framework, report_template, toolkit, project_type]
+        type_label:
+          type: string
+          description: The front-end name of the type, e.g. Contact Form
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+          description: One line of plain text (always null for a Case Form)
+        causes:
+          type: array
+          items:
+            type: string
+          description: Cause and subcause names, causes first
+        used_by_count:
+          type: integer
+          description: How many organisations use it
+        explore_url:
+          type: string
+          nullable: true
+          description: Its page on Explore (null for a Project Type)
+        matched_words:
+          type: integer
+          description: How many of the query's words it matched
+
+    PaginatedImpactStoreSearch:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImpactStoreSearchResult'
 
     LibrarySearchResult:
       type: object
