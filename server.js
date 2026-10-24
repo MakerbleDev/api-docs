@@ -898,6 +898,7 @@ function buildDocsPage() {
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#library"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Library</a>
+        <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
         <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Add Metric To</a>
@@ -1729,6 +1730,29 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "<code>projects</code> you can see and <code>other_projects_count</code>, <code>records_count</code> and <code>last_used_at</code>, <code>contained_in</code> (the Surveys, Forms, Outcomes, Frameworks, Metrics or Toolkits including it), <code>contained_in_count</code> and <code>in_use</code>. Counts only" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" },
             { code: "422", cls: "response-4xx", desc: "Unknown <code>item_type</code>" }
+          ])}
+        </div>
+      </section>
+
+      <!-- ImpactStore -->
+      <section class="section" id="impact-store">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">ImpactStore</h2>
+        <div class="section-desc">
+          <p>The Makerble ImpactStore is what the Explore pages show: ready-made, well-tested Surveys, Contact Forms, Impact Frameworks, Report Templates and Toolkits published for any organisation to reuse. Search it before making one of these from scratch. Only published items are searched, and withdrawn ones never appear, so every user gets the same results.</p>
+          <p>Each item has a <code>type</code>: <code>survey</code>, <code>contact_form</code>, <code>impact_framework</code>, <code>report_template</code> or <code>toolkit</code>. Items matching more of the words in <code>query</code> come first, and <code>matched_words</code> says how many each matched. Read a Survey, Contact Form, Impact Framework or Toolkit in full with <a href="#library">Get a library item</a>, using the same <code>type</code> and <code>id</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/impact_store/search", "Search the ImpactStore", true, [
+            { name: "query", type: "string", required: false, desc: "Words to look for in the name and description. Common words such as \"a\" and \"for\" are ignored; an item matching none of the words is left out" },
+            { name: "item_type", type: "string", required: false, desc: "<code>survey</code>, <code>contact_form</code>, <code>impact_framework</code>, <code>report_template</code> or <code>toolkit</code> (default every kind)" },
+            { name: "cause", type: "string", required: false, desc: "A cause or subcause name from the Explore page, in any case. A cause takes in its subcauses; Contact Forms and Report Templates have no causes, so a cause leaves them out" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Results per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only items updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Matching published items, best match first, with <code>id</code>, <code>type</code>, <code>type_label</code>, <code>name</code>, <code>description</code>, <code>causes</code>, <code>used_by_count</code> (how many organisations use it), <code>explore_url</code> and <code>matched_words</code>" },
+            { code: "422", cls: "response-4xx", desc: "Unknown <code>item_type</code> or <code>cause</code>" }
           ])}
         </div>
       </section>
