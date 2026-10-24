@@ -5029,6 +5029,12 @@ paths:
         `project_scopable: true` in `GET /checklists/action_types` (surveys, events, labelled stories,
         cases, project states). Then only records made in the Project through which the Checklist was
         added to the Contact count towards it. It is ignored for other types.
+
+        "Due within N days of the checklist being added": set `due_within_days` (a whole number from 0
+        to 3650) to give an action a deadline. Each Contact's due date is the day the Checklist was
+        added to them plus that many days, so changing it moves the due date for everyone. Leave it
+        out, or send `null`, for no deadline. `GET /beneficiaries/{beneficiary_id}/checklists` then
+        says which actions are done late or overdue.
       operationId: createChecklist
       security: [{tokenAuth: []}]
       requestBody:
@@ -5048,6 +5054,7 @@ paths:
                   - action_type: "invite_to_event"
                     title: "Invite them to an induction event"
                     only_this_project: true
+                    due_within_days: 14
                     criteria:
                       project_event_categories: ["301:7"]
                   - action_type: "create_task"
@@ -5143,7 +5150,7 @@ paths:
       description: |
         Updates the name, description or actions. An action sent with its `id` is changed;
         `{id, _destroy: true}` removes it; an action without an `id` is added. Requires an editor or
-        reporter of the Organisation.
+        reporter of the Organisation. Send `due_within_days: null` to remove an action's deadline.
       operationId: updateChecklist
       security: [{tokenAuth: []}]
       parameters:
@@ -5169,6 +5176,7 @@ paths:
                     _destroy: true
                   - id: 57
                     owner_kind: "adder"
+                    due_within_days: 7
       responses:
         "200":
           description: The updated Checklist
@@ -5244,6 +5252,11 @@ paths:
         "Safeguarding Team"), `responsible_user_ids` (only colleagues who can see the Contact) and
         `owner_warning` when nobody responsible can see them (e.g. "No one in Safeguarding Team can see
         this contact").
+
+        An action whose Checklist gives it a deadline (`due_within_days`) has `due_on`: the day the
+        Checklist was added to the Contact plus that many days (null when there is no deadline).
+        `done_late` is true when it was done after `due_on`; `overdue` is true when it isn't done and
+        `due_on` has passed. Both are false for an action with no deadline.
       operationId: listContactChecklists
       security: [{tokenAuth: []}]
       parameters:
