@@ -634,7 +634,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Project'
+                $ref: '#/components/schemas/ProjectDetail'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -1104,6 +1104,137 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+    post:
+      tags: [Beneficiaries]
+      summary: Add existing Contacts to a Project
+      description: |
+        Adds existing Contacts (Beneficiaries) to a Project, all with one status (Beneficiary State,
+        e.g. Enrolled or Waiting List). This is the same as "Assign Contacts to projects" on the
+        Contacts page: each Contact added gets an entry on their activity timeline, and the Project's
+        team is notified. It doesn't create Contacts: use `POST /beneficiaries` for that.
+
+        Use it before `POST /project_story_categories/{id}/survey_links` with `beneficiary_ids`, when
+        the Contacts aren't in the Survey Campaign's Project yet.
+
+        - `beneficiary_state_id` is optional. Without it the Contacts are Enrolled, or get the
+          Project's first status if Enrolled is switched off. `GET /projects/{id}` lists the
+          statuses switched on in `beneficiary_states`.
+        - A Contact already in the Project is left as they are (their status doesn't change) and is
+          returned with `already_in_project: true`.
+        - Nothing is added if any Contact is refused.
+        - The Project must be open (not closed).
+
+        Requires an Organisation Editor, Reporter or Observer, or a user who may edit the Contact
+        (a Project Editor, or a Project Reporter if the organisation allows it, of a Project the
+        Contact is in).
+      operationId: addProjectBeneficiaries
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, beneficiary_ids]
+              properties:
+                project_id:
+                  type: integer
+                  description: The Project to add the Contacts to
+                beneficiary_ids:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: integer
+                  description: Contacts of the Project's organisation, at most 200
+                beneficiary_state_id:
+                  type: integer
+                  description: Optional Contact status, from `beneficiary_states` in GET /projects/{id}
+            example:
+              project_id: 572
+              beneficiary_ids: [160498, 160499]
+              beneficiary_state_id: 3
+      responses:
+        "201":
+          description: One entry per Contact, in the order given
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: The Project–Contact link
+                        project_id:
+                          type: integer
+                        beneficiary_id:
+                          type: integer
+                        beneficiary_state_id:
+                          type: integer
+                          nullable: true
+                          description: The Contact's status in the Project
+                        already_in_project:
+                          type: boolean
+                          description: The Contact was already in the Project and was left as they were
+                        created_at:
+                          type: string
+                          format: date-time
+                        updated_at:
+                          type: string
+                          format: date-time
+              example:
+                data:
+                  - id: 88121
+                    project_id: 572
+                    beneficiary_id: 160498
+                    beneficiary_state_id: 3
+                    already_in_project: false
+                    created_at: "2026-10-22T10:15:00.000Z"
+                    updated_at: "2026-10-22T10:15:00.000Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not move these Contacts between Projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: string
+              example:
+                errors: ["You do not have permission to move these contacts between projects: 160498."]
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: |
+            Invalid request: ids that aren't Contacts of the Project's organisation (listed in
+            `beneficiary_ids_not_found`; the same whether the Contact is in another organisation or
+            doesn't exist), a status not switched on for the Project, a closed Project, no ids, or more
+            than 200.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                  beneficiary_ids_not_found:
+                    type: array
+                    items:
+                      type: integer
+              example:
+                errors: ["These contacts were not found in the project's organisation: 9876."]
+                beneficiary_ids_not_found: [9876]
+
 
   /beneficiary_categories:
     get:
@@ -7896,6 +8027,28 @@ components:
               type: string
               example: "Greenfield Community Trust"
 
+    ProjectDetail:
+      description: A Project as returned by `GET /projects/{id}`.
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            beneficiary_states:
+              type: array
+              description: |
+                The Contact statuses (Beneficiary States) switched on for the
+                Project, e.g. Enrolled or Waiting List. Pass an `id` as `beneficiary_state_id` to
+                `POST /project_beneficiaries`.
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 3
+                  name:
+                    type: string
+                    example: "Enrolled"
+
     Project:
       allOf:
         - $ref: '#/components/schemas/Timestamps'
@@ -8084,6 +8237,7 @@ components:
                     parameter:
                       type: string
                       example: "project[help_statement]"
+
 
     User:
       allOf:
