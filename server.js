@@ -1174,6 +1174,45 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or in an Organisation you don't work in" },
             { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>" }
           ], "Edits a Project's details as the <b>Edit Project</b> page does, with the same permissions. Only what you send changes: a colleague list you send replaces that role's colleagues, and one you leave out is kept.")}
+          ${endpointCard("GET", "/projects/{id}/preferences", "Get a Project's Project Preferences", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Project Preferences: Contact Forms and statuses (Waiting List, Enrolled, Alumni, Declined) with their forms and baseline Surveys, editorial control, Events, Cases, Timesheets, default Story privacy and the Mailchimp list" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not a Manager of the Project or an Organisation Admin (e.g. a Changemaker)" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or in an Organisation you don't work in" }
+          ], "What the Project's <b>Project Preferences</b> page shows.")}
+          ${endpointCard("PATCH", "/projects/{id}/preferences", "Change a Project's Project Preferences", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "...", type: "object", required: false, desc: "Any of the settings <code>GET /projects/{id}/preferences</code> returns. A list you send replaces that list; <code>[]</code> empties it" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Project Preferences" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not a Manager of the Project or an Organisation Admin" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or in an Organisation you don't work in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>" }
+          ], "Saves what the <b>Project Preferences</b> page saves, with the same permissions. Only the settings you send change. Forms, Case Forms, Event Formats and Surveys must be the Project's Organisation's.")}
+          ${endpointCard("GET", "/projects/{id}/targets", "Get a Project's targets", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>year_start_date</code>, the one-off targets on its <code>metrics</code> (Changes and Indicators) and <code>trackers</code>, and its <code>deadlines</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You can't edit this Project's targets" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or in an Organisation you don't work in" }
+          ], "What the Project's <b>Set Targets</b> page shows.")}
+          ${endpointCard("PATCH", "/projects/{id}/targets", "Set a Project's targets", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "year_start_date", type: "string", required: false, desc: "YYYY-MM-DD" },
+            { name: "metrics", type: "object[]", required: false, desc: "<code>[{metric_type: Change|Indicator, metric_id, target}]</code>" },
+            { name: "trackers", type: "object[]", required: false, desc: "<code>[{tracker_type: CohortTracker|WorkflowTracker|FormulaTracker|FilteredMetric, tracker_id, target}]</code>" },
+            { name: "deadlines", type: "object[]", required: false, desc: "<code>[{metric_type, metric_id, date, number}]</code>. Replaces all the Project's deadline targets; <code>[]</code> clears them" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The targets" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You can't edit this Project's targets" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or in an Organisation you don't work in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. a metric or tracker that isn't on the Project; nothing is saved" }
+          ], "Saves what the <b>Set Targets</b> page saves. Only metrics and trackers already on the Project can be given a target. The same request as <code>PATCH /albums/{id}/targets</code>, without <code>target_type</code>.")}
           ${endpointCard("POST", "/projects/add_colleague.json", "Add users to a Project", true, [], [
             { code: "200", cls: "response-2xx", desc: "Users added successfully" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
