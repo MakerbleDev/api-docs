@@ -2068,6 +2068,13 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "<code>{project_id, assignment_mode}</code>" },
             { code: "404", cls: "response-4xx", desc: "A Project the user can't edit" }
           ])}
+          ${endpointCard("GET", "/checklists/{id}/progress", "Get a Checklist's progress", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "project_id", type: "integer", required: false, desc: "Only Contacts in this Project, one the Checklist is added to" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>contacts_count</code>, <code>complete_count</code>, <code>list_limit</code> and, for each action in order, <code>completed_count</code>, <code>furthest_count</code> and <code>waiting_count</code>, each with the first <code>list_limit</code> Contacts as <code>{beneficiary_id, name}</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, another Organisation's, or a Project the Checklist isn't added to" }
+          ], "The Progress section of the Checklist's profile page. <code>completed</code>: Contacts who have done the action. <code>furthest</code>: Contacts for whom it is the furthest action done. <code>waiting</code>: Contacts for whom it is the first action not done, so someone who did steps 1 and 3 is waiting on step 2. Only Contacts the user can see are counted.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [

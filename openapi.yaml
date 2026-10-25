@@ -5498,6 +5498,59 @@ paths:
           description: The user can't add Checklists to Projects in this Organisation
         "404":
           description: The Checklist or Project wasn't found, or the user can't edit the Project
+
+  /checklists/{id}/progress:
+    get:
+      tags: [Checklists]
+      summary: Get a Checklist's progress
+      description: |
+        Where the Contacts on a Checklist have got to: the Progress section of the Checklist's profile
+        page. For each action, in order: `completed` (Contacts who have done it), `furthest` (Contacts
+        for whom it is the furthest action done) and `waiting` (Contacts for whom it is the first action
+        not done, so a Contact who did steps 1 and 3 is waiting on step 2). Each list gives its full
+        count (`completed_count`, `furthest_count`, `waiting_count`) and the first `list_limit` (30)
+        Contacts alphabetically as `{beneficiary_id, name}`. `contacts_count` is every Contact counted and
+        `complete_count` those with every action done. Only Contacts the user can see are counted.
+      operationId: getChecklistProgress
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: project_id
+          in: query
+          required: false
+          description: Count only the Contacts in this Project, which must be one the Checklist is added to
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The counts and lists for each action
+          content:
+            application/json:
+              example:
+                checklist_id: 42
+                project_id: null
+                contacts_count: 3
+                complete_count: 1
+                list_limit: 30
+                actions:
+                  - id: 55
+                    number: 1
+                    action_type: "complete_form"
+                    title: "Complete the Intake form"
+                    completed_count: 2
+                    completed: [{beneficiary_id: 901, name: "Ayanda Dlamini"}, {beneficiary_id: 902, name: "Kagiso Mokoena"}]
+                    furthest_count: 0
+                    furthest: []
+                    waiting_count: 1
+                    waiting: [{beneficiary_id: 903, name: "Mpho Sithole"}]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
