@@ -5294,6 +5294,12 @@ paths:
         added to them plus that many days, so changing it moves the due date for everyone. Leave it
         out, or send `null`, for no deadline. `GET /beneficiaries/{beneficiary_id}/checklists` then
         says which actions are done late or overdue.
+
+        "Allow colleagues to tick this off by hand with a note": set `allow_manual_completion: true`
+        on an action that can happen offline (a phone call, a home visit, a paper form). Colleagues
+        who can edit a Contact can then mark it done by hand with
+        `POST /beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/completion`.
+        It is false unless sent; on an update, an action that doesn't mention it keeps its setting.
       operationId: createChecklist
       security: [{tokenAuth: []}]
       requestBody:
@@ -5320,6 +5326,7 @@ paths:
                     title: "Set a follow-up task"
                     owner_kind: "team"
                     owner_team_id: 18
+                    allow_manual_completion: true
       responses:
         "201":
           description: The Checklist, with its actions, projects and contacts_count
@@ -5516,6 +5523,9 @@ paths:
         Checklist was added to the Contact plus that many days (null when there is no deadline).
         `done_late` is true when it was done after `due_on`; `overdue` is true when it isn't done and
         `due_on` has passed. Both are false for an action with no deadline.
+
+        `allow_manual_completion` says whether colleagues may tick the action off by hand
+        (`POST .../actions/{action_id}/completion`).
       operationId: listContactChecklists
       security: [{tokenAuth: []}]
       parameters:
@@ -5645,6 +5655,116 @@ paths:
           description: The user can see the Contact but can't edit it
         "404":
           $ref: '#/components/responses/NotFound'
+
+  /beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/completion:
+    post:
+      tags: [Checklists]
+      summary: Mark a Contact's Checklist action as done by hand
+      description: |
+        The "Mark as done…" link under an action in a Contact's Checklists box, for steps that leave
+        no record Makerble can detect, such as a phone call, a home visit or a paper consent form.
+        Only an action whose Checklist allows it (`allow_manual_completion: true`) can be ticked off
+        this way, and only while it isn't done. Requires edit access to the Contact.
+
+        `completed_on` is the date it happened (`YYYY-MM-DD`, today or earlier) and `note` says what
+        happened. The note, and the `evidence` file when one is sent as multipart form data, are
+        saved as a Story on the Contact's timeline, which becomes the action's proof. The Story goes
+        in the Project the Checklist was added through, otherwise the Contact's only Project the user
+        can record stories in; when there is more than one, send `project_id`.
+
+        The action's `completion` then has `completion_method: manual`, `completed_by_user_id` the
+        user, `completed_at` the date given, and `proof_type: Story` with the new Story's `proof_id`.
+      operationId: markContactChecklistActionDone
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: checklist_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: action_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              completed_on: "2026-10-20"
+              note: "Paper consent signed at the home visit, scanned to file"
+              project_id: 301
+          multipart/form-data:
+            schema:
+              type: object
+              required: [completed_on, note]
+              properties:
+                completed_on:
+                  type: string
+                  format: date
+                note:
+                  type: string
+                project_id:
+                  type: integer
+                evidence:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: "`{checklist_id, action_id, done: true, completion: {completed_at, completed_by_user_id, completed_by_name, completion_method, proof_type, proof_id, proof_deleted}}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can see the Contact but can't edit it
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Checklists]
+      summary: Undo marking a Contact's Checklist action as done by hand
+      description: |
+        Takes back a tick made by hand. Only the colleague who made it, or an Organisation Admin, can
+        undo it, and only a manual completion can be undone. The Story stays on the Contact's
+        timeline. Makerble then looks again for a record that proves the action done, so the
+        response can still say `done: true` with a `detected` completion. Requires edit access to the
+        Contact.
+      operationId: undoContactChecklistActionDone
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: checklist_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: action_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "`{checklist_id, action_id, done, completion}` (completion null when not done)"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can see the Contact but can't edit it
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /beneficiaries/{beneficiary_id}/checklists/available:
     get:

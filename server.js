@@ -2052,7 +2052,7 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "The new Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "e.g. an action with every option unticked" }
-          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria, only_this_project, due_within_days, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. The owner fields are optional. <code>only_this_project: true</code> (\"Only count records in this project\") counts only records made in the Project the Checklist was added to the Contact through. <code>due_within_days</code> (\"Due within N days of the checklist being added\", 0 to 3650) gives the action a deadline; leave it out for none.")}
+          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, actions: [{action_type, title, description, criteria, only_this_project, due_within_days, allow_manual_completion, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. The owner fields are optional. <code>allow_manual_completion: true</code> (\"Allow colleagues to tick this off by hand with a note\") lets colleagues mark the action done by hand. <code>only_this_project: true</code> (\"Only count records in this project\") counts only records made in the Project the Checklist was added to the Contact through. <code>due_within_days</code> (\"Due within N days of the checklist being added\", 0 to 3650) gives the action a deadline; leave it out for none.")}
           ${endpointCard("PATCH", "/checklists/{id}", "Update a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
@@ -2070,7 +2070,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code> and <code>completion</code> (<code>completed_at</code>, <code>completed_by_user_id</code>, <code>completed_by_name</code>, <code>completion_method</code>, <code>proof_type</code>, <code>proof_id</code>, <code>proof_deleted</code>; null until done), <code>due_on</code>, <code>done_late</code> and <code>overdue</code> (when the Checklist gives the action a deadline), owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated: each Checklist with <code>done_count</code>, <code>actions_count</code> and its actions' <code>done</code> and <code>completion</code> (<code>completed_at</code>, <code>completed_by_user_id</code>, <code>completed_by_name</code>, <code>completion_method</code>, <code>proof_type</code>, <code>proof_id</code>, <code>proof_deleted</code>; null until done), <code>due_on</code>, <code>done_late</code> and <code>overdue</code> (when the Checklist gives the action a deadline), <code>allow_manual_completion</code>, owner fields, <code>owner_overridden</code>, <code>owner_description</code>, <code>responsible_user_ids</code> and <code>owner_warning</code>" },
             { code: "404", cls: "response-4xx", desc: "A Contact the user can't see" }
           ])}
           ${endpointCard("PATCH", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner", "Change who is responsible for an action for one Contact", true, [
@@ -2094,6 +2094,28 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The action's owner fields, as for the PATCH" },
             { code: "403", cls: "response-4xx", desc: "Can see the Contact but not edit it" }
           ])}
+          ${endpointCard("POST", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/completion", "Mark a Contact's Checklist action as done by hand", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "action_id", in: "path", type: "integer", required: true, desc: "The Checklist action's ID" },
+            { name: "completed_on", type: "string", required: true, desc: "Date it happened, <code>YYYY-MM-DD</code>; today or earlier" },
+            { name: "note", type: "string", required: true, desc: "What happened; saved as a Story on the Contact's timeline" },
+            { name: "evidence", type: "file", required: false, desc: "A file to attach to that Story (multipart form data)" },
+            { name: "project_id", type: "integer", required: false, desc: "The Project to record the Story in, when there is more than one" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>{checklist_id, action_id, done: true, completion}</code> with <code>completion_method: manual</code> and the Story as <code>proof_type</code>/<code>proof_id</code>" },
+            { code: "403", cls: "response-4xx", desc: "Can see the Contact but not edit it" },
+            { code: "422", cls: "response-4xx", desc: "e.g. a future date, no note, already done, or an action that can't be ticked off by hand" }
+          ], "For steps that leave no record Makerble can detect (a phone call, a home visit, a paper form). Only actions with <code>allow_manual_completion: true</code>.")}
+          ${endpointCard("DELETE", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/completion", "Undo marking a Contact's Checklist action as done by hand", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "action_id", in: "path", type: "integer", required: true, desc: "The Checklist action's ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{checklist_id, action_id, done, completion}</code>; Makerble looks again for a record that proves the action done" },
+            { code: "403", cls: "response-4xx", desc: "Can see the Contact but not edit it" },
+            { code: "422", cls: "response-4xx", desc: "Not the colleague who marked it, nor an Organisation Admin" }
+          ], "The Story stays on the Contact's timeline.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/available", "List the Checklists that can be added to a Contact", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
