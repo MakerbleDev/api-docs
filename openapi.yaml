@@ -5306,6 +5306,12 @@ paths:
         who can edit a Contact can then mark it done by hand with
         `POST /beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/completion`.
         It is false unless sent; on an update, an action that doesn't mention it keeps its setting.
+
+        "If earlier steps aren't done": set `if_earlier_steps_not_done` to say what a colleague sees
+        when they start an action for a Contact before the actions above it are done. `remind` (the
+        default, "Show a reminder, let them continue") shows a reminder they can dismiss; `ask_reason`
+        ("Warn and ask for a reason to skip") makes them give a reason, which is logged. On an update,
+        an action that doesn't mention it keeps its setting.
       operationId: createChecklist
       security: [{tokenAuth: []}]
       requestBody:
@@ -5333,6 +5339,7 @@ paths:
                     owner_kind: "team"
                     owner_team_id: 18
                     allow_manual_completion: true
+                    if_earlier_steps_not_done: "ask_reason"
       responses:
         "201":
           description: The Checklist, with its actions, projects and contacts_count
@@ -5399,7 +5406,9 @@ paths:
       description: |
         A Checklist with its ordered actions, the Projects that offer it and how many Contacts have it.
         Each action includes who is responsible for it: `owner_kind`, `owner_user_id`, `owner_team_id`,
-        `owner_relationship_side` and a readable `owner_description`.
+        `owner_relationship_side` and a readable `owner_description`, and its settings
+        `due_within_days`, `only_this_project`, `allow_manual_completion` and
+        `if_earlier_steps_not_done` (`remind` or `ask_reason`).
       operationId: getChecklist
       security: [{tokenAuth: []}]
       parameters:
