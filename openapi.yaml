@@ -158,6 +158,13 @@ tags:
       Organisation always has age bands (by default 0–12, 13–17, 18–24 and 25 and over); an Album or
       Project can have its own, and otherwise uses its Organisation's. The Demographics tab of
       Manage Contacts and the Snapshot use the same bands.
+  - name: Snapshot
+    description: |
+      The Snapshot under Today: one Album's (Portfolio's) or Project's headline numbers on one page.
+      "Who we're working with" shows how its Contacts (Beneficiaries) split by Ratio Set, by age band
+      and, on an Album, by Project; "How the work is going" shows one headline number per Results
+      Canvas column; "Workload" shows up to three Workflow, Cohort or Formula Trackers. The Album's or
+      Project's editors choose what goes on it on the Snapshot tab of its Preferences.
   - name: Beneficiaries
     description: Contacts — the people your organisation works with
   - name: Beneficiary Categories
@@ -8155,6 +8162,147 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /albums/{album_id}/snapshot_settings:
+    parameters:
+      - name: album_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The Album's (Bundle's) ID
+    get:
+      tags: [Snapshot]
+      summary: Get what an Album (Portfolio)'s Snapshot shows
+      description: |
+        What the Album's Snapshot shows, as on the Snapshot tab of its Preferences, and every choice
+        there is: the panels for "Who we're working with" (the Ratio Sets its Contacts are tagged
+        with, Age band and Split by project), the metrics in each Results Canvas column for "How the
+        work is going", and the Workflow, Cohort and Formula Trackers, which can go on any tile and on
+        Workload. Until its managers choose, `customised` is false and the defaults are shown. Anyone
+        who can see the Album can read it.
+      operationId: getAlbumSnapshotSettings
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: What the Snapshot shows, and the choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotSettings'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Snapshot]
+      summary: Choose what an Album (Portfolio)'s Snapshot shows
+      description: |
+        Sets the Snapshot's panels (in display order), its tiles (one per Results Canvas column; null
+        hides a tile) and up to three Workload tiles, using the `key`s that GET lists under `choices`.
+        Whatever you don't send stays as it is. Only the Album's managers can change it.
+      operationId: setAlbumSnapshotSettings
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SnapshotSettingsRequest'
+            examples:
+              panels:
+                value:
+                  panels: [age_band, split_by_project, "ratio_set:12"]
+              tiles:
+                value:
+                  tiles: {activities: "Change:31", engagement: null, potential: "WorkflowTracker:4"}
+                  workload: ["CohortTracker:2", null, null]
+      responses:
+        "200":
+          description: What the Snapshot shows after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotSettings'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /projects/{project_id}/snapshot_settings:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The Project's ID
+    get:
+      tags: [Snapshot]
+      summary: Get what a Project's Snapshot shows
+      description: |
+        What the Project's Snapshot shows, as on the Snapshot tab of its Preferences, and every choice
+        there is: the panels for "Who we're working with" (the Ratio Sets its Contacts are tagged
+        with, and Age band), the metrics in each Results Canvas column for "How the work is going",
+        and the Workflow, Cohort and Formula Trackers, which can go on any tile and on Workload. Until
+        its editors choose, `customised` is false and the defaults are shown. Anyone in the Project's
+        Organisation can read it.
+      operationId: getProjectSnapshotSettings
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: What the Snapshot shows, and the choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotSettings'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Snapshot]
+      summary: Choose what a Project's Snapshot shows
+      description: |
+        Sets the Snapshot's panels (in display order), its tiles (one per Results Canvas column; null
+        hides a tile) and up to three Workload tiles, using the `key`s that GET lists under `choices`.
+        Whatever you don't send stays as it is. Only Project Managers and Organisation Admins (whoever
+        can change Project Preferences) can change it.
+      operationId: setProjectSnapshotSettings
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SnapshotSettingsRequest'
+            examples:
+              panels:
+                value:
+                  panels: [age_band, "ratio_set:12"]
+              tiles:
+                value:
+                  tiles: {activities: "Change:31", engagement: null}
+                  workload: ["WorkflowTracker:4", null, null]
+      responses:
+        "200":
+          description: What the Snapshot shows after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotSettings'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /webhook_endpoints:
     get:
       tags: [Webhooks]
@@ -13878,6 +14026,134 @@ components:
         use_organisation_bands:
           type: boolean
           description: Albums and Projects only. `true` removes their own bands so they use their Organisation's.
+    SnapshotPanel:
+      type: object
+      required: [key, name, source]
+      properties:
+        key:
+          type: string
+          description: '`age_band`, `split_by_project` (Albums only) or `ratio_set:<id>`'
+          example: "ratio_set:12"
+        name:
+          type: string
+          example: Gender
+        source:
+          type: string
+          enum: [Ratio Set, From Date of Birth, Albums only]
+    SnapshotChoice:
+      type: object
+      required: [key, name, kind]
+      properties:
+        key:
+          type: string
+          description: '`<type>:<id>`, the type being Change, Indicator, FilteredMetric, WorkflowTracker, CohortTracker or FormulaTracker'
+          example: "Change:31"
+        name:
+          type: string
+          example: Sessions run
+        kind:
+          type: string
+          enum: [Progress Tracker, Indicator, Filtered version, Workflow Tracker, Cohort Tracker, Formula Tracker]
+    SnapshotChoiceOrNull:
+      type: object
+      nullable: true
+      description: What a tile shows, or null when it is hidden
+      required: [key, name, kind]
+      properties:
+        key:
+          type: string
+          example: "Change:31"
+        name:
+          type: string
+          example: Sessions run
+        kind:
+          type: string
+          enum: [Progress Tracker, Indicator, Filtered version, Workflow Tracker, Cohort Tracker, Formula Tracker]
+    SnapshotSettings:
+      type: object
+      required: [customised, panels, tiles, workload, choices]
+      properties:
+        customised:
+          type: boolean
+          description: false until the editors choose, when the defaults are shown (Age band and the first two Ratio Sets; the first metric in each column; no Workload tiles)
+        panels:
+          type: array
+          description: The "Who we're working with" panels, in display order
+          items:
+            $ref: '#/components/schemas/SnapshotPanel'
+        tiles:
+          type: array
+          description: One per Results Canvas column, in order
+          items:
+            type: object
+            required: [column, column_label, choice]
+            properties:
+              column:
+                type: string
+                enum: [activities, engagement, potential, behaviour, growth]
+              column_label:
+                type: string
+                description: The column's name on the Results Canvas
+                example: Activity
+              choice:
+                $ref: '#/components/schemas/SnapshotChoiceOrNull'
+        workload:
+          type: array
+          description: The three Workload tiles; null for a hidden one
+          items:
+            $ref: '#/components/schemas/SnapshotChoiceOrNull'
+        choices:
+          type: object
+          required: [panels, columns, trackers]
+          properties:
+            panels:
+              type: array
+              items:
+                $ref: '#/components/schemas/SnapshotPanel'
+            columns:
+              type: array
+              description: The metrics in each Results Canvas column, filtered versions included
+              items:
+                type: object
+                required: [key, label, options]
+                properties:
+                  key:
+                    type: string
+                  label:
+                    type: string
+                  options:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SnapshotChoice'
+            trackers:
+              type: array
+              description: The Workflow, Cohort and Formula Trackers, which can go on any tile and on Workload
+              items:
+                $ref: '#/components/schemas/SnapshotChoice'
+    SnapshotSettingsRequest:
+      type: object
+      properties:
+        panels:
+          type: array
+          items:
+            type: string
+          description: Panel keys in display order. An empty list shows no panels.
+        tiles:
+          type: object
+          description: Results Canvas column => metric or tracker key, or null to hide the tile. Columns left out keep their tile.
+          properties:
+            activities: {type: string, nullable: true}
+            engagement: {type: string, nullable: true}
+            potential: {type: string, nullable: true}
+            behaviour: {type: string, nullable: true}
+            growth: {type: string, nullable: true}
+        workload:
+          type: array
+          maxItems: 3
+          items:
+            type: string
+            nullable: true
+          description: Up to three tracker keys; null hides a tile
     AgeBandCounts:
       type: object
       required: [source, total_count, data]
