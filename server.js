@@ -899,6 +899,7 @@ function buildDocsPage() {
         <a href="#indicators"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Indicators</a>
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#library"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Library</a>
+        <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Surveys</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
@@ -1888,6 +1889,38 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Matching published items, best match first, with <code>id</code>, <code>type</code>, <code>type_label</code>, <code>name</code>, <code>description</code>, <code>causes</code>, <code>used_by_count</code> (how many organisations use it), <code>explore_url</code> (null for a Project Type) and <code>matched_words</code>" },
             { code: "422", cls: "response-4xx", desc: "Unknown <code>item_type</code> or <code>cause</code>" }
           ])}
+        </div>
+      </section>
+
+      <!-- Explore Surveys -->
+      <section class="section" id="explore-surveys">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Explore Surveys</h2>
+        <div class="section-desc">
+          <p>Explore Surveys lists the Surveys published to the Makerble&reg; ImpactStore&trade; and approved: validated scales and tried-and-tested questionnaires shared by Makerble and other organisations. The API gives the same search, filters, counts and sort as the Explore Surveys page. Every caller sees the same Surveys; only <code>yours</code> and <code>added_to_a_project</code> depend on your organisations. To search your own organisation's Surveys, use <a href="#library">Library</a> instead.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=health</code>) or comma-separated (<code>theme=health,organisational</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/surveys", "Explore Surveys", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Survey's name or description" },
+            { name: "theme", type: "string", required: false, desc: "<code>mental_health_and_wellbeing</code>, <code>children_and_young_people</code>, <code>employment_and_skills</code>, <code>community_and_culture</code>, <code>health</code>, <code>organisational</code>" },
+            { name: "audience", type: "string", required: false, desc: "Who answers it: <code>children_under_16</code>, <code>young_people_16_to_25</code>, <code>adults</code>, <code>staff_and_volunteers</code>" },
+            { name: "time", type: "string", required: false, desc: "Time to complete: <code>under_5</code>, <code>5_to_15</code>, <code>over_15</code> minutes" },
+            { name: "feature", type: "string", required: false, desc: "<code>validated</code> (Validated scale), <code>verdicts</code> (Verdicts set up), <code>repeats</code> (Repeat at intervals)" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Wellbeing</code>, <code>Young people</code>, <code>Employment</code>, <code>Feedback</code>, <code>Staff and volunteers</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (most organisations using it first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Surveys per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Surveys updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Surveys with <code>id</code>, <code>name</code>, <code>description</code>, <code>shared_by</code>, <code>tag</code>, <code>question_count</code>, <code>estimated_minutes</code>, <code>themes</code>, <code>audiences</code>, <code>repeats_at_intervals</code>, <code>validated</code>, <code>verdicts</code>, <code>libraries_count</code> (organisations using it), <code>yours</code> and <code>added_to_a_project</code>, plus <code>facets</code>: each filter's options with how many Surveys each would return given the other filters" }
+          ])}
+          ${endpointCard("GET", "/explore/surveys/{id}", "Preview an Explore Survey", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Survey's id from Explore Surveys" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Survey's fields as above plus <code>sections</code>, each with its <code>title</code> (null before the first section header) and its <code>questions</code> in order" },
+            { code: "404", cls: "response-4xx", desc: "Not listed on Explore Surveys (unpublished, unapproved or without a description)" }
+          ], "To use a Survey, add it to a project in Makerble with Add to a project on Explore Surveys.")}
         </div>
       </section>
 
