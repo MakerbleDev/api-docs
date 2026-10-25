@@ -184,6 +184,8 @@ tags:
     description: Join table linking Outcomes to Indicators
   - name: Framework Sets
     description: Groups of Impact Frameworks (e.g. the SDGs) that organisations report their contribution towards
+  - name: Explore
+    description: The Makerble® ImpactStore™'s Explore pages, with the same search, filters and counts as the app
   - name: Library
     description: Search the organisation's library and the public library of reusable building blocks, read an item in full, and see where it is used
   - name: ImpactStore
@@ -4779,6 +4781,176 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /explore/surveys:
+    get:
+      tags: [Explore]
+      summary: Explore Surveys
+      operationId: listExploreSurveys
+      description: |
+        Lists the Surveys (Story Categories) published to the Makerble® ImpactStore™ and approved,
+        with the same search, filters, counts and sort as the Explore Surveys page. Every caller
+        sees the same Surveys; `yours` and `added_to_a_project` depend on the caller's organisations.
+
+        - `query` matches the Survey's name or description.
+        - The filters take option keys, as arrays (`theme[]=health`) or comma-separated
+          (`theme=health,organisational`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `theme`: `mental_health_and_wellbeing`, `children_and_young_people`,
+            `employment_and_skills`, `community_and_culture`, `health`, `organisational`
+          - `audience` (Who answers it): `children_under_16`, `young_people_16_to_25`, `adults`,
+            `staff_and_volunteers`
+          - `time` (Time to complete): `under_5`, `5_to_15`, `over_15`
+          - `feature`: `validated` (Validated scale), `verdicts` (Verdicts set up), `repeats`
+            (Repeat at intervals)
+        - `chip` is one of the page's Popular chips: `Wellbeing`, `Young people`, `Employment`,
+          `Feedback`, `Staff and volunteers`.
+        - `facets` gives each filter's options with how many Surveys each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (most organisations using it first, the default), `new` or `az`.
+        - Add a Survey to a project in the app with **Add to a project** on Explore Surveys.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: wellbeing
+          description: Words to look for in the Survey's name or description
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: mental_health_and_wellbeing
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: audience
+          in: query
+          required: false
+          schema:
+            type: string
+          example: children_under_16
+          description: Who answers it option keys, comma-separated or repeated as audience[]
+        - name: time
+          in: query
+          required: false
+          schema:
+            type: string
+          example: under_5,5_to_15
+          description: Time to complete option keys, comma-separated or repeated as time[]
+        - name: feature
+          in: query
+          required: false
+          schema:
+            type: string
+          example: validated
+          description: Feature option keys, comma-separated or repeated as feature[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Wellbeing, Young people, Employment, Feedback, Staff and volunteers]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Surveys that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreSurveys'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 412
+                    name: Stirling Children's Wellbeing Scale
+                    description: Positive emotional state and outlook for children aged 8 to 15.
+                    shared_by: Makerble Templates
+                    tag: Verdicts
+                    question_count: 15
+                    estimated_minutes: 5
+                    themes: [mental_health_and_wellbeing, children_and_young_people]
+                    audiences: [children_under_16]
+                    repeats_at_intervals: true
+                    validated: true
+                    verdicts: true
+                    libraries_count: 31
+                    yours: false
+                    added_to_a_project: false
+                facets:
+                  - key: audience
+                    label: Who answers it
+                    options:
+                      - value: children_under_16
+                        label: Children under 16
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/surveys/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Survey
+      operationId: getExploreSurvey
+      description: |
+        One Survey listed on Explore Surveys, as its Preview shows it: the fields of
+        **Explore Surveys** plus `sections`, each with its `title` (null for questions before the
+        first section header) and its `questions` in the order the Survey asks them. A Survey
+        that isn't listed on Explore (unpublished, unapproved or without a description) is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 412
+      responses:
+        "200":
+          description: The Survey's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreSurveyPreview'
+              example:
+                id: 412
+                name: Stirling Children's Wellbeing Scale
+                description: Positive emotional state and outlook for children aged 8 to 15.
+                shared_by: Makerble Templates
+                tag: Verdicts
+                question_count: 2
+                estimated_minutes: 1
+                themes: [mental_health_and_wellbeing]
+                audiences: [children_under_16]
+                repeats_at_intervals: true
+                validated: true
+                verdicts: true
+                libraries_count: 31
+                yours: false
+                added_to_a_project: false
+                sections:
+                  - title: Positive emotional state
+                    questions: ["I've been feeling calm", "I've been in a good mood"]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /library/search:
     get:
       tags: [Library]
@@ -8411,6 +8583,119 @@ components:
         owner:
           type: string
           enum: [your organisation, public library, Makerble]
+
+    ExploreSurvey:
+      type: object
+      description: A Survey (Story Category) listed on Explore Surveys
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        shared_by:
+          type: string
+          nullable: true
+          description: The organisation (or person) that published it
+        tag:
+          type: string
+          nullable: true
+          enum: [Verdicts, Validated, null]
+        question_count:
+          type: integer
+        estimated_minutes:
+          type: integer
+          nullable: true
+          description: About how long it takes to answer, worked out from its questions
+        themes:
+          type: array
+          items:
+            type: string
+        audiences:
+          type: array
+          description: Who answers it
+          items:
+            type: string
+        repeats_at_intervals:
+          type: boolean
+        validated:
+          type: boolean
+          description: An industry-recognised, validated scale
+        verdicts:
+          type: boolean
+          description: Verdicts are set up, so it classifies each respondent automatically
+        libraries_count:
+          type: integer
+          description: How many organisations have it in one of their projects
+        yours:
+          type: boolean
+          description: Your organisation published it
+        added_to_a_project:
+          type: boolean
+          description: It is already in one of your organisation's projects
+
+    ExploreFacetGroup:
+      type: object
+      properties:
+        key:
+          type: string
+          enum: [theme, audience, time, feature]
+        label:
+          type: string
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+              label:
+                type: string
+              count:
+                type: integer
+                description: How many Surveys this option would return, given the other filters already chosen
+              selected:
+                type: boolean
+
+    PaginatedExploreSurveys:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreSurvey'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreSurveyPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreSurvey'
+        - type: object
+          properties:
+            sections:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                    nullable: true
+                  questions:
+                    type: array
+                    items:
+                      type: string
 
     PaginatedLibrarySearch:
       type: object
