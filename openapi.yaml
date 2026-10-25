@@ -5406,9 +5406,8 @@ paths:
 
         - `metric_id`, `field_id` or `activity_tracker_id`: reuse a Metric (Indicator), Field
           (Custom Field) or Activity tracker (Change). Any id you can't see is `404`.
-        - `new_metric`: a new Metric. A scale Metric needs `list_id` (an existing List) or `list`
-          (a new List with its choices). Without `outcome_id` it is filed under "Outcome Not
-          Assigned".
+        - `new_metric`: a new Metric, with `outcome_id` for the Outcome it measures. A scale
+          Metric needs `list_id` (an existing List) or `list` (a new List with its choices).
         - `new_field`: a new Field; `section_title` makes a heading.
 
         Search the library first and reuse what fits: results recorded against a copy of a Metric
@@ -5467,10 +5466,12 @@ paths:
                     name: "Job search hours"
                     metric_type: value
                     default_question: "How many hours did you spend looking for work this week?"
+                    outcome_id: 3301
                 - new_metric:
                     name: "Interview confidence"
                     metric_type: scale
                     default_question: "How confident do you feel about interviews?"
+                    outcome_id: 3301
                     list_id: 2210
                 - new_field:
                     field_name: "Postcode"
@@ -9468,7 +9469,7 @@ components:
           type: integer
         new_metric:
           type: object
-          required: [name, metric_type, default_question]
+          required: [name, metric_type, default_question, outcome_id]
           properties:
             name:
               type: string
