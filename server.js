@@ -2043,6 +2043,14 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "<code>{kinds: [{owner_kind, name}], teams: [{id, name}], relationship_sides: [{owner_relationship_side, name}]}</code>" },
             { code: "403", cls: "response-4xx", desc: "No role in the Organisation that can see Checklists" }
           ], "<code>owner_kind</code>: <code>none</code> (nobody in particular), <code>adder</code> (the colleague who added the Checklist, or the Project's Project Managers when a Project added it), <code>user</code> (<code>owner_user_id</code>, from <code>GET /users</code>), <code>team</code> (<code>owner_team_id</code>: anyone in the Team who can see the Contact) or <code>relationship</code> (<code>owner_relationship_side</code> \"&lt;category_id&gt;:parent|child\").")}
+          ${endpointCard("GET", "/checklists/{id}/skips", "List a Checklist's skipped steps", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only skips saved after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated, newest first: <code>{id, beneficiary_id, checklist_action_id, action_title, skipped_actions, reason, user_id, user_name, story_id, created_at}</code>" }
+          ], "When colleagues did an action before the earlier steps were done: the exceptions on the Checklist's Board. Only Contacts the user can see.")}
           ${endpointCard("GET", "/checklists/{id}", "Get a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
@@ -2122,6 +2130,21 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "<code>{all_done, others_count, data: [...]}</code>: the first action not done on each Checklist, most pressing first (overdue, then earliest <code>due_on</code>, then Checklist name). Each has <code>checklist_id</code>, <code>checklist_name</code>, <code>number</code> of <code>total</code>, <code>action_id</code>, <code>action_type</code>, <code>action_name</code>, <code>title</code>, <code>due_on</code>, <code>overdue</code>, <code>if_earlier_steps_not_done</code> and the owner fields" }
           ], "As on the Next step card of the Contact's profile. <code>data[0]</code> is the next step.")}
+          ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/gate", "Check the earlier steps before a Checklist action", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "action_id", in: "path", type: "integer", required: true, desc: "The action about to be done" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{gated, reason_required, missing: [{action_id, number, action_type, title, required_first}]}</code>" }
+          ], "The soft gate shown on the profile when an action is started before the earlier steps are done. Nothing is blocked; record going past it with <code>POST .../skips</code>.")}
+          ${endpointCard("POST", "/beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/skips", "Skip the earlier steps of a Checklist action", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
+            { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "action_id", in: "path", type: "integer", required: true, desc: "The action being done early" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The skip: <code>{id, checklist_action_id, action_title, skipped_actions, reason, user_id, user_name, story_id, created_at}</code>" },
+            { code: "422", cls: "response-4xx", desc: "No reason when a missing step is Required first, or nothing to skip" }
+          ], "Body: <code>{reason}</code>. Saved with the Contact's Checklist and as a story on their timeline. Needs edit access to the Contact.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/available", "List the Checklists that can be added to a Contact", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [

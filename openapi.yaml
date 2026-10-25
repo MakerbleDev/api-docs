@@ -5461,6 +5461,35 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /checklists/{id}/skips:
+    get:
+      tags: [Checklists]
+      summary: List a Checklist's skipped steps
+      description: |
+        The times colleagues did one of the Checklist's actions for a Contact before the earlier steps
+        were done, newest first: the exceptions shown on the Checklist's Board. Each skip has
+        `beneficiary_id`, `checklist_action_id`, `action_title`, `skipped_actions` ({id, title,
+        required_first}), `reason`, `user_id`, `user_name`, `story_id` (its story on the Contact's
+        timeline) and `created_at`. Only Contacts the user can see are included.
+      operationId: listChecklistSkips
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: "`{page, page_size, page_count, total_count, data: [skip]}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /checklists/{id}/projects/{project_id}:
     patch:
       tags: [Checklists]
@@ -5801,6 +5830,63 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+
+  /beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/gate:
+    get:
+      tags: [Checklists]
+      summary: Check the earlier steps before a Checklist action
+      description: |
+        The "soft gate" a colleague sees on the Contact's profile when they start an action before the
+        earlier steps on the same Checklist are done. `gated` is true when some aren't; `missing` lists
+        them ({action_id, number, action_type, title, required_first}); `reason_required` is true when
+        one is set to "Warn and ask for a reason to skip" (Required first). Nothing is blocked: to go
+        ahead, record the skip with `POST .../skips`.
+      operationId: getContactChecklistGate
+      security: [{tokenAuth: []}]
+      parameters:
+        - {name: beneficiary_id, in: path, required: true, schema: {type: integer}}
+        - {name: checklist_id, in: path, required: true, schema: {type: integer}}
+        - {name: action_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        "200":
+          description: "`{gated, reason_required, missing: [{action_id, number, action_type, title, required_first}]}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/skips:
+    post:
+      tags: [Checklists]
+      summary: Skip the earlier steps of a Checklist action
+      description: |
+        Records that the action is being done for the Contact before its earlier steps ("Continue
+        anyway" on the profile): who, when, which steps and why. The skip is also put on the Contact's
+        timeline as a story. `reason` is required when a missing step is Required first. Needs edit
+        access to the Contact.
+      operationId: skipContactChecklistSteps
+      security: [{tokenAuth: []}]
+      parameters:
+        - {name: beneficiary_id, in: path, required: true, schema: {type: integer}}
+        - {name: checklist_id, in: path, required: true, schema: {type: integer}}
+        - {name: action_id, in: path, required: true, schema: {type: integer}}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            example:
+              reason: "The induction is this week; consent is in the post"
+      responses:
+        "201":
+          description: The skip ({id, beneficiary_id, checklist_id, checklist_action_id, action_title, skipped_actions, reason, user_id, user_name, story_id, created_at})
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't edit this Contact
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /beneficiaries/{beneficiary_id}/checklists/available:
     get:
