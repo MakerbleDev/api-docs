@@ -922,6 +922,7 @@ function buildDocsPage() {
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
         <a href="#age-bands"       class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Age Bands</a>
+        <a href="#snapshot"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Snapshot</a>
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Case Forms</a>
       </div>
@@ -3041,6 +3042,57 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Can't change this Project's Preferences" },
             { code: "404", cls: "response-4xx", desc: "Another Organisation's Project" },
             { code: "422", cls: "response-4xx", desc: "No starting ages" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Snapshot -->
+      <section class="section" id="snapshot">
+        <div class="section-eyebrow">Today</div>
+        <h2 class="section-title">Snapshot</h2>
+        <div class="section-desc">
+          <p>The Snapshot, under <strong>Today</strong> in the sidebar, puts one Album's (Portfolio's) or Project's headline numbers on one page. <strong>Who we're working with</strong> shows how its Contacts split by a Ratio Set (as on the Demographics tab), by age band and, on an Album, by Project. <strong>How the work is going</strong> shows one headline number per Results Canvas column. <strong>Workload</strong> shows up to three Workflow, Cohort or Formula Trackers.</p>
+          <p>The Album's or Project's editors choose what goes on it on the <strong>Snapshot</strong> tab of its Preferences. GET lists what it shows and every choice there is, each with a <code>key</code> such as <code>age_band</code>, <code>ratio_set:12</code> or <code>Change:31</code>; PUT takes those keys. Until anyone chooses, <code>customised</code> is false and the defaults apply: Age band and the first two Ratio Sets, the first metric in each column, and no Workload tiles.</p>
+          <p>Anyone in the Organisation (or who can see the Album) can read the settings. Only the Album's managers, or whoever can change a Project's Preferences, can change them. Another Organisation's records answer <code>404</code>.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> PUT changes only what you send, so <code>{"tiles": {"engagement": null}}</code> hides the Engagement tile and leaves everything else as it is.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/albums/{album_id}/snapshot_settings", "Get what an Album's Snapshot shows", true, [
+            { name: "album_id", in: "path", type: "integer", required: true, desc: "The Album's (Bundle's) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "customised, panels, tiles (choice null = hidden), workload and choices" },
+            { code: "404", cls: "response-4xx", desc: "An Album you can't see" }
+          ])}
+          ${endpointCard("PUT", "/albums/{album_id}/snapshot_settings", "Choose what an Album's Snapshot shows", true, [
+            { name: "album_id", in: "path", type: "integer", required: true, desc: "The Album's (Bundle's) ID" },
+            { name: "panels", in: "body", type: "string[]", required: false, desc: "Panel keys in display order; split_by_project is for Albums only; [] shows none" },
+            { name: "tiles", in: "body", type: "object", required: false, desc: "Results Canvas column (activities, engagement, potential, behaviour, growth) => key, or null to hide the tile" },
+            { name: "workload", in: "body", type: "string[]", required: false, desc: "Up to three tracker keys; null hides a tile" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The settings after the change" },
+            { code: "403", cls: "response-4xx", desc: "Not one of the Album's managers" },
+            { code: "404", cls: "response-4xx", desc: "An Album you can't see" },
+            { code: "422", cls: "response-4xx", desc: "A key that can't go where it was put" }
+          ])}
+          ${endpointCard("GET", "/projects/{project_id}/snapshot_settings", "Get what a Project's Snapshot shows", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "The Project's ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "customised, panels, tiles (choice null = hidden), workload and choices" },
+            { code: "404", cls: "response-4xx", desc: "Another Organisation's Project" }
+          ])}
+          ${endpointCard("PUT", "/projects/{project_id}/snapshot_settings", "Choose what a Project's Snapshot shows", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "The Project's ID" },
+            { name: "panels", in: "body", type: "string[]", required: false, desc: "Panel keys in display order; [] shows none" },
+            { name: "tiles", in: "body", type: "object", required: false, desc: "Results Canvas column (activities, engagement, potential, behaviour, growth) => key, or null to hide the tile" },
+            { name: "workload", in: "body", type: "string[]", required: false, desc: "Up to three tracker keys; null hides a tile" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The settings after the change" },
+            { code: "403", cls: "response-4xx", desc: "Can't change this Project's Preferences" },
+            { code: "404", cls: "response-4xx", desc: "Another Organisation's Project" },
+            { code: "422", cls: "response-4xx", desc: "A key that can't go where it was put" }
           ])}
         </div>
       </section>
