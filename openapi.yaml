@@ -6350,6 +6350,14 @@ paths:
           again counts twice, or once when counting each Contact once.
         - `cases_open`: the Cases open at the end of each timeframe (or today, while that is still to
           come). Always a snapshot.
+        - `time_spent`: hours logged in Timesheets on the Project, or any of an Album's Projects, each
+          entry once, to 1 decimal place. Task and Update Timesheets are dated by their Update (Story),
+          or by when their Task was done; Event Timesheets by when the Event started. Timesheets on draft
+          Updates aren't counted. `settings` choose `kinds` (any of `updates_and_tasks`, `event_staff`,
+          `event_guests`; default the first two) and, optionally, only the time of some colleagues:
+          `user_ids` and/or `roles` (`editor`: Organisation Admins and Project Managers, `reporter`:
+          Changemakers, `observer`: Observers). These don't narrow Event guests' time. Always counts
+          `items`; `unit` is `hours`.
 
         For the three Cases sources, `settings` can name one Case Form, `{case_form_id: ...}`, to count
         only the Cases created with it; leave it out or send null for any Case Form. Confidential Cases
@@ -6733,7 +6741,10 @@ paths:
 
         `data` lists one page of the items counted, newest first: the Contact, `detail` (who they were
         signposted to, or the Project they were referred to), `project_id` (a referral's destination) and
-        when it happened. `total_count` counts every item, whatever the count mode. An item the user may
+        when it happened. For `time_spent`, `number` is hours to 1 decimal place and each item is a
+        Timesheet entry: whose time it is (`user_id`, `user_name`; or the Contact for an Event guest's),
+        its `hours`, and the Update, Task or Event it was logged on, which the user must be able to see
+        for it to be listed. `total_count` counts every item, whatever the count mode. An item the user may
         not see (a Contact they can't read, or a referral to a Project they can't see) is counted in
         `hidden_count` for that page but never listed. Requires the same rights as viewing that Results
         Canvas.
@@ -12159,7 +12170,7 @@ components:
           type: string
         source:
           type: string
-          enum: [signpostings, internal_referrals, cases_created, cases_closed, cases_open]
+          enum: [signpostings, internal_referrals, cases_created, cases_closed, cases_open, time_spent]
           description: What it counts
         count_mode:
           type: string
@@ -12167,7 +12178,7 @@ components:
           description: "items: each signposting, referral, Case or Case closing (adds up across periods, except cases_open); contacts: each Contact once (a snapshot)"
         settings:
           type: object
-          description: "internal_referrals: which Projects count as a referral. The Cases sources: the Case Form to count (null for any). signpostings has none."
+          description: "internal_referrals: which Projects count as a referral. The Cases sources: the Case Form to count (null for any). time_spent: which Timesheets, and whose time. signpostings has none."
           properties:
             destinations:
               type: string
@@ -12180,6 +12191,23 @@ components:
               type: integer
               nullable: true
               description: "Cases sources only: count only the Cases created with this one of the Organisation's Case Forms"
+            kinds:
+              type: array
+              description: "time_spent only: which Timesheets count (default updates_and_tasks and event_staff)"
+              items:
+                type: string
+                enum: [updates_and_tasks, event_staff, event_guests]
+            user_ids:
+              type: array
+              description: "time_spent only: count only these colleagues' time (with roles, either counts)"
+              items:
+                type: integer
+            roles:
+              type: array
+              description: "time_spent only: count only the time of people with these roles in the Organisation or the Project"
+              items:
+                type: string
+                enum: [editor, reporter, observer]
 
     WorkflowTracker:
       type: object
@@ -12199,7 +12227,7 @@ components:
           nullable: true
         source:
           type: string
-          enum: [signpostings, internal_referrals, cases_created, cases_closed, cases_open]
+          enum: [signpostings, internal_referrals, cases_created, cases_closed, cases_open, time_spent]
         count_mode:
           type: string
           enum: [items, contacts]
@@ -12207,6 +12235,10 @@ components:
           type: string
           enum: [additive, snapshot]
           description: additive adds up across periods; snapshot (counting each Contact once, or cases_open) works each timeframe out on its own
+        unit:
+          type: string
+          enum: [count, hours]
+          description: What its numbers are in; hours (to 1 decimal place) for time_spent
         settings:
           type: object
           example:
@@ -12259,13 +12291,14 @@ components:
           enum: [additive, snapshot]
         results:
           type: object
+          description: Whole numbers, or hours to 1 decimal place for time_spent
           properties:
             period:
-              type: integer
+              type: number
             year_to_date:
-              type: integer
+              type: number
             all_time:
-              type: integer
+              type: number
         hidden_count:
           type: integer
           description: Latest records counted but not listed, because the user may not see them (e.g. a confidential Case)
@@ -12277,12 +12310,21 @@ components:
             properties:
               contact_name:
                 type: string
+                nullable: true
               detail:
                 type: string
-                description: Who they were signposted to, the Project they were referred to, or the Case's title
+                description: Who they were signposted to, the Project they were referred to, the Case's title, or the Update, Task or Event the time was logged on
               happened_at:
                 type: string
                 format: date-time
+              user_name:
+                type: string
+                nullable: true
+                description: "time_spent only: whose time it is (null for an Event guest's, named in contact_name)"
+              hours:
+                type: number
+                nullable: true
+                description: time_spent only, to 1 decimal place
 
     WorkflowTrackerPlacement:
       type: object
@@ -12353,7 +12395,8 @@ components:
           nullable: true
           description: For a snapshot, the date it is read at
         number:
-          type: integer
+          type: number
+          description: A whole number, or hours to 1 decimal place for time_spent
         target:
           type: integer
           nullable: true
@@ -12377,12 +12420,15 @@ components:
             properties:
               contact_id:
                 type: integer
+                nullable: true
+                description: Null for a time_spent entry of a colleague's time
               contact_name:
                 type: string
+                nullable: true
               detail:
                 type: string
                 nullable: true
-                description: Who the Contact was signposted to, the Project they were referred to, or the Case's title
+                description: Who the Contact was signposted to, the Project they were referred to, the Case's title, or the Update, Task or Event the time was logged on
               project_id:
                 type: integer
                 nullable: true
@@ -12394,6 +12440,30 @@ components:
               happened_at:
                 type: string
                 format: date-time
+                description: For time_spent, the Update's date, when the Task was done, or when the Event started
+              user_id:
+                type: integer
+                nullable: true
+                description: "time_spent only: whose time it is (null for an Event guest's)"
+              user_name:
+                type: string
+                nullable: true
+              hours:
+                type: number
+                nullable: true
+                description: time_spent only, to 1 decimal place
+              story_id:
+                type: integer
+                nullable: true
+                description: "time_spent only: the Update (Story) the time was logged on"
+              task_id:
+                type: integer
+                nullable: true
+                description: "time_spent only: the Task the time was logged on"
+              event_id:
+                type: integer
+                nullable: true
+                description: "time_spent only: the Event the time was logged on"
 
     FormulaToken:
       type: object
