@@ -152,6 +152,12 @@ tags:
     description: The primary organisational unit — every Story and Case belongs to a Project
   - name: Albums
     description: Albums (Bundles; being renamed Portfolios on screen) group Projects so their results can be seen together
+  - name: Age Bands
+    description: |
+      Age bands worked out from each Contact's (Beneficiary's) Date of Birth, as of today. An
+      Organisation always has age bands (by default 0–12, 13–17, 18–24 and 25 and over); an Album or
+      Project can have its own, and otherwise uses its Organisation's. The Demographics tab of
+      Manage Contacts and the Snapshot use the same bands.
   - name: Beneficiaries
     description: Contacts — the people your organisation works with
   - name: Beneficiary Categories
@@ -7921,6 +7927,234 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /organisations/{organisation_id}/age_bands:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+    get:
+      tags: [Age Bands]
+      summary: Get an Organisation's age bands
+      description: |
+        The Organisation's (Charity's) age bands, as set in Organisation Preferences › Age bands. Every
+        Album and Project without its own bands uses these. Anyone in the Organisation can read them.
+      operationId: getOrganisationAgeBands
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The age bands
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgeBands'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Age Bands]
+      summary: Set an Organisation's age bands
+      description: |
+        Replaces the Organisation's age bands with the starting ages sent (whole numbers from 0 to
+        120, saved sorted and unique; at least one). Only the Organisation's admins (Charity Editors)
+        can change them. Every Album and Project without its own bands follows the change.
+      operationId: setOrganisationAgeBands
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgeBandsRequest'
+            example:
+              starts: [0, 13, 18, 25]
+      responses:
+        "200":
+          description: The age bands after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgeBands'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /organisations/{organisation_id}/age_band_counts:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+    get:
+      tags: [Age Bands]
+      summary: Count an Organisation's Contacts by age band
+      description: |
+        What the Age band panel on the Demographics tab of Manage Contacts shows: how many of the
+        Organisation's Contacts (Beneficiaries) are in each age band, with ages worked out from Date of
+        Birth as of today. Send `album_id` or `project_id` to count only that Album's or Project's
+        Contacts by its age bands (`source` says whose bands were used).
+
+        "Under X" appears only when a Contact is younger than the first band, "Date of birth in the
+        future" only when a Contact's Date of Birth is after today (a data-entry error worth fixing),
+        and "No date of birth" only when a Contact has none (and not at all when the Organisation
+        hides untagged Contacts from demographics charts). Bands with fewer Contacts than the Organisation's Minimum Results
+        Threshold have `contacts: null` and are added up under "Below Threshold". Anyone in the
+        Organisation can read the counts.
+      operationId: countContactsByAgeBand
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: album_id
+          in: query
+          schema:
+            type: integer
+          description: Count only this Album's (Bundle's) Contacts, by its age bands
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: Count only this Project's Contacts, by its age bands
+      responses:
+        "200":
+          description: Contacts per age band
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgeBandCounts'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /albums/{album_id}/age_bands:
+    parameters:
+      - name: album_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The Album's (Bundle's) ID
+    get:
+      tags: [Age Bands]
+      summary: Get an Album (Portfolio)'s age bands
+      description: |
+        The age bands an Album (Portfolio) uses, as on its Preferences page: its own, or its Organisation's when it
+        has none (`source` says which). Anyone who can see the Album can read them.
+      operationId: getAlbumAgeBands
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The age bands
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgeBands'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Age Bands]
+      summary: Set an Album (Portfolio)'s age bands
+      description: |
+        Gives the Album its own age bands, or (with `use_organisation_bands: true`) puts it back on
+        its Organisation's. Starting ages are whole numbers from 0 to 120, saved sorted and unique.
+        Only the Album's managers can change them.
+      operationId: setAlbumAgeBands
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgeBandsRequest'
+            examples:
+              ownBands:
+                value:
+                  starts: [10, 14, 18, 22]
+              organisationBands:
+                value:
+                  use_organisation_bands: true
+      responses:
+        "200":
+          description: The age bands after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgeBands'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
+  /projects/{project_id}/age_bands:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The Project's ID
+    get:
+      tags: [Age Bands]
+      summary: Get a Project's age bands
+      description: |
+        The age bands a Project uses, as on its Preferences page: its own, or its Organisation's when it
+        has none (`source` says which). Anyone who can see the Project can read them.
+      operationId: getProjectAgeBands
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The age bands
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgeBands'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Age Bands]
+      summary: Set a Project's age bands
+      description: |
+        Gives the Project its own age bands, or (with `use_organisation_bands: true`) puts it back on
+        its Organisation's. Starting ages are whole numbers from 0 to 120, saved sorted and unique.
+        Only Project Managers and Organisation Admins (whoever can change Project Preferences) can change them.
+      operationId: setProjectAgeBands
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgeBandsRequest'
+            examples:
+              ownBands:
+                value:
+                  starts: [10, 14, 18, 22]
+              organisationBands:
+                value:
+                  use_organisation_bands: true
+      responses:
+        "200":
+          description: The age bands after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgeBands'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /webhook_endpoints:
     get:
       tags: [Webhooks]
@@ -13613,6 +13847,61 @@ components:
                 type: boolean
                 description: Makerble gave the seat automatically when the colleague was given a role
 
+    AgeBands:
+      type: object
+      required: [source, starts, bands]
+      properties:
+        source:
+          type: string
+          enum: [organisation, album, project]
+          description: Whose bands these are. `organisation` for an Album or Project with none of its own.
+        starts:
+          type: array
+          items:
+            type: integer
+          description: The age each band starts at, in order
+          example: [0, 13, 18, 25]
+        bands:
+          type: array
+          items:
+            type: string
+          description: The bands as shown on screen
+          example: ["0–12", "13–17", "18–24", "25 and over"]
+    AgeBandsRequest:
+      type: object
+      properties:
+        starts:
+          type: array
+          items:
+            type: integer
+          description: The age each band starts at (0 to 120), in any order
+        use_organisation_bands:
+          type: boolean
+          description: Albums and Projects only. `true` removes their own bands so they use their Organisation's.
+    AgeBandCounts:
+      type: object
+      required: [source, total_count, data]
+      properties:
+        source:
+          type: string
+          enum: [organisation, album, project]
+          description: Whose age bands were used
+        total_count:
+          type: integer
+          description: Every Contact counted, including any the threshold hides
+        data:
+          type: array
+          items:
+            type: object
+            required: [band, contacts]
+            properties:
+              band:
+                type: string
+                example: "13–17"
+              contacts:
+                type: integer
+                nullable: true
+                description: Contacts in the band; null when below the Minimum Results Threshold
     SeatChangeRequest:
       type: object
       required: [contract_id]
