@@ -2117,6 +2117,11 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Can see the Contact but not edit it" },
             { code: "422", cls: "response-4xx", desc: "Not the colleague who marked it, nor an Organisation Admin" }
           ], "The Story stays on the Contact's timeline.")}
+          ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/next_step", "Get a Contact's next step", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{all_done, others_count, data: [...]}</code>: the first action not done on each Checklist, most pressing first (overdue, then earliest <code>due_on</code>, then Checklist name). Each has <code>checklist_id</code>, <code>checklist_name</code>, <code>number</code> of <code>total</code>, <code>action_id</code>, <code>action_type</code>, <code>action_name</code>, <code>title</code>, <code>due_on</code>, <code>overdue</code>, <code>if_earlier_steps_not_done</code> and the owner fields" }
+          ], "As on the Next step card of the Contact's profile. <code>data[0]</code> is the next step.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists/available", "List the Checklists that can be added to a Contact", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [

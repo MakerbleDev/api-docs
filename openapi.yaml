@@ -5772,6 +5772,36 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /beneficiaries/{beneficiary_id}/checklists/next_step:
+    get:
+      tags: [Checklists]
+      summary: Get a Contact's next step
+      description: |
+        What to do next for a Contact, as on the Next step card of their profile: the first action
+        not yet done on each of their Checklists, the most pressing first (overdue, then the earliest
+        `due_on`, then by Checklist name), so `data[0]` is the next step. Each step has the Checklist
+        (`checklist_id`, `checklist_name`), its place in it (`number` of `total`), the action
+        (`action_id`, `action_type`, `action_name`, `title`, `description`), its deadline (`due_on`,
+        `overdue`), `if_earlier_steps_not_done` and who is responsible for it (the same owner fields as
+        `GET /beneficiaries/{beneficiary_id}/checklists`). `others_count` is how many other Checklists
+        are waiting; `all_done` is true when every action on the Contact's Checklists is done. Not
+        paginated: a Contact has few Checklists.
+      operationId: getContactNextStep
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "`{all_done, others_count, data: [{checklist_id, checklist_name, number, total, action_id, action_type, action_name, title, description, due_on, overdue, if_earlier_steps_not_done, owner_kind, owner_description, responsible_user_ids, ...}]}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /beneficiaries/{beneficiary_id}/checklists/available:
     get:
       tags: [Checklists]
