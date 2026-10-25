@@ -2900,7 +2900,7 @@ function buildDocsPage() {
             { name: "album_id", type: "integer", required: false, desc: "Count only this Album's Contacts, by its age bands" },
             { name: "project_id", type: "integer", required: false, desc: "Count only this Project's Contacts, by its age bands" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "source, total_count and data: [{band, contacts}], with \"Under X\" and \"No date of birth\" only when someone is in them" },
+            { code: "200", cls: "response-2xx", desc: "source, total_count and data: [{band, contacts}], with \"Under X\", \"Date of birth in the future\" and \"No date of birth\" only when someone is in them" },
             { code: "404", cls: "response-4xx", desc: "Not in this Organisation, or the Album or Project isn't one of its own" }
           ])}
           ${endpointCard("GET", "/albums/{album_id}/age_bands", "Get an Album's age bands", true, [

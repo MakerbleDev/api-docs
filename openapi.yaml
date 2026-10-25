@@ -7604,9 +7604,10 @@ paths:
         Birth as of today. Send `album_id` or `project_id` to count only that Album's or Project's
         Contacts by its age bands (`source` says whose bands were used).
 
-        "Under X" appears only when a Contact is younger than the first band, and "No date of birth"
-        only when a Contact has none (and not at all when the Organisation hides untagged Contacts
-        from demographics charts). Bands with fewer Contacts than the Organisation's Minimum Results
+        "Under X" appears only when a Contact is younger than the first band, "Date of birth in the
+        future" only when a Contact's Date of Birth is after today (a data-entry error worth fixing),
+        and "No date of birth" only when a Contact has none (and not at all when the Organisation
+        hides untagged Contacts from demographics charts). Bands with fewer Contacts than the Organisation's Minimum Results
         Threshold have `contacts: null` and are added up under "Below Threshold". Anyone in the
         Organisation can read the counts.
       operationId: countContactsByAgeBand
