@@ -919,6 +919,7 @@ function buildDocsPage() {
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
+        <a href="#age-bands"       class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Age Bands</a>
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Case Forms</a>
       </div>
@@ -2861,6 +2862,78 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Makerble Support, who can only look" },
             { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation, or the Contract, colleague or Billing Role isn't one of its own" },
             { code: "422", cls: "response-4xx", desc: "A billing_role_id on a Flat Pricing Contract" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Age Bands -->
+      <section class="section" id="age-bands">
+        <div class="section-eyebrow">Demographics</div>
+        <h2 class="section-title">Age Bands</h2>
+        <div class="section-desc">
+          <p>Age bands group Contacts by age, worked out from each Contact's Date of Birth as of today, so a Contact moves band when their birthday passes. Bands are stored as the age each one starts at: <code>[0, 13, 18, 25]</code> means 0–12, 13–17, 18–24 and 25 and over.</p>
+          <p>Every Organisation has age bands (by default 0–12, 13–17, 18–24 and 25 and over), set under <strong>Organisation Preferences › Age bands</strong>. An Album (Portfolio) or Project can have its own on its Preferences page, and otherwise uses its Organisation's; <code>source</code> says whose bands are in use. The <strong>Age band</strong> card on the Demographics tab of Manage Contacts uses the same bands.</p>
+          <p>Anyone in the Organisation can read age bands and counts. Only the Organisation's admins can change its bands, an Album's managers its bands, and whoever can change Project Preferences a Project's. Another Organisation's records answer <code>404</code>.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> To report how many Contacts in a Project are in each age band, call <code>GET /organisations/{organisation_id}/age_band_counts?project_id=…</code>. Bands with fewer Contacts than the Organisation's Minimum Results Threshold come back with <code>contacts: null</code> and are added up under "Below Threshold".</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/organisations/{organisation_id}/age_bands", "Get an Organisation's age bands", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "source, starts (the age each band starts at) and bands (e.g. \"0–12\")" },
+            { code: "404", cls: "response-4xx", desc: "Not in this Organisation" }
+          ])}
+          ${endpointCard("PUT", "/organisations/{organisation_id}/age_bands", "Set an Organisation's age bands", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "starts", in: "body", type: "integer[]", required: true, desc: "The age each band starts at (0 to 120), in any order; saved sorted and unique" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The age bands after the change" },
+            { code: "403", cls: "response-4xx", desc: "Not an admin of this Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not in this Organisation" },
+            { code: "422", cls: "response-4xx", desc: "No starting ages" }
+          ])}
+          ${endpointCard("GET", "/organisations/{organisation_id}/age_band_counts", "Count an Organisation's Contacts by age band", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "album_id", type: "integer", required: false, desc: "Count only this Album's Contacts, by its age bands" },
+            { name: "project_id", type: "integer", required: false, desc: "Count only this Project's Contacts, by its age bands" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "source, total_count and data: [{band, contacts}], with \"Under X\" and \"No date of birth\" only when someone is in them" },
+            { code: "404", cls: "response-4xx", desc: "Not in this Organisation, or the Album or Project isn't one of its own" }
+          ])}
+          ${endpointCard("GET", "/albums/{album_id}/age_bands", "Get an Album's age bands", true, [
+            { name: "album_id", in: "path", type: "integer", required: true, desc: "The Album's (Bundle's) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Its own bands (source: album), or its Organisation's (source: organisation)" },
+            { code: "404", cls: "response-4xx", desc: "An Album you can't see" }
+          ])}
+          ${endpointCard("PUT", "/albums/{album_id}/age_bands", "Set an Album's age bands", true, [
+            { name: "album_id", in: "path", type: "integer", required: true, desc: "The Album's (Bundle's) ID" },
+            { name: "starts", in: "body", type: "integer[]", required: false, desc: "Its own bands: the age each starts at" },
+            { name: "use_organisation_bands", in: "body", type: "boolean", required: false, desc: "true removes its own bands so it uses its Organisation's" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The age bands after the change" },
+            { code: "403", cls: "response-4xx", desc: "Not one of the Album's managers" },
+            { code: "404", cls: "response-4xx", desc: "An Album you can't see" },
+            { code: "422", cls: "response-4xx", desc: "No starting ages" }
+          ])}
+          ${endpointCard("GET", "/projects/{project_id}/age_bands", "Get a Project's age bands", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "The Project's ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Its own bands (source: project), or its Organisation's (source: organisation)" },
+            { code: "404", cls: "response-4xx", desc: "Another Organisation's Project" }
+          ])}
+          ${endpointCard("PUT", "/projects/{project_id}/age_bands", "Set a Project's age bands", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "The Project's ID" },
+            { name: "starts", in: "body", type: "integer[]", required: false, desc: "Its own bands: the age each starts at" },
+            { name: "use_organisation_bands", in: "body", type: "boolean", required: false, desc: "true removes its own bands so it uses its Organisation's" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The age bands after the change" },
+            { code: "403", cls: "response-4xx", desc: "Can't change this Project's Preferences" },
+            { code: "404", cls: "response-4xx", desc: "Another Organisation's Project" },
+            { code: "422", cls: "response-4xx", desc: "No starting ages" }
           ])}
         </div>
       </section>
