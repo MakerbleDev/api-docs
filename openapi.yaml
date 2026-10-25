@@ -2940,13 +2940,20 @@ paths:
     get:
       tags: [Outcomes]
       summary: List all Outcomes
-      description: Each Outcome has a stage (short/medium/long-term) placing it in Progress Panel cols 3–5.
+      description: |
+        Each Outcome has a stage (short/medium/long-term) placing it in Progress Panel cols 3–5.
+
+        Returns only the Outcomes the signed-in user can see: their own, those of every
+        organisation where they are an editor, reporter or observer, and those used by one of
+        their Projects. Outcomes from the public library shared by all organisations are
+        added only when `include_public_library=true`.
       operationId: listOutcomes
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
+        - $ref: '#/components/parameters/IncludePublicLibrary'
       responses:
         "200":
           description: Paginated list of Outcomes
@@ -2961,10 +2968,15 @@ paths:
     get:
       tags: [Outcomes]
       summary: Get a single Outcome
+      description: |
+        Returns 404 for an Outcome the signed-in user cannot see, with the same body as for
+        an ID that does not exist. A public-library Outcome owned by another organisation is
+        returned only when `include_public_library=true`.
       operationId: getOutcome
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/IncludePublicLibrary'
       responses:
         "200":
           description: Outcome record
@@ -8807,7 +8819,7 @@ components:
         type: boolean
         default: false
       example: true
-      description: Also include Indicators from the public library shared by all organisations (default false)
+      description: Also include Indicators or Outcomes from the public library shared by all organisations (default false)
 
   responses:
     Unauthorized:

@@ -1811,13 +1811,15 @@ function buildDocsPage() {
         <div class="endpoint-list">
           ${endpointCard("GET", "/outcomes", "List all Outcomes", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
-            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list with title, icon, stage (short_term/medium_term/long_term)" }])}
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "include_public_library", type: "boolean", required: false, desc: "Also include Outcomes from the public library shared by all organisations (default false)" }
+          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list with title, icon, stage (short_term/medium_term/long_term). Only Outcomes the user can see: their own, their organisations' and those used by their Projects" }])}
           ${endpointCard("GET", "/outcomes/{id}", "Get a single Outcome", true, [
-            { name: "id", in: "path", type: "integer", required: true, desc: "Outcome ID" }
+            { name: "id", in: "path", type: "integer", required: true, desc: "Outcome ID" },
+            { name: "include_public_library", type: "boolean", required: false, desc: "Allow a public-library Outcome from another organisation to be returned (default false)" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Outcome record" },
-            { code: "404", cls: "response-4xx", desc: "Not found" }
+            { code: "404", cls: "response-4xx", desc: "Not found, or not visible to the user" }
           ])}
           ${endpointCard("POST", "/metrics/{id}/copy", "Copy a metric (an Output, Outcome or Indicator)", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "ID of the metric to copy" },
