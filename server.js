@@ -1837,7 +1837,7 @@ function buildDocsPage() {
         <h2 class="section-title">Library</h2>
         <div class="section-desc">
           <p>The Library holds the reusable building blocks your organisation can see: Surveys, Metrics, Activity and Attendance trackers, Outcomes, Lists of answer choices, Units, Fields, Contact Forms, Case Forms, Impact Frameworks, Toolkits, Project Types and Ideas. Search it before making something new, so results keep adding up with those recorded against the original.</p>
-          <p>You can also create Lists, Units, Fields and Outcomes, and a whole Survey or Contact Form with its questions. Search first and reuse what fits: a create call whose name is the same as, or near-identical to, an item you can already reuse (ignoring case, spacing and punctuation) creates nothing and returns <code>409</code> with the matches; send <code>force: true</code> to create it anyway.</p>
+          <p>You can also create Lists, Units, Fields and Outcomes, a whole Survey or Contact Form with its questions, and an Impact Framework with its entries. Search first and reuse what fits: a create call whose name is the same as, or near-identical to, an item you can already reuse (ignoring case, spacing and punctuation) creates nothing and returns <code>409</code> with the matches; send <code>force: true</code> to create it anyway.</p>
           <p>Each item has a <code>type</code>: <code>survey</code>, <code>metric</code>, <code>activity_tracker</code>, <code>outcome</code>, <code>list</code>, <code>unit</code>, <code>field</code>, <code>contact_form</code>, <code>case_form</code>, <code>impact_framework</code>, <code>toolkit</code>, <code>project_type</code>, <code>idea</code>. <code>source</code> chooses your organisation's own library (default), the public library shared by every organisation, or both. Items you may not see are never returned; asking for one by id returns <code>404</code>.</p>
         </div>
         <div class="endpoint-list">
@@ -1957,6 +1957,21 @@ function buildDocsPage() {
             { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse instead of the new ones, each with its <code>question</code>" },
             { code: "422", cls: "response-4xx", desc: "Invalid input; nothing is created and the error names the field" }
           ], "A Contact Form (Beneficiary Category). Reuse Fields and Lists by id, and define only what's missing.")}
+          ${endpointCard("POST", "/impact_frameworks", "Create an Impact Framework with its entries", true, [
+            { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
+            { name: "name", in: "body", type: "string", required: true, desc: "e.g. <code>Youth employment</code>" },
+            { name: "entries", in: "body", type: "array", required: true, desc: "In order. Each has a <code>stage</code> and exactly one of <code>activity_tracker_id</code> or <code>new_activity_tracker</code> {name, category} (Activity or Participation outputs), or <code>outcome_id</code> or <code>new_outcome</code> {title} (Short-, Medium- or Long-term outcomes). An Outcome entry can add <code>new_metrics</code>. At most 50 entries and new Metrics together" },
+            { name: "description / color / causes / department", in: "body", type: "string", required: false, desc: "Shown with the framework and used by the Explore filters" },
+            { name: "approved", in: "body", type: "boolean", required: false, desc: "Makerble staff only: share it in the public library and approve its new items" },
+            { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create new items even though near-identical ones exist (see 409)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created: <code>data</code> is the framework as Get a library item shows it, by stage, plus <code>approved</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "You may not create Impact Frameworks, trackers, Outcomes or Metrics, as in the Makerble app" },
+            { code: "404", cls: "response-4xx", desc: "The organisation, or an id in an entry, isn't one you can use; the error names the entry" },
+            { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse instead of the new ones, each with its <code>entry</code>" },
+            { code: "422", cls: "response-4xx", desc: "Invalid input (e.g. an Outcome in an Activity stage); nothing is created and the error names the entry" }
+          ], "An Impact Framework (Template). Reuse trackers and Outcomes by id, and define only what's missing.")}
         </div>
       </section>
 
