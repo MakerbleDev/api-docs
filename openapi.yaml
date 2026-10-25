@@ -5509,8 +5509,12 @@ paths:
         for whom it is the furthest action done) and `waiting` (Contacts for whom it is the first action
         not done, so a Contact who did steps 1 and 3 is waiting on step 2). Each list gives its full
         count (`completed_count`, `furthest_count`, `waiting_count`) and the first `list_limit` (30)
-        Contacts alphabetically as `{beneficiary_id, name}`. `contacts_count` is every Contact counted and
-        `complete_count` those with every action done. Only Contacts the user can see are counted.
+        Contacts alphabetically as `{beneficiary_id, name}`. Each Contact in `waiting` also has the Board's
+        details: `days_waiting` (since the Checklist was added or the previous action was done),
+        `overdue` (the action is past its due date), `skipped_a_step` (a colleague logged starting a later
+        action first) and `responsible` (who is responsible for the action). `contacts_count` is every
+        Contact counted, `complete_count` those with every action done (the first of them in `complete`)
+        and `overdue_count` those whose waiting action is overdue. Only Contacts the user can see are counted.
       operationId: getChecklistProgress
       security: [{tokenAuth: []}]
       parameters:
@@ -5525,6 +5529,12 @@ paths:
           description: Count only the Contacts in this Project, which must be one the Checklist is added to
           schema:
             type: integer
+        - name: responsible
+          in: query
+          required: false
+          description: "Count only the Contacts whose waiting action this person or Team is responsible for: `me` (directly or through one of the user's Teams), `user:<id>` or `team:<id>`"
+          schema:
+            type: string
       responses:
         "200":
           description: The counts and lists for each action
@@ -5533,9 +5543,12 @@ paths:
               example:
                 checklist_id: 42
                 project_id: null
+                responsible: null
                 contacts_count: 3
                 complete_count: 1
+                overdue_count: 1
                 list_limit: 30
+                complete: [{beneficiary_id: 904, name: "Refilwe Mahlangu"}]
                 actions:
                   - id: 55
                     number: 1
@@ -5546,11 +5559,13 @@ paths:
                     furthest_count: 0
                     furthest: []
                     waiting_count: 1
-                    waiting: [{beneficiary_id: 903, name: "Mpho Sithole"}]
+                    waiting: [{beneficiary_id: 903, name: "Mpho Sithole", days_waiting: 9, overdue: true, skipped_a_step: false, responsible: "Anyone in Youth Workers"}]
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
