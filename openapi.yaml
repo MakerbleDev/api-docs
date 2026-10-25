@@ -8303,6 +8303,91 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /snapshot:
+    get:
+      tags: [Snapshot]
+      summary: Get an Album (Portfolio)'s or Project's Snapshot
+      description: |
+        The numbers Today › Snapshot shows for one Album or Project. **panels** ("Who we're working
+        with") count its Contacts by Ratio Set, age band or Project, by the Demographics tab's rules:
+        only Contacts you can view are counted, Contacts without a value are under "No Data" or "No
+        date of birth" (left out if the Organisation hides untagged Contacts from charts), and groups
+        below the Organisation's Minimum Results Threshold have `contacts: null` and are added up under
+        "Below Threshold". `percent` is of all the Album's or Project's Contacts. **tiles** ("How the
+        work is going", one per Results Canvas column not hidden) and **workload** give each chosen
+        metric's or tracker's All-time result, as on the Results Canvas; `value` is null for a tracker
+        with no single number (a Choice Indicator).
+
+        Name the Album or Project with `album_id` or `project_id`; without either, you get your pinned
+        one, or else the last one you viewed in Makerble (`404` when there's neither). What appears is
+        chosen with PUT /albums/{album_id}/snapshot_settings or /projects/{project_id}/snapshot_settings.
+      operationId: getSnapshot
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: The Album's (Bundle's) ID
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: The Project's ID
+      responses:
+        "200":
+          description: The Snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /snapshot/pin:
+    put:
+      tags: [Snapshot]
+      summary: Pin an Album (Portfolio) or Project as your Snapshot
+      description: |
+        Makes Today › Snapshot (and GET /snapshot without an id) open this Album or Project for you,
+        as the **Pin as my Snapshot** button does. It only changes your own Snapshot.
+      operationId: pinSnapshot
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                album_id:
+                  type: integer
+                project_id:
+                  type: integer
+            examples:
+              project:
+                value:
+                  project_id: 412
+      responses:
+        "200":
+          description: What is now pinned
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pinned]
+                properties:
+                  pinned:
+                    $ref: '#/components/schemas/SnapshotOwner'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /webhook_endpoints:
     get:
       tags: [Webhooks]
@@ -14154,6 +14239,100 @@ components:
             type: string
             nullable: true
           description: Up to three tracker keys; null hides a tile
+    SnapshotOwner:
+      type: object
+      required: [type, id, name]
+      properties:
+        type:
+          type: string
+          enum: [album, project]
+        id:
+          type: integer
+        name:
+          type: string
+          example: Youth Programme 2026
+    SnapshotTile:
+      type: object
+      required: [column, key, name, kind, value, unit]
+      properties:
+        column:
+          type: string
+          nullable: true
+          description: The Results Canvas column's name; null on a Workload tile
+          example: Activity
+        key:
+          type: string
+          example: "Change:31"
+        name:
+          type: string
+          example: Sessions run
+        kind:
+          type: string
+          enum: [Progress Tracker, Indicator, Filtered version, Workflow Tracker, Cohort Tracker, Formula Tracker]
+        value:
+          type: number
+          nullable: true
+          description: The All-time result, as on the Results Canvas; null when the tracker has no single number
+          example: 148
+        unit:
+          type: string
+          nullable: true
+          example: count
+    Snapshot:
+      type: object
+      required: [showing, contacts_count, panels, tiles, workload]
+      properties:
+        showing:
+          allOf:
+            - $ref: '#/components/schemas/SnapshotOwner'
+            - type: object
+              required: [pinned]
+              properties:
+                pinned:
+                  type: boolean
+                  description: Whether this is your pinned Snapshot
+        contacts_count:
+          type: integer
+          description: The Album's or Project's Contacts that you can view
+        panels:
+          type: array
+          items:
+            type: object
+            required: [key, name, source, rows]
+            properties:
+              key:
+                type: string
+              name:
+                type: string
+                example: Gender
+              source:
+                type: string
+                example: Ratio Set, as on the Demographics tab
+              rows:
+                type: array
+                items:
+                  type: object
+                  required: [label, contacts, percent]
+                  properties:
+                    label:
+                      type: string
+                      example: Female
+                    contacts:
+                      type: integer
+                      nullable: true
+                      description: null when below the Minimum Results Threshold
+                    percent:
+                      type: number
+                      nullable: true
+                      example: 51.1
+        tiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/SnapshotTile'
+        workload:
+          type: array
+          items:
+            $ref: '#/components/schemas/SnapshotTile'
     AgeBandCounts:
       type: object
       required: [source, total_count, data]
