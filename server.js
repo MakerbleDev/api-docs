@@ -3025,7 +3025,7 @@ function buildDocsPage() {
         <div class="section-desc">
           <p>The Snapshot, under <strong>Today</strong> in the sidebar, puts one Album's (Portfolio's) or Project's headline numbers on one page. <strong>Who we're working with</strong> shows how its Contacts split by a Ratio Set (as on the Demographics tab), by age band and, on an Album, by Project. <strong>How the work is going</strong> shows one headline number per Results Canvas column. <strong>Workload</strong> shows up to three Workflow, Cohort or Formula Trackers.</p>
           <p>The Album's or Project's editors choose what goes on it on the <strong>Snapshot</strong> tab of its Preferences. GET lists what it shows and every choice there is, each with a <code>key</code> such as <code>age_band</code>, <code>ratio_set:12</code> or <code>Change:31</code>; PUT takes those keys. Until anyone chooses, <code>customised</code> is false and the defaults apply: Age band and the first two Ratio Sets, the first metric in each column, and no Workload tiles.</p>
-          <p><code>GET /snapshot</code> gives the numbers themselves, counted by the Demographics tab's rules for the Contacts you can view, with each tile's All-time result as on the Results Canvas. Without an id it reads your pinned Album or Project, or else the last one you viewed; <code>PUT /snapshot/pin</code> pins one.</p>
+          <p><code>GET /snapshot</code> gives the numbers themselves, counted by the Demographics tab's rules for the Contacts you can view, with each tile's result for the Results Canvas's current period, or all time when there are no deadlines (<code>timeframe</code> says which). Without an id it reads your pinned Album or Project, or else the last one you viewed; <code>PUT /snapshot/pin</code> pins one.</p>
           <p>Anyone in the Organisation (or who can see the Album) can read the settings. Only the Album's managers, or whoever can change a Project's Preferences, can change them. Another Organisation's records answer <code>404</code>.</p>
         </div>
         <div class="callout callout-tip">
@@ -3037,7 +3037,7 @@ function buildDocsPage() {
             { name: "album_id", type: "integer", required: false, desc: "The Album's (Bundle's) ID" },
             { name: "project_id", type: "integer", required: false, desc: "The Project's ID. With neither, your pinned Album or Project, or else the last one you viewed" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "showing, contacts_count, panels (rows of label, contacts, percent; contacts null below the threshold), tiles and workload (each with its All-time value)" },
+            { code: "200", cls: "response-2xx", desc: "showing, contacts_count, timeframe, panels (rows of label, contacts, percent; contacts null below the threshold), tiles and workload (each with its value for timeframe)" },
             { code: "404", cls: "response-4xx", desc: "An Album or Project you can't see, or none named, pinned or viewed" }
           ])}
           ${endpointCard("PUT", "/snapshot/pin", "Pin an Album or Project as your Snapshot", true, [

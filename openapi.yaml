@@ -8315,8 +8315,8 @@ paths:
         below the Organisation's Minimum Results Threshold have `contacts: null` and are added up under
         "Below Threshold". `percent` is of all the Album's or Project's Contacts. **tiles** ("How the
         work is going", one per Results Canvas column not hidden) and **workload** give each chosen
-        metric's or tracker's All-time result, as on the Results Canvas; `value` is null for a tracker
-        with no single number (a Choice Indicator).
+        metric's or tracker's result for the Results Canvas's current period, or all time when there are
+        no deadlines (`timeframe` says which); `value` is null for a tracker with no single number.
 
         Name the Album or Project with `album_id` or `project_id`; without either, you get your pinned
         one, or else the last one you viewed in Makerble (`404` when there's neither). What appears is
@@ -14272,7 +14272,7 @@ components:
         value:
           type: number
           nullable: true
-          description: The All-time result, as on the Results Canvas; null when the tracker has no single number
+          description: The result over `timeframe`, as on the Results Canvas's Period view; null when the tracker has no single number
           example: 148
         unit:
           type: string
@@ -14280,7 +14280,7 @@ components:
           example: count
     Snapshot:
       type: object
-      required: [showing, contacts_count, panels, tiles, workload]
+      required: [showing, contacts_count, timeframe, panels, tiles, workload]
       properties:
         showing:
           allOf:
@@ -14294,6 +14294,22 @@ components:
         contacts_count:
           type: integer
           description: The Album's or Project's Contacts that you can view
+        timeframe:
+          type: object
+          description: What the tiles count. The Results Canvas's current period (from the day after the last deadline to the next, or to today once they have all passed), or all time when there are no deadlines.
+          required: [kind, start_date, end_date]
+          properties:
+            kind:
+              type: string
+              enum: [period, all_time]
+            start_date:
+              type: string
+              format: date
+              nullable: true
+              description: null for all time
+            end_date:
+              type: string
+              format: date
         panels:
           type: array
           items:
