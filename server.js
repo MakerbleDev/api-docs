@@ -902,6 +902,7 @@ function buildDocsPage() {
         <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Surveys</a>
         <a href="#explore-report-templates" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Report Templates</a>
         <a href="#explore-dropdowns" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Dropdowns</a>
+        <a href="#explore-impact-frameworks" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Impact Frameworks</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
@@ -2108,6 +2109,37 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Dropdown's fields as above plus every one of its answer <code>choices</code>, in order" },
             { code: "404", cls: "response-4xx", desc: "Not listed on Explore Dropdowns (not shared or not approved)" }
           ], "To use a Dropdown, copy it into your organisation in Makerble with Add to organisation on Explore Dropdowns.")}
+        </div>
+      </section>
+
+      <!-- Explore Impact Frameworks -->
+      <section class="section" id="explore-impact-frameworks">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Explore Impact Frameworks</h2>
+        <div class="section-desc">
+          <p>Explore Impact Frameworks lists the public, approved Impact Frameworks (Templates) in the Makerble&reg; ImpactStore&trade;: sets of outcomes and progress trackers across the stages of change. The API gives the same search, filters, counts and sort as the Explore Impact Frameworks page. Every caller sees the same Impact Frameworks; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=inclusion</code>) or comma-separated (<code>size=up_to_5,6_to_10</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/impact_frameworks", "Explore Impact Frameworks", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Impact Framework's name or description" },
+            { name: "theme", type: "string", required: false, desc: "<code>mental_health_and_wellbeing</code>, <code>children_and_young_people</code>, <code>employment_and_skills</code>, <code>community_and_culture</code>, <code>health</code>, <code>organisational</code>, <code>global_goals</code>, <code>inclusion</code>, <code>education_and_training</code>, <code>leadership</code>" },
+            { name: "set", type: "string", required: false, desc: "Part of a Framework Set: a platform-wide Framework Set's id (listed in <code>facets</code>), or <code>none</code>" },
+            { name: "size", type: "string", required: false, desc: "Number of outcomes: <code>up_to_5</code>, <code>6_to_10</code>, <code>over_10</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>SDGs</code>, <code>Inclusion</code>, <code>Employment</code>, <code>Wellbeing</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (on the most organisations' projects first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Impact Frameworks per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Impact Frameworks updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Impact Frameworks with <code>id</code>, <code>name</code>, <code>description</code>, <code>themes</code>, <code>framework_sets</code> (each with <code>id</code>, <code>name</code> and <code>short_code</code>), <code>outcome_count</code>, <code>progress_tracker_count</code>, <code>shared_by</code>, <code>libraries_count</code> (organisations using it on a project) and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/impact_frameworks/{id}", "Preview an Explore Impact Framework", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Impact Framework's id from Explore Impact Frameworks" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Impact Framework's fields as above plus <code>stages</code>, each stage of change with its <code>title</code> (Activities, Engagement, Ability, Behaviour or Effect) and its outcomes and progress trackers as <code>items</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not public and approved" }
+          ], "To use an Impact Framework, add it to projects in Makerble with Add to projects on Explore Impact Frameworks.")}
         </div>
       </section>
 

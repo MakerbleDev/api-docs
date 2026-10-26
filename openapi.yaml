@@ -5447,6 +5447,161 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /explore/impact_frameworks:
+    get:
+      tags: [Explore]
+      summary: Explore Impact Frameworks
+      operationId: listExploreImpactFrameworks
+      description: |
+        Lists the public, approved Impact Frameworks (Templates) in the Makerble® ImpactStore™, with
+        the same search, filters, counts and sort as the Explore Impact Frameworks page. Every caller
+        sees the same Impact Frameworks; `yours` depends on the caller's organisations.
+
+        - `query` matches the Impact Framework's name or description.
+        - The filters take option keys, as arrays (`theme[]=inclusion`) or comma-separated
+          (`theme=inclusion,leadership`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `theme`: `mental_health_and_wellbeing`, `children_and_young_people`, `employment_and_skills`, `community_and_culture`, `health`, `organisational`, `global_goals`, `inclusion`, `education_and_training`, `leadership`
+          - `set` (Part of a Framework Set): a platform-wide Framework Set's id, or `none` for
+            frameworks in no set. `facets` lists the sets.
+          - `size`: `up_to_5`, `6_to_10`, `over_10` outcomes
+        - `chip` is one of the page's Popular chips: `SDGs`, `Inclusion`, `Employment`, `Wellbeing`.
+        - `facets` gives each filter's options with how many Impact Frameworks each would return,
+          given the other filters already chosen.
+        - `sort` is `added` (on the most organisations' projects first, the default), `new` or `az`.
+        - Add an Impact Framework to projects in the app with **Add to projects** on Explore Impact
+          Frameworks.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: inclusion
+          description: Words to look for in the Impact Framework's name or description
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: global_goals
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: set
+          in: query
+          required: false
+          schema:
+            type: string
+          example: none
+          description: Framework Set ids or none, comma-separated or repeated as set[]
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: string
+          example: up_to_5
+          description: Size option keys, comma-separated or repeated as size[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [SDGs, Inclusion, Employment, Wellbeing]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Impact Frameworks that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreImpactFrameworks'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 301
+                    name: Quality Education
+                    description: Outcomes for SDG 4.
+                    themes: [global_goals, children_and_young_people]
+                    framework_sets:
+                      - id: 2
+                        name: UN Sustainable Development Goals
+                        short_code: SDG 4
+                    outcome_count: 10
+                    progress_tracker_count: 3
+                    shared_by: Makerble Templates
+                    libraries_count: 15
+                    yours: false
+                facets:
+                  - key: size
+                    label: Size
+                    options:
+                      - value: 6_to_10
+                        label: 6 to 10 outcomes
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/impact_frameworks/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Impact Framework
+      operationId: getExploreImpactFramework
+      description: |
+        One Impact Framework listed on Explore Impact Frameworks, as its Preview shows it: the fields
+        of **Explore Impact Frameworks** plus `stages`, each stage of change with its `title`
+        (Activities, Engagement, Ability, Behaviour or Effect) and the outcomes and progress trackers
+        in it as `items`. An Impact Framework that isn't public and approved is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 301
+      responses:
+        "200":
+          description: The Impact Framework's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreImpactFrameworkPreview'
+              example:
+                id: 301
+                name: Quality Education
+                description: Outcomes for SDG 4.
+                themes: [global_goals]
+                framework_sets: []
+                outcome_count: 1
+                progress_tracker_count: 1
+                shared_by: Makerble Templates
+                libraries_count: 15
+                yours: false
+                stages:
+                  - title: Activities
+                    items: [Sessions delivered]
+                  - title: Behaviour (mid-term outcomes)
+                    items: [Stays in school]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /library/search:
     get:
       tags: [Library]
@@ -10587,6 +10742,84 @@ components:
               type: array
               items:
                 type: string
+
+    ExploreImpactFramework:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        themes:
+          type: array
+          items:
+            type: string
+        framework_sets:
+          type: array
+          description: The platform-wide Framework Sets it belongs to
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              short_code:
+                type: string
+                nullable: true
+        outcome_count:
+          type: integer
+        progress_tracker_count:
+          type: integer
+        shared_by:
+          type: string
+          nullable: true
+        libraries_count:
+          type: integer
+          description: How many organisations use it on a project
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreImpactFrameworks:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreImpactFramework'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreImpactFrameworkPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreImpactFramework'
+        - type: object
+          properties:
+            stages:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: string
 
     PaginatedLibrarySearch:
       type: object
