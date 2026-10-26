@@ -158,6 +158,11 @@ tags:
       Organisation always has age bands (by default 0–12, 13–17, 18–24 and 25 and over); an Album or
       Project can have its own, and otherwise uses its Organisation's. The Demographics tab of
       Manage Contacts and the Snapshot use the same bands.
+  - name: Focus
+    description: |
+      Focus under Today: one list of everything that needs the signed-in user, grouped by when it's
+      due (Overdue, Today, This week, Later) and filtered by type. The first source is Checklist
+      Actions: the next step on each Contact's Checklist that the user is responsible for.
   - name: Snapshot
     description: |
       The Snapshot under Today: one Album's (Portfolio's) or Project's headline numbers on one page.
@@ -9213,6 +9218,130 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /focus:
+    get:
+      tags: [Focus]
+      summary: Get what needs you, as on your Focus page
+      description: |
+        Everything that needs you, from every source you haven't switched off, most overdue first,
+        as on Today › Focus. Today the only source is **Checklist Actions** (`type: checklist_actions`):
+        for each Contact and Checklist, the first step not yet done, when you are responsible for it
+        (the Checklist's "Who is responsible?", or the Contact's own choice in its place). "The
+        colleague who added this checklist" counts when that was you.
+
+        `scope=me` (the default) gives what you are responsible for; `scope=teams` adds what your
+        Teams are responsible for, and is only available when you are in a Team (`teams: true`).
+        There is no view of everyone's work: a Checklist's progress gives that.
+
+        Each item has `id`, `type`, `title`, `contact` ({id, name}), `context` (e.g. "Checklist Action ·
+        Intake · step 2 of 5", plus who is responsible when it isn't you), `url`, `due_on` (the day the
+        Checklist was added plus the step's due days, or null), `due_text`, `section` (`overdue`,
+        `today`, `this_week` for the next 7 days, or `later` for later or undated) and `action`
+        ({label, url, method}), the row's button. `counts`, `sections` and `sources` describe the whole
+        list, whatever `section` or page you ask for. Only Contacts you can see are included.
+      operationId: getFocus
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [me, teams]
+          description: "`teams` adds what your Teams are responsible for. Falls back to `me` when you are in no Team."
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Only items from this source, e.g. `checklist_actions`. A type with no items gives every item.
+        - name: section
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [overdue, today, this_week, later]
+          description: Only items in this section.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: What needs you
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FocusFeed'
+              example:
+                scope: me
+                teams: true
+                type: null
+                sources: [{key: checklist_actions, label: Checklist Actions, shown: true}]
+                counts: {all: 1, checklist_actions: 1}
+                sections: [{key: overdue, label: Overdue, count: 1}]
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: checklist_actions-812
+                    type: checklist_actions
+                    title: Consent form
+                    contact: {id: 4021, name: Ayanda Dlamini}
+                    context: Checklist Action · Youth Programme Intake · step 3 of 6
+                    url: /beneficiaries/4021
+                    due_on: "2026-10-11"
+                    raised_on: null
+                    due_text: 15 days overdue
+                    section: overdue
+                    action: {label: Open, url: /beneficiaries/4021, method: get}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /focus/settings:
+    patch:
+      tags: [Focus]
+      summary: Choose what your Focus page shows
+      description: |
+        The sources your Focus page shows, as chosen under its ⚙ "What Focus shows you". Send the keys
+        of the sources to show; every other source is switched off. Saved for you only: your email and
+        web notification settings are unchanged.
+      operationId: updateFocusSettings
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shown_sources]
+              properties:
+                shown_sources:
+                  type: array
+                  items:
+                    type: string
+                  description: Source keys from `sources` in GET /focus; `[]` shows none.
+            example:
+              shown_sources: [checklist_actions]
+      responses:
+        "200":
+          description: The sources after the change
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sources]
+                properties:
+                  sources:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FocusSource'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /snapshot:
     get:
       tags: [Snapshot]
@@ -10083,6 +10212,130 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    FocusSource:
+      type: object
+      required: [key, label, shown]
+      properties:
+        key:
+          type: string
+          description: e.g. checklist_actions
+        label:
+          type: string
+          description: Its name under ⚙ What Focus shows you, e.g. Checklist Actions
+        shown:
+          type: boolean
+          description: False when you have switched it off
+    FocusItem:
+      type: object
+      required: [id, type, title, context, contact, url, due_on, raised_on, due_text, section, action]
+      properties:
+        id:
+          type: string
+          description: Unique across every source, e.g. checklist_actions-812
+        type:
+          type: string
+          description: The source it came from, e.g. checklist_actions
+        title:
+          type: string
+          description: What it is, e.g. the Checklist step
+        context:
+          type: string
+          description: Where it belongs, e.g. "Checklist Action · Intake · step 2 of 5", plus who is responsible when it isn't you
+        contact:
+          type: object
+          nullable: true
+          description: The Contact it is about, when there is one
+          required: [id, name]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        url:
+          type: string
+          description: Where the row leads
+        due_on:
+          type: string
+          format: date
+          nullable: true
+          description: The day it is due, or null
+        raised_on:
+          type: string
+          format: date
+          nullable: true
+          description: For something with no due date, the day it was raised
+        due_text:
+          type: string
+          description: e.g. "15 days overdue", "Due today", "Due in 4 days", "No due date"
+        section:
+          type: string
+          enum: [overdue, today, this_week, later]
+        action:
+          type: object
+          description: The row's one button
+          required: [label, url, method]
+          properties:
+            label:
+              type: string
+              description: e.g. Open
+            url:
+              type: string
+            method:
+              type: string
+              description: The HTTP method, e.g. get
+    FocusFeed:
+      type: object
+      required: [scope, teams, type, sources, counts, sections, page, page_size, page_count, total_count, data]
+      properties:
+        scope:
+          type: string
+          enum: [me, teams]
+        teams:
+          type: boolean
+          description: You are in a Team, so scope=teams is available
+        type:
+          type: string
+          nullable: true
+          description: The type filtered by, or null for every type
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/FocusSource'
+        counts:
+          type: object
+          description: "`all`, and the number of items of each type that has any, e.g. {all: 4, checklist_actions: 4}"
+          required: [all]
+          additionalProperties:
+            type: integer
+          properties:
+            all:
+              type: integer
+        sections:
+          type: array
+          description: The sections that have items, in order
+          items:
+            type: object
+            required: [key, label, count]
+            properties:
+              key:
+                type: string
+                enum: [overdue, today, this_week, later]
+              label:
+                type: string
+              count:
+                type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FocusItem'
 
     ImpactStoreSearchResult:
       type: object
