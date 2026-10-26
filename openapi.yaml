@@ -1107,7 +1107,16 @@ paths:
     post:
       tags: [Projects]
       summary: Add users to a Project
-      description: Grants roles on a Project. A user can hold Editor, Reporter, and Observer simultaneously.
+      description: |
+        Adds users to Projects' teams, as the Project's **Add Users** page does: as Project Managers (`editor_ids`),
+        Changemakers (`reporter_ids`) or Analysts (`observer_ids`). A user can hold more than one role.
+
+        You must be a Project Manager of every listed Project, or an Organisation Admin of its Organisation. The users
+        must already be colleagues in the Project's Organisation, unless the Organisation's preference "Allow Project
+        Managers to add Makerble Users outside the organisation to their project" is on.
+
+        The request is all or nothing: if any Project isn't found (404), isn't yours to manage (403) or any user can't
+        be added (422), nobody is added to any Project.
       operationId: addColleague
       security: [{tokenAuth: []}]
       requestBody:
@@ -1147,6 +1156,10 @@ paths:
           description: Users added
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/AddColleagueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -9278,6 +9291,14 @@ components:
           example:
             success: false
             errors: "Permission denied."
+    AddColleagueForbidden:
+      description: You aren't a Project Manager of one of the listed Projects or an Organisation Admin of its Organisation. Nobody is added to any of them.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You don't have permission to add users to project 619."
     UnprocessableEntity:
       description: Validation failed
       content:
