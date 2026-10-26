@@ -1840,6 +1840,7 @@ function buildDocsPage() {
         <h2 class="section-title">Library</h2>
         <div class="section-desc">
           <p>The Library holds the reusable building blocks your organisation can see: Surveys, Metrics, Activity and Attendance trackers, Outcomes, Lists of answer choices, Units, Fields, Contact Forms, Case Forms, Impact Frameworks, Toolkits, Project Types and Ideas. Search it before making something new, so results keep adding up with those recorded against the original.</p>
+          <p>You can also create Lists, Units, Fields and Outcomes. Search first and reuse what fits: a create call whose name is the same as, or near-identical to, an item you can already reuse (ignoring case, spacing and punctuation) creates nothing and returns <code>409</code> with the matches; send <code>force: true</code> to create it anyway.</p>
           <p>Each item has a <code>type</code>: <code>survey</code>, <code>metric</code>, <code>activity_tracker</code>, <code>outcome</code>, <code>list</code>, <code>unit</code>, <code>field</code>, <code>contact_form</code>, <code>case_form</code>, <code>impact_framework</code>, <code>toolkit</code>, <code>project_type</code>, <code>idea</code>. <code>source</code> chooses your organisation's own library (default), the public library shared by every organisation, or both. Items you may not see are never returned; asking for one by id returns <code>404</code>.</p>
         </div>
         <div class="endpoint-list">
@@ -1870,6 +1871,62 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" },
             { code: "422", cls: "response-4xx", desc: "Unknown <code>item_type</code>" }
           ])}
+          ${endpointCard("POST", "/lists", "Create a List", true, [
+            { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
+            { name: "name", in: "body", type: "string", required: true, desc: "e.g. <code>Agree - Disagree</code>" },
+            { name: "choices", in: "body", type: "array", required: true, desc: "The answer choices in order, each different, at most 50" },
+            { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create it even though a near-identical one exists (see 409)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created: <code>data</code> is the new item as Get a library item shows it, plus <code>approved</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "You may not create this kind of item, as in the Makerble app" },
+            { code: "404", cls: "response-4xx", desc: "<code>organisation_id</code> is not one of your organisations" },
+            { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse with the same or a near-identical name. Resend with <code>force: true</code> to create anyway" },
+            { code: "422", cls: "response-4xx", desc: "Invalid input, e.g. a missing name; nothing is created" }
+          ], "A List (Ratio Set) of answer choices, private to your organisation. Nothing is created unless the List and all its choices are.")}
+          ${endpointCard("POST", "/units", "Create a Unit", true, [
+            { name: "name", in: "body", type: "string", required: true, desc: "e.g. <code>hours</code>" },
+            { name: "alignment", in: "body", type: "string", required: true, desc: "<code>left</code> (£10) or <code>right</code> (10 hours)" },
+            { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create it even though a near-identical one exists (see 409)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created: <code>data</code> is the new item as Get a library item shows it, plus <code>approved</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "Only Makerble staff create Units; reuse an existing one" },
+            { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse with the same or a near-identical name. Resend with <code>force: true</code> to create anyway" },
+            { code: "422", cls: "response-4xx", desc: "Invalid input, e.g. a missing name; nothing is created" }
+          ], "Units are shared by every organisation. One that already exists is never changed.")}
+          ${endpointCard("POST", "/fields", "Create a Field", true, [
+            { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
+            { name: "field_name", in: "body", type: "string", required: true, desc: "The question, e.g. <code>Date of birth</code>" },
+            { name: "field_data_type", in: "body", type: "string", required: true, desc: "<code>text</code>, <code>number</code>, <code>date</code>, <code>time</code>, <code>file</code>, <code>section_title</code>, <code>email_address</code> or <code>telephone</code>" },
+            { name: "section_text", in: "body", type: "string", required: false, desc: "For a <code>section_title</code> Field only" },
+            { name: "private", in: "body", type: "boolean", required: false, desc: "Only the organisation's staff may see the answers" },
+            { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create it even though a near-identical one exists (see 409)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created: <code>data</code> is the new item as Get a library item shows it, plus <code>approved</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "You may not create this kind of item, as in the Makerble app" },
+            { code: "404", cls: "response-4xx", desc: "<code>organisation_id</code> is not one of your organisations" },
+            { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse with the same or a near-identical name. Resend with <code>force: true</code> to create anyway" },
+            { code: "422", cls: "response-4xx", desc: "Invalid input, e.g. a missing name; nothing is created" }
+          ], "A Field (Custom Field): a question with a free answer, for a Survey or Contact Form.")}
+          ${endpointCard("POST", "/outcomes", "Create an Outcome", true, [
+            { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
+            { name: "title", in: "body", type: "string", required: true, desc: "e.g. <code>Improved confidence</code>" },
+            { name: "stage", in: "body", type: "string", required: true, desc: "<code>Short-term outcomes</code>, <code>Medium-term outcomes</code> or <code>Long-term outcomes</code>" },
+            { name: "description", in: "body", type: "string", required: false, desc: "What the Outcome means" },
+            { name: "instruction", in: "body", type: "string", required: false, desc: "Guidance for staff recording it" },
+            { name: "department", in: "body", type: "string", required: false, desc: "A cause area (Department) name" },
+            { name: "approved / private / is_default", in: "body", type: "boolean", required: false, desc: "Makerble staff only; ignored for everyone else" },
+            { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create it even though a near-identical one exists (see 409)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created: <code>data</code> is the new item as Get a library item shows it, plus <code>approved</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "You may not create this kind of item, as in the Makerble app" },
+            { code: "404", cls: "response-4xx", desc: "<code>organisation_id</code> is not one of your organisations" },
+            { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse with the same or a near-identical name. Resend with <code>force: true</code> to create anyway" },
+            { code: "422", cls: "response-4xx", desc: "Invalid input, e.g. a missing name; nothing is created" }
+          ], "Stays unapproved and private to your organisation unless you are Makerble staff.")}
         </div>
       </section>
 

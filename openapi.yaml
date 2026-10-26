@@ -2971,6 +2971,69 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+    post:
+      tags: [Outcomes, Library]
+      summary: Create an Outcome
+      operationId: createOutcome
+      description: |
+        Creates an Outcome: a change your organisation wants to see in the people it works with,
+        e.g. "Improved confidence". It stays unapproved and private to your organisation unless you
+        are Makerble staff: `approved`, `private` and `is_default` are honoured for staff only and
+        ignored for everyone else. Near-identical titles get `409`, as for **Create a List**.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organisation_id, title, stage]
+              properties:
+                organisation_id:
+                  type: integer
+                  description: The organisation (Charity) that will own it; you must be one of its editors
+                title:
+                  type: string
+                stage:
+                  type: string
+                  enum: [Short-term outcomes, Medium-term outcomes, Long-term outcomes]
+                description:
+                  type: string
+                instruction:
+                  type: string
+                  description: Guidance for staff recording it
+                department:
+                  type: string
+                  description: A cause area (Department) name, e.g. Health
+                approved:
+                  type: boolean
+                  description: Makerble staff only
+                private:
+                  type: boolean
+                  description: Makerble staff only
+                is_default:
+                  type: boolean
+                  description: Makerble staff only
+                force:
+                  $ref: '#/components/schemas/ForceCreate'
+            example:
+              organisation_id: 913
+              title: "Improved confidence"
+              stage: "Short-term outcomes"
+      responses:
+        "201":
+          $ref: '#/components/responses/LibraryItemCreated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/LibraryCreateForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/LibraryDuplicates'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /outcomes/{id}:
     get:
       tags: [Outcomes]
@@ -5197,6 +5260,158 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /lists:
+    post:
+      tags: [Library]
+      summary: Create a List
+      operationId: createList
+      description: |
+        Creates a List (a Ratio Set): the answer choices for a multiple-choice question or a scale
+        Metric, e.g. "Agree - Disagree". The choices keep the order you send, at most 50, each
+        different. The List stays private to your organisation.
+
+        Search the library first (**Search the library**) and reuse a List that fits. If your
+        organisation or the public library already has a List with the same or a near-identical
+        name (ignoring case, spacing and punctuation), nothing is created and you get `409` with the
+        matches. Send `force: true` to create it anyway. Your organisation can never have two Lists
+        with exactly the same name, so that is a `409` even with `force`.
+
+        Nothing is created unless everything is: a bad choice creates no List.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organisation_id, name, choices]
+              properties:
+                organisation_id:
+                  type: integer
+                  description: The organisation (Charity) that will own it; you must be one of its editors
+                name:
+                  type: string
+                choices:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                force:
+                  $ref: '#/components/schemas/ForceCreate'
+            example:
+              organisation_id: 913
+              name: "Agree - Disagree"
+              choices: ["Strongly agree", "Agree", "Neutral", "Disagree", "Strongly disagree"]
+      responses:
+        "201":
+          $ref: '#/components/responses/LibraryItemCreated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/LibraryCreateForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/LibraryDuplicates'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /units:
+    post:
+      tags: [Library]
+      summary: Create a Unit
+      operationId: createUnit
+      description: |
+        Creates a Unit: the unit of measure shown beside a number answer, e.g. "hours" or "£".
+        Units are shared by every organisation, so only Makerble staff may create one; anyone else
+        gets `403` and should reuse an existing Unit. A Unit that already exists is never changed.
+        Near-identical names get `409`, as for **Create a List**.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, alignment]
+              properties:
+                name:
+                  type: string
+                alignment:
+                  type: string
+                  enum: [left, right]
+                  description: Which side of the number it goes, e.g. left for £10, right for 10 hours
+                force:
+                  $ref: '#/components/schemas/ForceCreate'
+            example:
+              name: "sessions"
+              alignment: right
+      responses:
+        "201":
+          $ref: '#/components/responses/LibraryItemCreated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/LibraryCreateForbidden'
+        "409":
+          $ref: '#/components/responses/LibraryDuplicates'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /fields:
+    post:
+      tags: [Library]
+      summary: Create a Field
+      operationId: createField
+      description: |
+        Creates a Field (a Custom Field): a question with a free answer rather than a Metric, e.g.
+        "Date of birth" (date) or "Postcode" (text), for a Survey or Contact Form. A `section_title`
+        Field is a heading with `section_text` under it; it isn't listed in the library, so the
+        response has only its `id`, `type`, `name` and `approved`. Fields are never shared in the
+        public library. Near-identical names get `409`, as for **Create a List**.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organisation_id, field_name, field_data_type]
+              properties:
+                organisation_id:
+                  type: integer
+                  description: The organisation (Charity) that will own it; you must be one of its editors
+                field_name:
+                  type: string
+                field_data_type:
+                  type: string
+                  enum: [text, number, date, time, file, section_title, email_address, telephone]
+                section_text:
+                  type: string
+                  description: For a section_title Field only
+                private:
+                  type: boolean
+                  description: True if only the organisation's staff may see the answers
+                force:
+                  $ref: '#/components/schemas/ForceCreate'
+            example:
+              organisation_id: 913
+              field_name: "Postcode"
+              field_data_type: text
+      responses:
+        "201":
+          $ref: '#/components/responses/LibraryItemCreated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/LibraryCreateForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/LibraryDuplicates'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /referral_submissions:
     post:
@@ -9258,6 +9473,69 @@ components:
       description: Also include Indicators or Outcomes from the public library shared by all organisations (default false)
 
   responses:
+    LibraryItemCreated:
+      description: Created. The new item as **Get a library item** shows it, and whether it is approved for the public library
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                allOf:
+                  - $ref: '#/components/schemas/LibraryItem'
+                  - type: object
+                    properties:
+                      approved:
+                        type: boolean
+          example:
+            data:
+              id: 5521
+              type: list
+              name: "Agree - Disagree"
+              owner: your organisation
+              choices:
+                - {id: 90101, name: "Agree", points: null}
+                - {id: 90102, name: "Disagree", points: null}
+              approved: false
+    LibraryDuplicates:
+      description: |
+        Nothing was created: items you can reuse already have the same or a near-identical name. Reuse
+        one, or send `force: true` to create it anyway. An exact duplicate in your own organisation is
+        refused even with `force`, and is listed by `id` and `type` only.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              duplicates:
+                type: array
+                items:
+                  type: object
+                  required: [id, type]
+                  properties:
+                    id:
+                      type: integer
+                    type:
+                      type: string
+                    name:
+                      type: string
+                    owner:
+                      type: string
+                      enum: [your organisation, public library, Makerble]
+          example:
+            error: "A List with this name already exists. Reuse it, or send force: true to create another."
+            duplicates:
+              - {id: 4410, type: list, name: "Agree – Disagree", owner: your organisation}
+    LibraryCreateForbidden:
+      description: You may not create this kind of item, as in the Makerble app (e.g. only Makerble staff create Units)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You do not have permission to create ratio sets."
     Unauthorized:
       description: Missing or invalid authentication credentials
       content:
@@ -9525,6 +9803,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LibrarySearchResult'
+
+    ForceCreate:
+      type: boolean
+      default: false
+      description: Create it even though an item with a near-identical name exists (see the 409 response)
 
     LibraryItem:
       type: object
