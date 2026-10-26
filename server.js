@@ -900,6 +900,11 @@ function buildDocsPage() {
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#library"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Library</a>
         <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Surveys</a>
+        <a href="#explore-report-templates" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Report Templates</a>
+        <a href="#explore-dropdowns" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Dropdowns</a>
+        <a href="#explore-impact-frameworks" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Impact Frameworks</a>
+        <a href="#explore-ideas" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Ideas</a>
+        <a href="#explore-metrics" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Metrics</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
@@ -2045,6 +2050,163 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Survey's fields as above plus <code>sections</code>, each with its <code>title</code> (null before the first section header) and its <code>questions</code> in order" },
             { code: "404", cls: "response-4xx", desc: "Not listed on Explore Surveys (unpublished, unapproved or without a description)" }
           ], "To use a Survey, add it to a project in Makerble with Add to a project on Explore Surveys.")}
+        </div>
+      </section>
+
+      <!-- Explore Report Templates -->
+      <section class="section" id="explore-report-templates">
+        <div class="section-eyebrow">Reporting</div>
+        <h2 class="section-title">Explore Report Templates</h2>
+        <div class="section-desc">
+          <p>Explore Report Templates lists the Report Templates in the Makerble&reg; ImpactStore&trade;: funder reports, trustee updates, contract monitoring returns and other reports, each set out as the questions to answer. The API gives the same search, filters, counts and sort as the Explore Report Templates page. Every caller sees the same Report Templates; only <code>yours</code> and <code>in_your_library</code> depend on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=community</code>) or comma-separated (<code>theme=community,governance</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/report_templates", "Explore Report Templates", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Report Template's name or description, or who it's for or its theme" },
+            { name: "recipient", type: "string", required: false, desc: "Who it's for: <code>funder</code>, <code>trustees</code>, <code>local_authority</code> (Commissioner or contract), <code>corporate_partner</code>, <code>internal</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>children_and_young_people</code>, <code>community</code>, <code>employment</code>, <code>governance</code>, <code>health_and_wellbeing</code>, <code>volunteering</code>" },
+            { name: "output", type: "string", required: false, desc: "Answer formats any of its questions ask for: <code>narrative</code>, <code>number</code>, <code>chart</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (in the most organisations' libraries first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Report Templates per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Report Templates updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Report Templates with <code>id</code>, <code>slug</code>, <code>name</code>, <code>description</code>, <code>recipient</code>, <code>theme</code>, <code>question_count</code>, <code>answer_formats</code>, <code>shared_by</code>, <code>libraries_count</code> (organisations with it in their library), <code>yours</code> and <code>in_your_library</code>, plus <code>facets</code>: each filter's options with how many Report Templates each would return given the other filters" }
+          ])}
+          ${endpointCard("GET", "/explore/report_templates/{id}", "Preview an Explore Report Template", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Report Template's id from Explore Report Templates" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Report Template's fields as above plus <code>questions</code>, each with its <code>title</code> and the <code>answer_formats</code> it asks for, in order" },
+            { code: "404", cls: "response-4xx", desc: "Not in the ImpactStore" }
+          ], "To use a Report Template, add it to your organisation's library in Makerble with Add to your library on Explore Report Templates.")}
+        </div>
+      </section>
+
+      <!-- Explore Dropdowns -->
+      <section class="section" id="explore-dropdowns">
+        <div class="section-eyebrow">Forms and surveys</div>
+        <h2 class="section-title">Explore Dropdowns</h2>
+        <div class="section-desc">
+          <p>Explore Dropdowns lists the Dropdowns (answer-choice lists, Ratio Sets) shared to the Makerble&reg; ImpactStore&trade; and approved: standard scales and category lists that make results compare cleanly across organisations. The API gives the same search, filters, counts and sort as the Explore Dropdowns page. Every caller sees the same Dropdowns; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=scales</code>) or comma-separated (<code>choices=up_to_10,11_to_100</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/dropdowns", "Explore Dropdowns", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Dropdown's title or any of its answer choices" },
+            { name: "designed_for", type: "string", required: false, desc: "<code>surveys_and_trackers</code>, <code>forms</code> (bio, event and project forms)" },
+            { name: "choices", type: "string", required: false, desc: "Number of answer choices: <code>up_to_10</code>, <code>11_to_100</code>, <code>over_100</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>scales</code>, <code>demographics</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Scales</code>, <code>Demographics</code>, <code>Equality monitoring</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (used in the most surveys, trackers and forms first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Dropdowns per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Dropdowns updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Dropdowns with <code>id</code>, <code>title</code>, <code>choice_count</code>, <code>designed_for</code>, <code>themes</code>, <code>shared_by</code>, <code>used_in_count</code> (surveys, trackers and forms using it) and <code>yours</code>, plus <code>facets</code>: each filter's options with how many Dropdowns each would return given the other filters" }
+          ])}
+          ${endpointCard("GET", "/explore/dropdowns/{id}", "Preview an Explore Dropdown", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Dropdown's id from Explore Dropdowns" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Dropdown's fields as above plus every one of its answer <code>choices</code>, in order" },
+            { code: "404", cls: "response-4xx", desc: "Not listed on Explore Dropdowns (not shared or not approved)" }
+          ], "To use a Dropdown, copy it into your organisation in Makerble with Add to organisation on Explore Dropdowns.")}
+        </div>
+      </section>
+
+      <!-- Explore Impact Frameworks -->
+      <section class="section" id="explore-impact-frameworks">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Explore Impact Frameworks</h2>
+        <div class="section-desc">
+          <p>Explore Impact Frameworks lists the public, approved Impact Frameworks (Templates) in the Makerble&reg; ImpactStore&trade;: sets of outcomes and progress trackers across the stages of change. The API gives the same search, filters, counts and sort as the Explore Impact Frameworks page. Every caller sees the same Impact Frameworks; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=inclusion</code>) or comma-separated (<code>size=up_to_5,6_to_10</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/impact_frameworks", "Explore Impact Frameworks", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Impact Framework's name or description" },
+            { name: "theme", type: "string", required: false, desc: "<code>mental_health_and_wellbeing</code>, <code>children_and_young_people</code>, <code>employment_and_skills</code>, <code>community_and_culture</code>, <code>health</code>, <code>organisational</code>, <code>global_goals</code>, <code>inclusion</code>, <code>education_and_training</code>, <code>leadership</code>" },
+            { name: "set", type: "string", required: false, desc: "Part of a Framework Set: a platform-wide Framework Set's id (listed in <code>facets</code>), or <code>none</code>" },
+            { name: "size", type: "string", required: false, desc: "Number of outcomes: <code>up_to_5</code>, <code>6_to_10</code>, <code>over_10</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>SDGs</code>, <code>Inclusion</code>, <code>Employment</code>, <code>Wellbeing</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (on the most organisations' projects first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Impact Frameworks per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Impact Frameworks updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Impact Frameworks with <code>id</code>, <code>name</code>, <code>description</code>, <code>themes</code>, <code>framework_sets</code> (each with <code>id</code>, <code>name</code> and <code>short_code</code>), <code>outcome_count</code>, <code>progress_tracker_count</code>, <code>shared_by</code>, <code>libraries_count</code> (organisations using it on a project) and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/impact_frameworks/{id}", "Preview an Explore Impact Framework", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Impact Framework's id from Explore Impact Frameworks" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Impact Framework's fields as above plus <code>stages</code>, each stage of change with its <code>title</code> (Activities, Engagement, Ability, Behaviour or Effect) and its outcomes and progress trackers as <code>items</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not public and approved" }
+          ], "To use an Impact Framework, add it to projects in Makerble with Add to projects on Explore Impact Frameworks.")}
+        </div>
+      </section>
+
+      <!-- Explore Ideas -->
+      <section class="section" id="explore-ideas">
+        <div class="section-eyebrow">Learning</div>
+        <h2 class="section-title">Explore Ideas</h2>
+        <div class="section-desc">
+          <p>Explore Ideas lists the approved Ideas (Tips) shared with everyone in the Makerble&reg; ImpactStore&trade;: what other organisations tried, how it went and what they would change. The API gives the same search, filters, counts and sort as the Explore Ideas page. <code>shared_by</code>, <code>person</code> and <code>yours</code> depend on you: your colleagues, the people you follow and you.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=leadership</code>) or comma-separated (<code>shared_by=colleagues,following</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/ideas", "Explore Ideas", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Idea's title or text" },
+            { name: "shared_by", type: "string", required: false, desc: "<code>anyone</code>, <code>colleagues</code>, <code>following</code>, <code>me</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>mental_health_and_wellbeing</code>, <code>children_and_young_people</code>, <code>employment_and_skills</code>, <code>community_and_culture</code>, <code>health</code>, <code>organisational</code>, <code>global_goals</code>, <code>inclusion</code>, <code>education_and_training</code>, <code>leadership</code>" },
+            { name: "audience", type: "string", required: false, desc: "<code>public_impact</code>, <code>personal</code>, <code>professional</code>" },
+            { name: "person", type: "string", required: false, desc: "User ids of colleagues or people you follow; any other id is ignored" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Community</code>, <code>Young people</code>, <code>Training</code>, <code>Leadership</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (saved to the most collections first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Ideas per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Ideas updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Ideas with <code>id</code>, <code>title</code>, <code>themes</code>, <code>reading_minutes</code>, <code>shared_by</code>, <code>saved_count</code> (collections it is saved to) and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/ideas/{id}", "Read an Explore Idea", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Idea's id from Explore Ideas" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Idea's fields as above plus its <code>text</code>, without formatting" },
+            { code: "404", cls: "response-4xx", desc: "Not approved and shared with everyone" }
+          ], "To keep an Idea, save it to a collection in Makerble with Save idea on Explore Ideas.")}
+        </div>
+      </section>
+
+      <!-- Explore Metrics -->
+      <section class="section" id="explore-metrics">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Explore Metrics</h2>
+        <div class="section-desc">
+          <p>Explore Metrics lists the published, approved metrics of the Makerble&reg; ImpactStore&trade; across the stages of change: progress trackers (<code>kind</code> <code>change</code>: Activities and Engagement), outcome indicators (<code>indicator</code>: Ability, Behaviour and Effect) and Financial Values (<code>financial_value</code>). The API gives the same search, filters, counts and sort as the Explore Metrics page. Every caller sees the same metrics; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>stage[]=ability</code>) or comma-separated (<code>answer_format=scale,yes_no</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/metrics", "Explore Metrics", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the metric's name or description" },
+            { name: "stage", type: "string", required: false, desc: "<code>activities</code>, <code>engagement</code>, <code>ability</code>, <code>behaviour</code>, <code>effect</code>, <code>financial_values</code>" },
+            { name: "answer_format", type: "string", required: false, desc: "<code>count</code>, <code>scale</code>, <code>yes_no</code>, <code>value</code>" },
+            { name: "audience", type: "string", required: false, desc: "<code>public_impact</code>, <code>personal</code>, <code>professional</code>" },
+            { name: "shared_by", type: "string", required: false, desc: "<code>makerble</code>, <code>others</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Wellbeing</code>, <code>Employment</code>, <code>Housing</code>, <code>Attendance</code>, <code>SDGs</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (on the most organisations' projects first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Metrics per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only metrics updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Metrics with <code>kind</code>, <code>id</code>, <code>name</code>, <code>stage</code>, <code>whats_inside</code> (e.g. 5-level scale), <code>shared_by</code>, <code>libraries_count</code> and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/metrics/{kind}/{id}", "Preview an Explore Metric", true, [
+            { name: "kind", in: "path", type: "string", required: true, desc: "<code>change</code>, <code>indicator</code> or <code>financial_value</code>" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "The metric's id from Explore Metrics" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The metric's fields as above plus <code>description</code>, <code>details</code> (its key facts by label) and the <code>choices</code> of a scale or yes-or-no indicator" },
+            { code: "404", cls: "response-4xx", desc: "Not published and approved" }
+          ], "To use a tracker or indicator, add it to a project in Makerble with Add to a project on Explore Metrics.")}
         </div>
       </section>
 

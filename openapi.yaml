@@ -5154,6 +5154,774 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /explore/report_templates:
+    get:
+      tags: [Explore]
+      summary: Explore Report Templates
+      operationId: listExploreReportTemplates
+      description: |
+        Lists the Report Templates in the Makerble® ImpactStore™, with the same search, filters,
+        counts and sort as the Explore Report Templates page. Every caller sees the same Report
+        Templates; `yours` and `in_your_library` depend on the caller's organisations.
+
+        - `query` matches the Report Template's name or description, or the label of who it's for
+          or its theme.
+        - The filters take option keys, as arrays (`theme[]=community`) or comma-separated
+          (`theme=community,governance`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `recipient` (Who it's for): `funder`, `trustees`, `local_authority` (Commissioner or
+            contract), `corporate_partner`, `internal`
+          - `theme`: `children_and_young_people`, `community`, `employment`, `governance`,
+            `health_and_wellbeing`, `volunteering`
+          - `output` (Answer formats): `narrative`, `number`, `chart`. A Report Template matches
+            when any of its questions asks for that format.
+        - `facets` gives each filter's options with how many Report Templates each would return,
+          given the other filters already chosen.
+        - `sort` is `added` (in the most organisations' libraries first, the default), `new` or `az`.
+        - Add a Report Template to your organisation's library in the app with **Add to your
+          library** on Explore Report Templates.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: end of grant
+          description: Words to look for in the Report Template's name, description, recipient or theme
+        - name: recipient
+          in: query
+          required: false
+          schema:
+            type: string
+          example: funder,trustees
+          description: Who it's for option keys, comma-separated or repeated as recipient[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: community
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: output
+          in: query
+          required: false
+          schema:
+            type: string
+          example: chart
+          description: Answer format option keys, comma-separated or repeated as output[]
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Report Templates that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreReportTemplates'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 18
+                    slug: annual-grant-report-to-a-funder
+                    name: Annual Grant Report to a Funder
+                    description: The yearly report most grant funders ask for.
+                    recipient: funder
+                    theme: community
+                    question_count: 5
+                    answer_formats: [narrative, number, chart]
+                    shared_by: Makerble® ImpactStore™
+                    libraries_count: 31
+                    yours: false
+                    in_your_library: false
+                facets:
+                  - key: recipient
+                    label: Who it's for
+                    options:
+                      - value: funder
+                        label: Funder
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/report_templates/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Report Template
+      operationId: getExploreReportTemplate
+      description: |
+        One Report Template listed on Explore Report Templates, as its Preview shows it: the fields
+        of **Explore Report Templates** plus `questions`, each with its `title` and the
+        `answer_formats` it asks for, in order. A Report Template that isn't in the ImpactStore is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 18
+      responses:
+        "200":
+          description: The Report Template's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreReportTemplatePreview'
+              example:
+                id: 18
+                slug: annual-grant-report-to-a-funder
+                name: Annual Grant Report to a Funder
+                description: The yearly report most grant funders ask for.
+                recipient: funder
+                theme: community
+                question_count: 2
+                answer_formats: [narrative, number]
+                shared_by: Makerble® ImpactStore™
+                libraries_count: 31
+                yours: false
+                in_your_library: false
+                questions:
+                  - title: What did you set out to achieve?
+                    answer_formats: [narrative]
+                  - title: Who did you reach?
+                    answer_formats: [number]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /explore/dropdowns:
+    get:
+      tags: [Explore]
+      summary: Explore Dropdowns
+      operationId: listExploreDropdowns
+      description: |
+        Lists the Dropdowns (answer-choice lists, Ratio Sets) shared to the Makerble® ImpactStore™
+        and approved, with the same search, filters, counts and sort as the Explore Dropdowns page.
+        Every caller sees the same Dropdowns; `yours` depends on the caller's organisations.
+
+        - `query` matches the Dropdown's title or any of its answer choices.
+        - The filters take option keys, as arrays (`theme[]=scales`) or comma-separated
+          (`theme=scales,demographics`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `designed_for`: `surveys_and_trackers`, `forms` (bio, event and project forms)
+          - `choices` (Number of choices): `up_to_10`, `11_to_100`, `over_100`
+          - `theme`: `scales`, `demographics`
+        - `chip` is one of the page's Popular chips: `Scales`, `Demographics`, `Equality monitoring`.
+        - `facets` gives each filter's options with how many Dropdowns each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (used in the most surveys, trackers and forms first, the default), `new`
+          or `az`.
+        - Copy a Dropdown into your organisation in the app with **Add to organisation** on Explore
+          Dropdowns.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: ethnicity
+          description: Words to look for in the Dropdown's title or answer choices
+        - name: designed_for
+          in: query
+          required: false
+          schema:
+            type: string
+          example: surveys_and_trackers
+          description: Designed for option keys, comma-separated or repeated as designed_for[]
+        - name: choices
+          in: query
+          required: false
+          schema:
+            type: string
+          example: up_to_10
+          description: Number of choices option keys, comma-separated or repeated as choices[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: scales
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Scales, Demographics, Equality monitoring]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Dropdowns that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreDropdowns'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 87
+                    title: Agreement scale
+                    choice_count: 5
+                    designed_for: [surveys_and_trackers]
+                    themes: [scales]
+                    shared_by: Makerble Templates
+                    used_in_count: 42
+                    yours: false
+                facets:
+                  - key: theme
+                    label: Theme
+                    options:
+                      - value: scales
+                        label: Scales
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/dropdowns/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Dropdown
+      operationId: getExploreDropdown
+      description: |
+        One Dropdown listed on Explore Dropdowns: the fields of **Explore Dropdowns** plus every
+        one of its answer `choices`, in order. A Dropdown that isn't listed on Explore (not shared
+        or not approved) is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 87
+      responses:
+        "200":
+          description: The Dropdown and its answer choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreDropdownPreview'
+              example:
+                id: 87
+                title: Agreement scale
+                choice_count: 5
+                designed_for: [surveys_and_trackers]
+                themes: [scales]
+                shared_by: Makerble Templates
+                used_in_count: 42
+                yours: false
+                choices: [Strongly disagree, Disagree, Not sure, Agree, Strongly agree]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /explore/impact_frameworks:
+    get:
+      tags: [Explore]
+      summary: Explore Impact Frameworks
+      operationId: listExploreImpactFrameworks
+      description: |
+        Lists the public, approved Impact Frameworks (Templates) in the Makerble® ImpactStore™, with
+        the same search, filters, counts and sort as the Explore Impact Frameworks page. Every caller
+        sees the same Impact Frameworks; `yours` depends on the caller's organisations.
+
+        - `query` matches the Impact Framework's name or description.
+        - The filters take option keys, as arrays (`theme[]=inclusion`) or comma-separated
+          (`theme=inclusion,leadership`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `theme`: `mental_health_and_wellbeing`, `children_and_young_people`, `employment_and_skills`, `community_and_culture`, `health`, `organisational`, `global_goals`, `inclusion`, `education_and_training`, `leadership`
+          - `set` (Part of a Framework Set): a platform-wide Framework Set's id, or `none` for
+            frameworks in no set. `facets` lists the sets.
+          - `size`: `up_to_5`, `6_to_10`, `over_10` outcomes
+        - `chip` is one of the page's Popular chips: `SDGs`, `Inclusion`, `Employment`, `Wellbeing`.
+        - `facets` gives each filter's options with how many Impact Frameworks each would return,
+          given the other filters already chosen.
+        - `sort` is `added` (on the most organisations' projects first, the default), `new` or `az`.
+        - Add an Impact Framework to projects in the app with **Add to projects** on Explore Impact
+          Frameworks.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: inclusion
+          description: Words to look for in the Impact Framework's name or description
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: global_goals
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: set
+          in: query
+          required: false
+          schema:
+            type: string
+          example: none
+          description: Framework Set ids or none, comma-separated or repeated as set[]
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: string
+          example: up_to_5
+          description: Size option keys, comma-separated or repeated as size[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [SDGs, Inclusion, Employment, Wellbeing]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Impact Frameworks that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreImpactFrameworks'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 301
+                    name: Quality Education
+                    description: Outcomes for SDG 4.
+                    themes: [global_goals, children_and_young_people]
+                    framework_sets:
+                      - id: 2
+                        name: UN Sustainable Development Goals
+                        short_code: SDG 4
+                    outcome_count: 10
+                    progress_tracker_count: 3
+                    shared_by: Makerble Templates
+                    libraries_count: 15
+                    yours: false
+                facets:
+                  - key: size
+                    label: Size
+                    options:
+                      - value: 6_to_10
+                        label: 6 to 10 outcomes
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/impact_frameworks/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Impact Framework
+      operationId: getExploreImpactFramework
+      description: |
+        One Impact Framework listed on Explore Impact Frameworks, as its Preview shows it: the fields
+        of **Explore Impact Frameworks** plus `stages`, each stage of change with its `title`
+        (Activities, Engagement, Ability, Behaviour or Effect) and the outcomes and progress trackers
+        in it as `items`. An Impact Framework that isn't public and approved is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 301
+      responses:
+        "200":
+          description: The Impact Framework's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreImpactFrameworkPreview'
+              example:
+                id: 301
+                name: Quality Education
+                description: Outcomes for SDG 4.
+                themes: [global_goals]
+                framework_sets: []
+                outcome_count: 1
+                progress_tracker_count: 1
+                shared_by: Makerble Templates
+                libraries_count: 15
+                yours: false
+                stages:
+                  - title: Activities
+                    items: [Sessions delivered]
+                  - title: Behaviour (mid-term outcomes)
+                    items: [Stays in school]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /explore/ideas:
+    get:
+      tags: [Explore]
+      summary: Explore Ideas
+      operationId: listExploreIdeas
+      description: |
+        Lists the approved Ideas (Tips) shared with everyone in the Makerble® ImpactStore™, with the
+        same search, filters, counts and sort as the Explore Ideas page. `shared_by`, `person` and
+        `yours` depend on the caller.
+
+        - `query` matches the Idea's title or text.
+        - The filters take option keys, as arrays (`theme[]=leadership`) or comma-separated
+          (`theme=leadership,inclusion`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `shared_by`: `anyone`, `colleagues` (colleagues in the caller's organisations and
+            projects, or the organisations themselves), `following` (people the caller follows),
+            `me`
+          - `theme`: `mental_health_and_wellbeing`, `children_and_young_people`, `employment_and_skills`, `community_and_culture`, `health`, `organisational`, `global_goals`, `inclusion`, `education_and_training`, `leadership`
+          - `audience`: `public_impact`, `personal`, `professional`, from the Idea's causes
+          - `person`: user ids of people who shared Ideas. Only the caller's colleagues, people
+            they follow and the caller count; any other id is ignored.
+        - `chip` is one of the page's Popular chips: `Community`, `Young people`, `Training`,
+          `Leadership`.
+        - `facets` gives each filter's options with how many Ideas each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (saved to the most collections first, the default), `new` or `az`.
+        - Save an Idea to a collection in the app with **Save idea** on Explore Ideas.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: cohesion
+          description: Words to look for in the Idea's title or text
+        - name: shared_by
+          in: query
+          required: false
+          schema:
+            type: string
+          example: colleagues,following
+          description: Shared by option keys, comma-separated or repeated as shared_by[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: leadership
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: audience
+          in: query
+          required: false
+          schema:
+            type: string
+          example: public_impact
+          description: Audience option keys, comma-separated or repeated as audience[]
+        - name: person
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "1204"
+          description: User ids of people who shared Ideas, comma-separated or repeated as person[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Community, Young people, Training, Leadership]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Ideas that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreIdeas'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 77
+                    title: The Resident Leadership Pipeline
+                    themes: [leadership, community_and_culture]
+                    reading_minutes: 4
+                    shared_by: Northside Housing
+                    saved_count: 14
+                    yours: false
+                facets:
+                  - key: theme
+                    label: Theme
+                    options:
+                      - value: leadership
+                        label: Leadership
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/ideas/{id}:
+    get:
+      tags: [Explore]
+      summary: Read an Explore Idea
+      operationId: getExploreIdea
+      description: |
+        One Idea listed on Explore Ideas: the fields of **Explore Ideas** plus its `text`, without
+        formatting. An Idea that isn't approved and shared with everyone is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 77
+      responses:
+        "200":
+          description: The Idea and its text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreIdeaPreview'
+              example:
+                id: 77
+                title: The Resident Leadership Pipeline
+                themes: [leadership]
+                reading_minutes: 1
+                shared_by: Northside Housing
+                saved_count: 14
+                yours: false
+                text: We grew resident leaders who now run three local groups.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /explore/metrics:
+    get:
+      tags: [Explore]
+      summary: Explore Metrics
+      operationId: listExploreMetrics
+      description: |
+        Lists the published, approved metrics of the Makerble® ImpactStore™ across the stages of
+        change, with the same search, filters, counts and sort as the Explore Metrics page:
+        progress trackers (`kind` `change`: Activities and Engagement), outcome indicators (`kind`
+        `indicator`: Ability, Behaviour and Effect, taking the stage of the Outcome they sit under
+        when they have none of their own) and Financial Values (`kind` `financial_value`). Every
+        caller sees the same metrics; `yours` depends on the caller's organisations.
+
+        - `query` matches the metric's name or description.
+        - The filters take option keys, as arrays (`stage[]=ability`) or comma-separated
+          (`stage=ability,behaviour`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `stage` (Stage of change): `activities`, `engagement`, `ability`, `behaviour`,
+            `effect`, `financial_values`
+          - `answer_format`: `count` (progress tracker), `scale` (Choice tracker), `yes_no`
+            (Achievement tracker), `value` (Numerical tracker, and Financial Values)
+          - `audience`: `public_impact`, `personal`, `professional`
+          - `shared_by`: `makerble`, `others`
+        - `chip` is one of the page's Popular chips: `Wellbeing`, `Employment`, `Housing`,
+          `Attendance`, `SDGs`.
+        - `facets` gives each filter's options with how many metrics each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (on the most organisations' projects first, the default), `new` or `az`.
+        - Add a tracker or indicator to a project in the app with **Add to a project** on Explore
+          Metrics; a Financial Value from Explore Financial Values.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: confidence
+          description: Words to look for in the metric's name or description
+        - name: stage
+          in: query
+          required: false
+          schema:
+            type: string
+          example: ability,behaviour
+          description: Stage of change option keys, comma-separated or repeated as stage[]
+        - name: answer_format
+          in: query
+          required: false
+          schema:
+            type: string
+          example: scale
+          description: Answer format option keys, comma-separated or repeated as answer_format[]
+        - name: audience
+          in: query
+          required: false
+          schema:
+            type: string
+          example: personal
+          description: Audience option keys, comma-separated or repeated as audience[]
+        - name: shared_by
+          in: query
+          required: false
+          schema:
+            type: string
+          example: makerble
+          description: Shared by option keys, comma-separated or repeated as shared_by[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Wellbeing, Employment, Housing, Attendance, SDGs]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed metrics that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreMetrics'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - kind: indicator
+                    id: 5310
+                    name: Job satisfaction
+                    stage: ability
+                    whats_inside: 5-level scale
+                    shared_by: Makerble
+                    libraries_count: 21
+                    yours: false
+                facets:
+                  - key: answer_format
+                    label: Answer format
+                    options:
+                      - value: scale
+                        label: Scale (Choice tracker)
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/metrics/{kind}/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Metric
+      operationId: getExploreMetric
+      description: |
+        One metric listed on Explore Metrics, as its Preview shows it: the fields of **Explore
+        Metrics** plus its `description`, `details` (its key facts by label, such as the Outcomes an
+        indicator sits under or a Financial Value's amount and source) and the `choices` of a scale
+        or yes-or-no indicator, in order. A metric that isn't published and approved is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [change, indicator, financial_value]
+          example: indicator
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 5310
+      responses:
+        "200":
+          description: The metric's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreMetricPreview'
+              example:
+                kind: indicator
+                id: 5310
+                name: Job satisfaction
+                stage: ability
+                whats_inside: 5-level scale
+                shared_by: Makerble
+                libraries_count: 21
+                yours: false
+                description: How satisfied someone is with their job.
+                details:
+                  Answer format: 5-level scale
+                  Stage of change: Ability (short-term outcomes)
+                  Sits under: Job satisfaction at follow-up
+                  Shared by: Makerble
+                choices: [Very dissatisfied, Dissatisfied, Neither, Satisfied, Very satisfied]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /library/search:
     get:
       tags: [Library]
@@ -10104,7 +10872,7 @@ components:
       properties:
         key:
           type: string
-          enum: [theme, audience, time, feature]
+          description: The filter's query parameter, e.g. theme. Each Explore endpoint lists its own.
         label:
           type: string
         options:
@@ -10118,7 +10886,7 @@ components:
                 type: string
               count:
                 type: integer
-                description: How many Surveys this option would return, given the other filters already chosen
+                description: How many items this option would return, given the other filters already chosen
               selected:
                 type: boolean
 
@@ -10159,6 +10927,334 @@ components:
                     type: array
                     items:
                       type: string
+
+    ExploreReportTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        recipient:
+          type: string
+          nullable: true
+          enum: [funder, trustees, local_authority, corporate_partner, internal, null]
+        theme:
+          type: string
+          nullable: true
+        question_count:
+          type: integer
+        answer_formats:
+          type: array
+          items:
+            type: string
+            enum: [narrative, number, chart]
+        shared_by:
+          type: string
+        libraries_count:
+          type: integer
+          description: How many organisations have it in their library
+        yours:
+          type: boolean
+          description: Whether one of the caller's organisations owns it
+        in_your_library:
+          type: boolean
+          description: Whether it is in the library of one of the caller's organisations
+
+    PaginatedExploreReportTemplates:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreReportTemplate'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreReportTemplatePreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreReportTemplate'
+        - type: object
+          properties:
+            questions:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  answer_formats:
+                    type: array
+                    items:
+                      type: string
+                      enum: [narrative, number, chart]
+
+    ExploreDropdown:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        choice_count:
+          type: integer
+        designed_for:
+          type: array
+          items:
+            type: string
+            enum: [surveys_and_trackers, forms]
+        themes:
+          type: array
+          items:
+            type: string
+            enum: [scales, demographics]
+        shared_by:
+          type: string
+          nullable: true
+        used_in_count:
+          type: integer
+          description: How many surveys, trackers and forms use it
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreDropdowns:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreDropdown'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreDropdownPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreDropdown'
+        - type: object
+          properties:
+            choices:
+              type: array
+              items:
+                type: string
+
+    ExploreImpactFramework:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        themes:
+          type: array
+          items:
+            type: string
+        framework_sets:
+          type: array
+          description: The platform-wide Framework Sets it belongs to
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              short_code:
+                type: string
+                nullable: true
+        outcome_count:
+          type: integer
+        progress_tracker_count:
+          type: integer
+        shared_by:
+          type: string
+          nullable: true
+        libraries_count:
+          type: integer
+          description: How many organisations use it on a project
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreImpactFrameworks:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreImpactFramework'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreImpactFrameworkPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreImpactFramework'
+        - type: object
+          properties:
+            stages:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: string
+
+    ExploreIdea:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        themes:
+          type: array
+          items:
+            type: string
+        reading_minutes:
+          type: integer
+        shared_by:
+          type: string
+          nullable: true
+        saved_count:
+          type: integer
+          description: How many collections it has been saved to
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreIdeas:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreIdea'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreIdeaPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreIdea'
+        - type: object
+          properties:
+            text:
+              type: string
+
+    ExploreMetric:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [change, indicator, financial_value]
+        id:
+          type: integer
+        name:
+          type: string
+        stage:
+          type: string
+          enum: [activities, engagement, ability, behaviour, effect, financial_values]
+        whats_inside:
+          type: string
+          description: The tracker type or scale, e.g. "5-level scale" or "Activity tracker · count"
+        shared_by:
+          type: string
+          nullable: true
+        libraries_count:
+          type: integer
+          description: How many organisations use it on a project
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreMetrics:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreMetric'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreMetricPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreMetric'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            details:
+              type: object
+              description: The metric's key facts, by label
+              additionalProperties:
+                type: string
+            choices:
+              type: array
+              items:
+                type: string
 
     PaginatedLibrarySearch:
       type: object
