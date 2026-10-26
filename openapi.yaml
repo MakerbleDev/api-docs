@@ -22,6 +22,22 @@ info:
 
     > **Multi-user integrations:** If activity must be attributed to specific users, authenticate separately per user. A single Organisation Admin token is acceptable when attribution to one admin is sufficient.
 
+    ## Connecting an app with OAuth 2.0
+    Apps published for other people to use, such as marketplace connectors, connect with OAuth 2.0 instead of asking for a password. The user signs in to Makerble, chooses which of their organisations (Charities) the app may use, and selects **Allow**. The app then calls the API as that user, limited to that organisation.
+
+    1. **Get a client ID and secret.** Makerble registers client applications; email [api-key-request@makerble.com](mailto:api-key-request@makerble.com) with your app's name and its exact redirect URI (https only). There is no self-service registration.
+    2. **Send the user to** `GET https://makerble.com/oauth/authorize?response_type=code&client_id=…&redirect_uri=…&scope=api&state=…`. Makerble shows the consent screen, then redirects to your redirect URI with `?code=…&state=…`, or `?error=access_denied` if the user cancels. A redirect URI that isn't registered for your app is refused without redirecting.
+    3. **Exchange the code** at `POST https://makerble.com/oauth/token` with `grant_type=authorization_code`. The code works once and expires after 10 minutes.
+    4. **Call the API** with `Authorization: Bearer <access_token>`. Don't send `X-User-Email`/`X-User-Token` as well. Tokens are only read from the `Authorization` header.
+    5. **Refresh** at `POST https://makerble.com/oauth/token` with `grant_type=refresh_token`. Access tokens last 1 hour. Refresh tokens don't expire, but each refresh returns a new refresh token: always store the latest one.
+
+    | Situation | Response |
+    |---|---|
+    | Token expired, revoked, or the user is no longer in the connected organisation | `401 {"error":"invalid_token"}` |
+    | Endpoint not yet available to connected apps | `403 {"error":"not_available_to_connected_apps"}` |
+
+    A connected app sees only the organisation the user chose, with that user's permissions there. It can call the operations that list `oauth2` under Security; more are added as they are reviewed. Users and Organisation Admins can disconnect an app at any time from **Settings → Connected Apps**, and it stops working straight away. The scope is always `api`.
+
     ## Creating Users via the API
     `POST /users` requires a separate API Key (`auth_code`). Request one at [api-key-request@makerble.com](mailto:api-key-request@makerble.com).
 
@@ -304,12 +320,111 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /oauth/token:
+    servers:
+      - url: https://makerble.com
+        description: Production (OAuth endpoints are not under /api/v2)
+      - url: https://staging.makerble.com
+        description: Staging
+    post:
+      tags: [Authentication]
+      summary: Exchange an authorisation code, or refresh an access token (OAuth 2.0)
+      description: |
+        For apps connected with OAuth 2.0. Exchange the `code` from the consent screen for an
+        access token and refresh token, or swap a refresh token for a new pair. Authenticate
+        the app with `client_id` and `client_secret` in the body, or with HTTP Basic auth.
+        Access tokens last 1 hour (`expires_in: 3600`). Each refresh returns a new refresh
+        token; store the latest one.
+      operationId: createOauthToken
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type, client_id, client_secret]
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code, refresh_token]
+                code:
+                  type: string
+                  description: Required for `authorization_code`. Works once; expires after 10 minutes.
+                redirect_uri:
+                  type: string
+                  description: Required for `authorization_code`; must match the one used on `/oauth/authorize`.
+                refresh_token:
+                  type: string
+                  description: Required for `refresh_token`.
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+            example:
+              grant_type: authorization_code
+              code: "Zx1...code"
+              redirect_uri: https://global.consent.azure-apim.net/redirect
+              client_id: "your-client-id"
+              client_secret: "your-client-secret"
+      responses:
+        "200":
+          description: Tokens issued
+          content:
+            application/json:
+              example:
+                access_token: "kq3...access"
+                token_type: Bearer
+                expires_in: 3600
+                refresh_token: "9Lm...refresh"
+                scope: api
+                created_at: 1791726153
+        "400":
+          description: Invalid, expired or already-used code or refresh token (`{"error":"invalid_grant"}`)
+        "401":
+          description: Unknown client or wrong client secret (`{"error":"invalid_client"}`)
+
+  /oauth/revoke:
+    servers:
+      - url: https://makerble.com
+        description: Production (OAuth endpoints are not under /api/v2)
+      - url: https://staging.makerble.com
+        description: Staging
+    post:
+      tags: [Authentication]
+      summary: Revoke an access or refresh token (OAuth 2.0)
+      description: |
+        For apps connected with OAuth 2.0, e.g. when the user disconnects from inside your app.
+        Revoking either token of a pair stops both working. Always returns 200, even for an
+        unknown token.
+      operationId: revokeOauthToken
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, client_id, client_secret]
+              properties:
+                token:
+                  type: string
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+            example:
+              token: "9Lm...refresh"
+              client_id: "your-client-id"
+              client_secret: "your-client-secret"
+      responses:
+        "200":
+          description: Token revoked (or already invalid)
+
   /users:
     get:
       tags: [Users]
       summary: List all Users
       operationId: listUsers
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -404,7 +519,7 @@ paths:
       tags: [Users]
       summary: Get a single User
       operationId: getUser
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
@@ -425,7 +540,7 @@ paths:
       summary: Get user permissions
       description: Returns the authenticated user's permissions across all Projects and Organisations.
       operationId: getUserPermissions
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       responses:
         "200":
           description: Permissions object
@@ -514,7 +629,7 @@ paths:
       summary: Get a single Organisation
       description: Returns a single Charity (Organisation). Each Charity owns one or more Projects.
       operationId: getCharity
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
@@ -801,7 +916,7 @@ paths:
         | Reporter | `reporter` | Changemaker | Create Stories |
         | Observer | `observer` | Analyst | Read-only |
       operationId: listProjects
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -911,7 +1026,7 @@ paths:
       tags: [Projects]
       summary: Get a single Project
       operationId: getProject
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
@@ -1250,7 +1365,7 @@ paths:
         Returns all Contacts visible to the authenticated user. Filter by `charity_id` or `project_id`.
         Response includes `custom_fields` defined by the Beneficiary Category.
       operationId: listBeneficiaries
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -1453,7 +1568,7 @@ paths:
       summary: Get advanced custom fields for all Beneficiaries
       description: Returns the per-record custom field values for all Beneficiaries.
       operationId: listBeneficiaryAdvancedCustomFields
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -1474,7 +1589,7 @@ paths:
       summary: Get Impact Box data (Progress Trackers per Contact)
       description: Aggregated metric progress per Beneficiary — the data shown in the Progress Trackers box on a Contact Profile page.
       operationId: getBeneficiaryImpactBoxData
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -1498,7 +1613,7 @@ paths:
         authenticated user can see are included. Use project_ids to narrow the results to specific
         projects; it can never widen them to projects the user cannot see.
       operationId: listProjectBeneficiaries
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - name: project_ids
           in: query
@@ -1663,7 +1778,7 @@ paths:
       tags: [Beneficiary Categories]
       summary: List all Beneficiary Categories (Contact Bio Forms)
       operationId: listBeneficiaryCategories
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -1683,7 +1798,7 @@ paths:
       tags: [Beneficiary Categories]
       summary: Get a single Beneficiary Category
       operationId: getBeneficiaryCategory
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
@@ -1703,7 +1818,7 @@ paths:
       tags: [Beneficiary Categories]
       summary: Get current active fields for Beneficiary Categories
       operationId: getBeneficiaryCategoryCurrentFields
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       responses:
         "200":
           description: Current field definitions
@@ -1746,7 +1861,7 @@ paths:
       summary: List all Beneficiary Types
       description: Returns the four types — Person (1), Organisation (2), Animal (3), Object (4). The ID is required when creating a Beneficiary.
       operationId: listBeneficiaryTypes
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -1787,7 +1902,7 @@ paths:
       tags: [Beneficiary Types]
       summary: List Beneficiary Type–Category associations
       operationId: listBeneficiaryTypesCategories
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -2105,7 +2220,7 @@ paths:
       summary: Get verdict scores for a Survey Campaign
       description: Verdict scores grouped by Beneficiary for a specific Survey within a Project.
       operationId: getStoryCategoryVerdicts
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - name: id
           in: path
@@ -2137,7 +2252,7 @@ paths:
       tags: [Project Story Categories]
       summary: List all Survey Campaigns (Project Story Categories)
       operationId: listProjectStoryCategories
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -2366,7 +2481,7 @@ paths:
         2. **Story Change Beneficiary** — tagged via a Participation Change
         3. **Story Indicator Beneficiary** — tagged via an Indicator response
       operationId: listStoryBeneficiaries
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -2417,7 +2532,7 @@ paths:
       summary: List Story Change Beneficiaries
       description: Per-Beneficiary Participation Change records. Only applies to Participation type Changes.
       operationId: listStoryChangeBeneficiaries
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -2463,7 +2578,7 @@ paths:
       summary: List Story Indicator Beneficiaries
       description: Per-Beneficiary indicator responses. Each record = one Contact's answer to one Indicator in one Story.
       operationId: listStoryIndicatorBeneficiaries
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -2488,7 +2603,7 @@ paths:
       summary: List all Cases
       description: Each Case is linked to one Beneficiary and one Project.
       operationId: listCases
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -2545,7 +2660,7 @@ paths:
       tags: [Cases]
       summary: List Project–Beneficiary–Case associations
       operationId: listProjectsBeneficiariesCases
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -2569,7 +2684,7 @@ paths:
 
         Supported field types: Text (short/long) · Number · Date & time · Time · Attachment · Select · Tickbox
       operationId: listCustomFieldCategories
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
@@ -3735,7 +3850,7 @@ paths:
         this response does **not** include `submission_credential` — that bearer token
         is only issued to the offline device itself.
       operationId: getReferralLinkDetailDefinition
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
@@ -3886,7 +4001,7 @@ paths:
           is still added to any project. The `error` gives the reason and the counts.
         - Default Event Formats (Appointments, Classes, Conferences, Gatherings, Meetings,
           Other Events, Sessions, Workshops) can be deleted under the same rules.
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
@@ -8486,7 +8601,7 @@ paths:
 
         `kind_counts` gives the number of files of each kind for the same filters, ignoring `kind` — the counts on the File type buttons.
       operationId: listMediaItems
-      security: [{tokenAuth: []}]
+      security: [{tokenAuth: []}, {oauth2: [api]}]
       parameters:
         - name: charity_id
           in: query
@@ -9657,6 +9772,19 @@ components:
       description: |
         Long-lived token from `POST /users/sign_in`. Does not expire.
         Must be accompanied by `X-User-Email` header.
+    oauth2:
+      type: oauth2
+      description: |
+        OAuth 2.0 authorisation code flow for connected apps. The token is limited to the
+        organisation the user chose on the consent screen, with that user's permissions.
+        See "Connecting an app with OAuth 2.0" above.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://makerble.com/oauth/authorize
+          tokenUrl: https://makerble.com/oauth/token
+          refreshUrl: https://makerble.com/oauth/token
+          scopes:
+            api: The same access as the user who connected the app, in the organisation they chose
     submissionBearerAuth:
       type: http
       scheme: bearer
