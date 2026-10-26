@@ -5301,6 +5301,11 @@ paths:
         `GET /checklists/action_types`. Actions keep the order sent. Requires an editor or reporter
         of the Organisation.
 
+        "What counts as done": send specific values under the type's criteria keys, or
+        `criteria: {any: true}` ("Any relationship", "Any survey" and so on) for any record of the
+        kind; `any` replaces specific values sent with it. An action with neither is saved as "Not set
+        yet" and can't be done for any Contact until its criteria are set.
+
         Each action may say who is responsible for it ("Who is responsible?"): `owner_kind` is `none`
         (nobody in particular, the default), `adder` (the colleague who added the Checklist to the
         Contact, or the Project's Project Managers when a Project added it automatically), `user`
@@ -5347,6 +5352,10 @@ paths:
                     title: "Give them a Role"
                     criteria:
                       beneficiary_role_ids: ["12", "14"]
+                  - action_type: "add_relationship"
+                    title: "Record a caregiver"
+                    criteria:
+                      any: true
                   - action_type: "invite_to_event"
                     title: "Invite them to an induction event"
                     only_this_project: true
@@ -5376,7 +5385,8 @@ paths:
       tags: [Checklists]
       summary: List the actions a Checklist can contain
       description: |
-        Every action type with its name and the `criteria_keys` it stores. Criteria values are strings:
+        Every action type with its name, the `criteria_keys` it stores, and `any_name`, the "Any"
+        choice for it, e.g. "Any relationship" (`criteria: {any: true}`). Criteria values are strings:
         IDs, or pairs such as `project_states` "<project_id>:<beneficiary_state_id>",
         `project_event_categories` "<project_id>:<event_category_id>", `relationship_sides`
         "<relationship_category_id>:parent|child", and `survey_waves` "<Survey Campaign id>:<Wave id, or 0
@@ -5386,7 +5396,7 @@ paths:
       security: [{tokenAuth: []}]
       responses:
         "200":
-          description: "`{data: [{action_type, name, criteria_keys}]}`"
+          description: "`{data: [{action_type, name, criteria_keys, any_name, project_scopable}]}`"
         "401":
           $ref: '#/components/responses/Unauthorized'
 
