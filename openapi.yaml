@@ -5923,6 +5923,17 @@ paths:
         default, "Show a reminder, let them continue") shows a reminder they can dismiss; `ask_reason`
         ("Warn and ask for a reason to skip") makes them give a reason, which is logged. On an update,
         an action that doesn't mention it keeps its setting.
+
+        Participant Journey stages: send `stages`, in order, each with a `key` of your choosing, a
+        `name` and an `icon` (see `GET /checklists/stage_icons`; `clipboard` if left out), and give
+        each action the `stage_key` of its stage. The Journey view on the Checklist's profile page
+        shows each stage as a column with its actions, left to right. Each stage's actions are kept
+        together, in stage order. Stages are optional; an action without a stage shows as its own
+        column.
+
+        An action may leave out `action_type`: it is saved as "Not set yet", e.g. while mapping a
+        participant journey before deciding how each step is recorded, and can't be done until a type
+        is chosen. An action with neither a type nor a title is skipped.
       operationId: createChecklist
       security: [{tokenAuth: []}]
       requestBody:
@@ -5934,9 +5945,19 @@ paths:
               checklist:
                 name: "Induction"
                 description: "Steps for every new contact"
+                stages:
+                  - key: "signup"
+                    name: "Sign up"
+                    icon: "clipboard"
+                  - key: "support"
+                    name: "Arrange support"
+                    icon: "calendar"
                 actions:
+                  - title: "How participants sign up"
+                    stage_key: "signup"
                   - action_type: "add_role"
                     title: "Give them a Role"
+                    stage_key: "support"
                     criteria:
                       beneficiary_role_ids: ["12", "14"]
                   - action_type: "add_relationship"
@@ -5987,6 +6008,21 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /checklists/stage_icons:
+    get:
+      tags: [Checklists]
+      summary: List the icons a Checklist stage can have
+      description: |
+        The icons a Participant Journey stage can have, in the order the icon picker shows them:
+        clipboard (sign-up clipboard), calendar, people, chart, flag, message, home, heart, school and book.
+      operationId: listChecklistStageIcons
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: "`{data: [{icon, name}]}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
   /checklists/owner_options:
     get:
       tags: [Checklists]
@@ -6024,7 +6060,9 @@ paths:
         Each action includes who is responsible for it: `owner_kind`, `owner_user_id`, `owner_team_id`,
         `owner_relationship_side` and a readable `owner_description`, and its settings
         `due_within_days`, `only_this_project`, `allow_manual_completion` and
-        `if_earlier_steps_not_done` (`remind` or `ask_reason`).
+        `if_earlier_steps_not_done` (`remind` or `ask_reason`), and its `stage_id`. `stages` lists the
+        Participant Journey stages in order, each with `id`, `name`, `icon`, `position` and `colour`.
+        An action whose type isn't chosen yet has a null `action_type` and `action_name` "Not set yet".
       operationId: getChecklist
       security: [{tokenAuth: []}]
       parameters:
@@ -6048,6 +6086,12 @@ paths:
         Updates the name, description or actions. An action sent with its `id` is changed;
         `{id, _destroy: true}` removes it; an action without an `id` is added. Requires an editor or
         reporter of the Organisation. Send `due_within_days: null` to remove an action's deadline.
+
+        Stages work the same way: a stage sent with its `id` is renamed, given a new `icon` or moved
+        (`position`); `{id, _destroy: true}` removes it; a stage without an `id` is added, with a `key`.
+        An action joins a stage with `stage_key`: a new stage's `key`, or an existing stage's `id` as a
+        string. An empty `stage_key` takes the action out of its stage, and an action that doesn't send
+        `stage_key` stays where it is. A stage left without actions is removed.
       operationId: updateChecklist
       security: [{tokenAuth: []}]
       parameters:
@@ -6074,6 +6118,11 @@ paths:
                   - id: 57
                     owner_kind: "adder"
                     due_within_days: 7
+                    stage_key: "88"
+                stages:
+                  - id: 88
+                    name: "Arrange support"
+                    icon: "people"
       responses:
         "200":
           description: The updated Checklist
@@ -6222,6 +6271,65 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+
+  /checklists/{id}/journey:
+    get:
+      tags: [Checklists]
+      summary: Get a Checklist's Participant Journey
+      description: |
+        The Journey view on the Checklist's profile page: its steps left to right, grouped into stages.
+        `columns` are in order: each stage with its `stage_id`, `name`, `icon` and `colour`, then its
+        `steps`. A Checklist without stages has one column per step, named "Step 1", "Step 2" and so on,
+        with a null `stage_id` and `icon`; so does a step left outside the stages. Each step has
+        `action_id`, `number` (its place in the Checklist), `title`, `action_type`, `action_name` ("Not
+        set yet" while no type is chosen), `done_count` (Contacts who have done it) and `waiting_count`
+        (Contacts for whom it is the first step not done), out of `contacts_count`. Only Contacts the user
+        can see are counted.
+      operationId: getChecklistJourney
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The columns of the Journey view
+          content:
+            application/json:
+              example:
+                checklist_id: 42
+                contacts_count: 10
+                columns:
+                  - stage_id: 88
+                    name: "Sign up"
+                    icon: "clipboard"
+                    colour: "#AC3898"
+                    steps:
+                      - action_id: 55
+                        number: 1
+                        title: "How participants sign up"
+                        action_type: "complete_form"
+                        action_name: "Complete a form"
+                        done_count: 10
+                        waiting_count: 0
+                  - stage_id: 89
+                    name: "Arrange support"
+                    icon: "calendar"
+                    colour: "#2F7DC0"
+                    steps:
+                      - action_id: 56
+                        number: 2
+                        title: "Initial assessment"
+                        action_type: null
+                        action_name: "Not set yet"
+                        done_count: 8
+                        waiting_count: 2
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /beneficiaries/{beneficiary_id}/checklists:
     get:
