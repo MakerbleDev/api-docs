@@ -2881,6 +2881,121 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /indicators/create_v2:
+    post:
+      tags: [Indicators]
+      summary: Create a Metric
+      operationId: createIndicator
+      description: |
+        Creates a Metric (an Indicator) for one of your organisations, or for yourself, and links it
+        to the Outcomes it measures. This is the request the Metric form in the Makerble app sends,
+        so its body uses the form's field names.
+
+        To create a Metric by type name (`scale`, `binary` or `value`) as part of a Survey or an
+        Impact Framework, use **Create a Survey** (`new_metric`) or **Create an Impact Framework**
+        (`new_metrics`) instead. They also create a new List for a scale Metric in the same call.
+
+        Search the library first (**Search the library**) and reuse a Metric that fits. If your
+        organisation or the public library already has a Metric with the same or a near-identical
+        name (ignoring case, spacing and punctuation), nothing is created and you get `409` with the
+        matches. Send `force: true` to create it anyway.
+
+        The Metric is visible only to your organisation's editors and leaders. It is recorded as made
+        through the API, or through the MCP server when the request comes from it.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [indicator]
+              properties:
+                indicator:
+                  type: object
+                  required: [name, indicator_type_id]
+                  properties:
+                    name:
+                      type: string
+                    indicator_type_id:
+                      type: integer
+                      description: |
+                        The ID of the Metric type: scale (multiple choice from a List), binary (tickbox)
+                        or value (a number). These IDs differ between environments.
+                    unit_id:
+                      type: integer
+                      description: The Unit shown beside a value Metric's number, e.g. hours
+                    owner_type:
+                      type: string
+                      enum: [Charity, User]
+                      description: "Charity: owned by the organisation in owner_id. User: owned by you."
+                    owner_id:
+                      type: integer
+                      description: The organisation (Charity) that will own it; it must be one of yours
+                outcome_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Outcomes it measures, owned by one of your organisations or by you
+                department_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Cause areas (Departments); defaults to the first one
+                selected_ratio_set_id:
+                  type: integer
+                  description: For a scale Metric, the List (Ratio Set) of answer choices; one you can see
+                current_field_id:
+                  type: integer
+                  description: A question on one of your organisations' Surveys that this Metric should answer
+                force:
+                  $ref: '#/components/schemas/ForceCreate'
+            example:
+              indicator:
+                name: "Felt more confident"
+                indicator_type_id: 2
+                owner_type: Charity
+                owner_id: 913
+              outcome_ids: [5844]
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+                  indicator:
+                    type: string
+                    description: The new Metric as a JSON-encoded string
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: |
+            An owner, Outcome, List or Survey question you may not use. `errors` says which, e.g.
+            "These outcomes (outcome_ids) can't be used: 5844".
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: string
+        "409":
+          $ref: '#/components/responses/LibraryDuplicates'
+        "500":
+          description: The Metric is invalid, e.g. a missing name; `errors` lists the problems and nothing is created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: string
+
   /indicators/{id}:
     get:
       tags: [Indicators]

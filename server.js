@@ -1791,6 +1791,21 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Full Indicator detail including ratio_set_id, default_question" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to the user" }
           ])}
+          ${endpointCard("POST", "/indicators/create_v2", "Create a Metric", true, [
+            { name: "indicator[name]", in: "body", type: "string", required: true, desc: "The Metric's name" },
+            { name: "indicator[indicator_type_id]", in: "body", type: "integer", required: true, desc: "The ID of the type: scale, binary or value (IDs differ between environments)" },
+            { name: "indicator[owner_type]", in: "body", type: "string", required: false, desc: "<code>Charity</code> (with <code>indicator[owner_id]</code>, one of your organisations) or <code>User</code> (you)" },
+            { name: "indicator[unit_id]", in: "body", type: "integer", required: false, desc: "Unit for a value Metric, e.g. hours" },
+            { name: "outcome_ids", in: "body", type: "array", required: false, desc: "Outcomes it measures, owned by your organisations or by you" },
+            { name: "selected_ratio_set_id", in: "body", type: "integer", required: false, desc: "For a scale Metric, the List of answer choices" },
+            { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create it even though a near-identical one exists (see 409)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Created: <code>{message: \"success\", indicator}</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "An owner, Outcome, List or Survey question you may not use; <code>errors</code> says which" },
+            { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists Metrics you can reuse with the same or a near-identical name. Resend with <code>force: true</code> to create anyway" },
+            { code: "500", cls: "response-5xx", desc: "Invalid Metric, e.g. a missing name; nothing is created" }
+          ], "The request the Metric form in the app sends. To create Metrics by type name inside a Survey or an Impact Framework, use Create a Survey or Create an Impact Framework instead.")}
           ${endpointCard("GET", "/scale_indicator_choices", "Get Scale Indicator choices", true, [
             { name: "story_category_id", type: "integer", required: false, desc: "Filter by Survey" },
             { name: "indicator_id", type: "integer", required: false, desc: "Filter by Indicator" }
