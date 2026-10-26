@@ -922,6 +922,7 @@ function buildDocsPage() {
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
         <a href="#age-bands"       class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Age Bands</a>
+        <a href="#focus"           class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Focus</a>
         <a href="#snapshot"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Snapshot</a>
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Case Forms</a>
@@ -3183,6 +3184,34 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Another Organisation's Project" },
             { code: "422", cls: "response-4xx", desc: "No starting ages" }
           ])}
+        </div>
+      </section>
+
+      <!-- Focus -->
+      <section class="section" id="focus">
+        <div class="section-eyebrow">Today</div>
+        <h2 class="section-title">Focus</h2>
+        <div class="section-desc">
+          <p>Focus, under <strong>Today</strong> in the sidebar, is one list of everything that needs you, grouped by when it's due: <strong>Overdue</strong>, <strong>Today</strong>, <strong>This week</strong> (the next 7 days) and <strong>Later</strong> (further away, or no due date). Its first source is <strong>Checklist Actions</strong>: for each Contact and Checklist, the next step not done, when you are responsible for it.</p>
+          <p><code>scope=me</code> gives what you are responsible for, including "the colleague who added this checklist" when that was you; <code>scope=teams</code> adds what your Teams are responsible for. Only Contacts you can see are included, and there is no view of everyone's work.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/focus", "Get what needs you, as on your Focus page", true, [
+            { name: "scope", type: "string", required: false, desc: "<code>me</code> (default) or <code>teams</code>, when you are in a Team" },
+            { name: "type", type: "string", required: false, desc: "Only items from one source, e.g. <code>checklist_actions</code>" },
+            { name: "section", type: "string", required: false, desc: "<code>overdue</code>, <code>today</code>, <code>this_week</code> or <code>later</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Default 10, max 200" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{scope, teams, type, sources, counts, sections, page, page_size, page_count, total_count, data}</code>; each item has <code>id</code>, <code>type</code>, <code>title</code>, <code>contact</code>, <code>context</code>, <code>url</code>, <code>due_on</code>, <code>due_text</code>, <code>section</code> and <code>action</code>, most overdue first" },
+            { code: "422", cls: "response-4xx", desc: "An unknown section" }
+          ], "<code>counts</code>, <code>sections</code> and <code>sources</code> describe the whole list, whatever section or page you ask for.")}
+          ${endpointCard("PATCH", "/focus/settings", "Choose what your Focus page shows", true, [
+            { name: "shown_sources", in: "body", type: "string[]", required: true, desc: "The source keys to show; every other source is switched off; <code>[]</code> for none" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{sources: [{key, label, shown}]}</code>" },
+            { code: "422", cls: "response-4xx", desc: "No <code>shown_sources</code>" }
+          ], "As under ⚙ What Focus shows you. Saved for you only; your email and web notification settings are unchanged.")}
         </div>
       </section>
 
