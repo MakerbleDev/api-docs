@@ -901,6 +901,7 @@ function buildDocsPage() {
         <a href="#library"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Library</a>
         <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Surveys</a>
         <a href="#explore-report-templates" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Report Templates</a>
+        <a href="#explore-dropdowns" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Dropdowns</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
@@ -2076,6 +2077,37 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Report Template's fields as above plus <code>questions</code>, each with its <code>title</code> and the <code>answer_formats</code> it asks for, in order" },
             { code: "404", cls: "response-4xx", desc: "Not in the ImpactStore" }
           ], "To use a Report Template, add it to your organisation's library in Makerble with Add to your library on Explore Report Templates.")}
+        </div>
+      </section>
+
+      <!-- Explore Dropdowns -->
+      <section class="section" id="explore-dropdowns">
+        <div class="section-eyebrow">Forms and surveys</div>
+        <h2 class="section-title">Explore Dropdowns</h2>
+        <div class="section-desc">
+          <p>Explore Dropdowns lists the Dropdowns (answer-choice lists, Ratio Sets) shared to the Makerble&reg; ImpactStore&trade; and approved: standard scales and category lists that make results compare cleanly across organisations. The API gives the same search, filters, counts and sort as the Explore Dropdowns page. Every caller sees the same Dropdowns; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=scales</code>) or comma-separated (<code>choices=up_to_10,11_to_100</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/dropdowns", "Explore Dropdowns", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Dropdown's title or any of its answer choices" },
+            { name: "designed_for", type: "string", required: false, desc: "<code>surveys_and_trackers</code>, <code>forms</code> (bio, event and project forms)" },
+            { name: "choices", type: "string", required: false, desc: "Number of answer choices: <code>up_to_10</code>, <code>11_to_100</code>, <code>over_100</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>scales</code>, <code>demographics</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Scales</code>, <code>Demographics</code>, <code>Equality monitoring</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (used in the most surveys, trackers and forms first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Dropdowns per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Dropdowns updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Dropdowns with <code>id</code>, <code>title</code>, <code>choice_count</code>, <code>designed_for</code>, <code>themes</code>, <code>shared_by</code>, <code>used_in_count</code> (surveys, trackers and forms using it) and <code>yours</code>, plus <code>facets</code>: each filter's options with how many Dropdowns each would return given the other filters" }
+          ])}
+          ${endpointCard("GET", "/explore/dropdowns/{id}", "Preview an Explore Dropdown", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Dropdown's id from Explore Dropdowns" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Dropdown's fields as above plus every one of its answer <code>choices</code>, in order" },
+            { code: "404", cls: "response-4xx", desc: "Not listed on Explore Dropdowns (not shared or not approved)" }
+          ], "To use a Dropdown, copy it into your organisation in Makerble with Add to organisation on Explore Dropdowns.")}
         </div>
       </section>
 

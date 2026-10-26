@@ -5304,6 +5304,149 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /explore/dropdowns:
+    get:
+      tags: [Explore]
+      summary: Explore Dropdowns
+      operationId: listExploreDropdowns
+      description: |
+        Lists the Dropdowns (answer-choice lists, Ratio Sets) shared to the Makerble® ImpactStore™
+        and approved, with the same search, filters, counts and sort as the Explore Dropdowns page.
+        Every caller sees the same Dropdowns; `yours` depends on the caller's organisations.
+
+        - `query` matches the Dropdown's title or any of its answer choices.
+        - The filters take option keys, as arrays (`theme[]=scales`) or comma-separated
+          (`theme=scales,demographics`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `designed_for`: `surveys_and_trackers`, `forms` (bio, event and project forms)
+          - `choices` (Number of choices): `up_to_10`, `11_to_100`, `over_100`
+          - `theme`: `scales`, `demographics`
+        - `chip` is one of the page's Popular chips: `Scales`, `Demographics`, `Equality monitoring`.
+        - `facets` gives each filter's options with how many Dropdowns each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (used in the most surveys, trackers and forms first, the default), `new`
+          or `az`.
+        - Copy a Dropdown into your organisation in the app with **Add to organisation** on Explore
+          Dropdowns.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: ethnicity
+          description: Words to look for in the Dropdown's title or answer choices
+        - name: designed_for
+          in: query
+          required: false
+          schema:
+            type: string
+          example: surveys_and_trackers
+          description: Designed for option keys, comma-separated or repeated as designed_for[]
+        - name: choices
+          in: query
+          required: false
+          schema:
+            type: string
+          example: up_to_10
+          description: Number of choices option keys, comma-separated or repeated as choices[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: scales
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Scales, Demographics, Equality monitoring]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Dropdowns that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreDropdowns'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 87
+                    title: Agreement scale
+                    choice_count: 5
+                    designed_for: [surveys_and_trackers]
+                    themes: [scales]
+                    shared_by: Makerble Templates
+                    used_in_count: 42
+                    yours: false
+                facets:
+                  - key: theme
+                    label: Theme
+                    options:
+                      - value: scales
+                        label: Scales
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/dropdowns/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Dropdown
+      operationId: getExploreDropdown
+      description: |
+        One Dropdown listed on Explore Dropdowns: the fields of **Explore Dropdowns** plus every
+        one of its answer `choices`, in order. A Dropdown that isn't listed on Explore (not shared
+        or not approved) is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 87
+      responses:
+        "200":
+          description: The Dropdown and its answer choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreDropdownPreview'
+              example:
+                id: 87
+                title: Agreement scale
+                choice_count: 5
+                designed_for: [surveys_and_trackers]
+                themes: [scales]
+                shared_by: Makerble Templates
+                used_in_count: 42
+                yours: false
+                choices: [Strongly disagree, Disagree, Not sure, Agree, Strongly agree]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /library/search:
     get:
       tags: [Library]
@@ -10385,6 +10528,65 @@ components:
                     items:
                       type: string
                       enum: [narrative, number, chart]
+
+    ExploreDropdown:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        choice_count:
+          type: integer
+        designed_for:
+          type: array
+          items:
+            type: string
+            enum: [surveys_and_trackers, forms]
+        themes:
+          type: array
+          items:
+            type: string
+            enum: [scales, demographics]
+        shared_by:
+          type: string
+          nullable: true
+        used_in_count:
+          type: integer
+          description: How many surveys, trackers and forms use it
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreDropdowns:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreDropdown'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreDropdownPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreDropdown'
+        - type: object
+          properties:
+            choices:
+              type: array
+              items:
+                type: string
 
     PaginatedLibrarySearch:
       type: object
