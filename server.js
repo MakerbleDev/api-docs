@@ -904,6 +904,7 @@ function buildDocsPage() {
         <a href="#explore-dropdowns" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Dropdowns</a>
         <a href="#explore-impact-frameworks" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Impact Frameworks</a>
         <a href="#explore-ideas" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Ideas</a>
+        <a href="#explore-metrics" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Metrics</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
@@ -2173,6 +2174,39 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Idea's fields as above plus its <code>text</code>, without formatting" },
             { code: "404", cls: "response-4xx", desc: "Not approved and shared with everyone" }
           ], "To keep an Idea, save it to a collection in Makerble with Save idea on Explore Ideas.")}
+        </div>
+      </section>
+
+      <!-- Explore Metrics -->
+      <section class="section" id="explore-metrics">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Explore Metrics</h2>
+        <div class="section-desc">
+          <p>Explore Metrics lists the published, approved metrics of the Makerble&reg; ImpactStore&trade; across the stages of change: progress trackers (<code>kind</code> <code>change</code>: Activities and Engagement), outcome indicators (<code>indicator</code>: Ability, Behaviour and Effect) and Financial Values (<code>financial_value</code>). The API gives the same search, filters, counts and sort as the Explore Metrics page. Every caller sees the same metrics; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>stage[]=ability</code>) or comma-separated (<code>answer_format=scale,yes_no</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/metrics", "Explore Metrics", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the metric's name or description" },
+            { name: "stage", type: "string", required: false, desc: "<code>activities</code>, <code>engagement</code>, <code>ability</code>, <code>behaviour</code>, <code>effect</code>, <code>financial_values</code>" },
+            { name: "answer_format", type: "string", required: false, desc: "<code>count</code>, <code>scale</code>, <code>yes_no</code>, <code>value</code>" },
+            { name: "audience", type: "string", required: false, desc: "<code>public_impact</code>, <code>personal</code>, <code>professional</code>" },
+            { name: "shared_by", type: "string", required: false, desc: "<code>makerble</code>, <code>others</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Wellbeing</code>, <code>Employment</code>, <code>Housing</code>, <code>Attendance</code>, <code>SDGs</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (on the most organisations' projects first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Metrics per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only metrics updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Metrics with <code>kind</code>, <code>id</code>, <code>name</code>, <code>stage</code>, <code>whats_inside</code> (e.g. 5-level scale), <code>shared_by</code>, <code>libraries_count</code> and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/metrics/{kind}/{id}", "Preview an Explore Metric", true, [
+            { name: "kind", in: "path", type: "string", required: true, desc: "<code>change</code>, <code>indicator</code> or <code>financial_value</code>" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "The metric's id from Explore Metrics" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The metric's fields as above plus <code>description</code>, <code>details</code> (its key facts by label) and the <code>choices</code> of a scale or yes-or-no indicator" },
+            { code: "404", cls: "response-4xx", desc: "Not published and approved" }
+          ], "To use a tracker or indicator, add it to a project in Makerble with Add to a project on Explore Metrics.")}
         </div>
       </section>
 

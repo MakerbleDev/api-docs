@@ -5752,6 +5752,176 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /explore/metrics:
+    get:
+      tags: [Explore]
+      summary: Explore Metrics
+      operationId: listExploreMetrics
+      description: |
+        Lists the published, approved metrics of the Makerble® ImpactStore™ across the stages of
+        change, with the same search, filters, counts and sort as the Explore Metrics page:
+        progress trackers (`kind` `change`: Activities and Engagement), outcome indicators (`kind`
+        `indicator`: Ability, Behaviour and Effect, taking the stage of the Outcome they sit under
+        when they have none of their own) and Financial Values (`kind` `financial_value`). Every
+        caller sees the same metrics; `yours` depends on the caller's organisations.
+
+        - `query` matches the metric's name or description.
+        - The filters take option keys, as arrays (`stage[]=ability`) or comma-separated
+          (`stage=ability,behaviour`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `stage` (Stage of change): `activities`, `engagement`, `ability`, `behaviour`,
+            `effect`, `financial_values`
+          - `answer_format`: `count` (progress tracker), `scale` (Choice tracker), `yes_no`
+            (Achievement tracker), `value` (Numerical tracker, and Financial Values)
+          - `audience`: `public_impact`, `personal`, `professional`
+          - `shared_by`: `makerble`, `others`
+        - `chip` is one of the page's Popular chips: `Wellbeing`, `Employment`, `Housing`,
+          `Attendance`, `SDGs`.
+        - `facets` gives each filter's options with how many metrics each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (on the most organisations' projects first, the default), `new` or `az`.
+        - Add a tracker or indicator to a project in the app with **Add to a project** on Explore
+          Metrics; a Financial Value from Explore Financial Values.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: confidence
+          description: Words to look for in the metric's name or description
+        - name: stage
+          in: query
+          required: false
+          schema:
+            type: string
+          example: ability,behaviour
+          description: Stage of change option keys, comma-separated or repeated as stage[]
+        - name: answer_format
+          in: query
+          required: false
+          schema:
+            type: string
+          example: scale
+          description: Answer format option keys, comma-separated or repeated as answer_format[]
+        - name: audience
+          in: query
+          required: false
+          schema:
+            type: string
+          example: personal
+          description: Audience option keys, comma-separated or repeated as audience[]
+        - name: shared_by
+          in: query
+          required: false
+          schema:
+            type: string
+          example: makerble
+          description: Shared by option keys, comma-separated or repeated as shared_by[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Wellbeing, Employment, Housing, Attendance, SDGs]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed metrics that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreMetrics'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - kind: indicator
+                    id: 5310
+                    name: Job satisfaction
+                    stage: ability
+                    whats_inside: 5-level scale
+                    shared_by: Makerble
+                    libraries_count: 21
+                    yours: false
+                facets:
+                  - key: answer_format
+                    label: Answer format
+                    options:
+                      - value: scale
+                        label: Scale (Choice tracker)
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/metrics/{kind}/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Metric
+      operationId: getExploreMetric
+      description: |
+        One metric listed on Explore Metrics, as its Preview shows it: the fields of **Explore
+        Metrics** plus its `description`, `details` (its key facts by label, such as the Outcomes an
+        indicator sits under or a Financial Value's amount and source) and the `choices` of a scale
+        or yes-or-no indicator, in order. A metric that isn't published and approved is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [change, indicator, financial_value]
+          example: indicator
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 5310
+      responses:
+        "200":
+          description: The metric's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreMetricPreview'
+              example:
+                kind: indicator
+                id: 5310
+                name: Job satisfaction
+                stage: ability
+                whats_inside: 5-level scale
+                shared_by: Makerble
+                libraries_count: 21
+                yours: false
+                description: How satisfied someone is with their job.
+                details:
+                  Answer format: 5-level scale
+                  Stage of change: Ability (short-term outcomes)
+                  Sits under: Job satisfaction at follow-up
+                  Shared by: Makerble
+                choices: [Very dissatisfied, Dissatisfied, Neither, Satisfied, Very satisfied]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /library/search:
     get:
       tags: [Library]
@@ -11021,6 +11191,70 @@ components:
           properties:
             text:
               type: string
+
+    ExploreMetric:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [change, indicator, financial_value]
+        id:
+          type: integer
+        name:
+          type: string
+        stage:
+          type: string
+          enum: [activities, engagement, ability, behaviour, effect, financial_values]
+        whats_inside:
+          type: string
+          description: The tracker type or scale, e.g. "5-level scale" or "Activity tracker · count"
+        shared_by:
+          type: string
+          nullable: true
+        libraries_count:
+          type: integer
+          description: How many organisations use it on a project
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreMetrics:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreMetric'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreMetricPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreMetric'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            details:
+              type: object
+              description: The metric's key facts, by label
+              additionalProperties:
+                type: string
+            choices:
+              type: array
+              items:
+                type: string
 
     PaginatedLibrarySearch:
       type: object
