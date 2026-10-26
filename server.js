@@ -903,6 +903,7 @@ function buildDocsPage() {
         <a href="#explore-report-templates" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Report Templates</a>
         <a href="#explore-dropdowns" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Dropdowns</a>
         <a href="#explore-impact-frameworks" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Impact Frameworks</a>
+        <a href="#explore-ideas" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Ideas</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
@@ -2140,6 +2141,38 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Impact Framework's fields as above plus <code>stages</code>, each stage of change with its <code>title</code> (Activities, Engagement, Ability, Behaviour or Effect) and its outcomes and progress trackers as <code>items</code>" },
             { code: "404", cls: "response-4xx", desc: "Not public and approved" }
           ], "To use an Impact Framework, add it to projects in Makerble with Add to projects on Explore Impact Frameworks.")}
+        </div>
+      </section>
+
+      <!-- Explore Ideas -->
+      <section class="section" id="explore-ideas">
+        <div class="section-eyebrow">Learning</div>
+        <h2 class="section-title">Explore Ideas</h2>
+        <div class="section-desc">
+          <p>Explore Ideas lists the approved Ideas (Tips) shared with everyone in the Makerble&reg; ImpactStore&trade;: what other organisations tried, how it went and what they would change. The API gives the same search, filters, counts and sort as the Explore Ideas page. <code>shared_by</code>, <code>person</code> and <code>yours</code> depend on you: your colleagues, the people you follow and you.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=leadership</code>) or comma-separated (<code>shared_by=colleagues,following</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/ideas", "Explore Ideas", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Idea's title or text" },
+            { name: "shared_by", type: "string", required: false, desc: "<code>anyone</code>, <code>colleagues</code>, <code>following</code>, <code>me</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>mental_health_and_wellbeing</code>, <code>children_and_young_people</code>, <code>employment_and_skills</code>, <code>community_and_culture</code>, <code>health</code>, <code>organisational</code>, <code>global_goals</code>, <code>inclusion</code>, <code>education_and_training</code>, <code>leadership</code>" },
+            { name: "audience", type: "string", required: false, desc: "<code>public_impact</code>, <code>personal</code>, <code>professional</code>" },
+            { name: "person", type: "string", required: false, desc: "User ids of colleagues or people you follow; any other id is ignored" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Community</code>, <code>Young people</code>, <code>Training</code>, <code>Leadership</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (saved to the most collections first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Ideas per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Ideas updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Ideas with <code>id</code>, <code>title</code>, <code>themes</code>, <code>reading_minutes</code>, <code>shared_by</code>, <code>saved_count</code> (collections it is saved to) and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/ideas/{id}", "Read an Explore Idea", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Idea's id from Explore Ideas" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Idea's fields as above plus its <code>text</code>, without formatting" },
+            { code: "404", cls: "response-4xx", desc: "Not approved and shared with everyone" }
+          ], "To keep an Idea, save it to a collection in Makerble with Save idea on Explore Ideas.")}
         </div>
       </section>
 

@@ -5602,6 +5602,156 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /explore/ideas:
+    get:
+      tags: [Explore]
+      summary: Explore Ideas
+      operationId: listExploreIdeas
+      description: |
+        Lists the approved Ideas (Tips) shared with everyone in the Makerble® ImpactStore™, with the
+        same search, filters, counts and sort as the Explore Ideas page. `shared_by`, `person` and
+        `yours` depend on the caller.
+
+        - `query` matches the Idea's title or text.
+        - The filters take option keys, as arrays (`theme[]=leadership`) or comma-separated
+          (`theme=leadership,inclusion`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `shared_by`: `anyone`, `colleagues` (colleagues in the caller's organisations and
+            projects, or the organisations themselves), `following` (people the caller follows),
+            `me`
+          - `theme`: `mental_health_and_wellbeing`, `children_and_young_people`, `employment_and_skills`, `community_and_culture`, `health`, `organisational`, `global_goals`, `inclusion`, `education_and_training`, `leadership`
+          - `audience`: `public_impact`, `personal`, `professional`, from the Idea's causes
+          - `person`: user ids of people who shared Ideas. Only the caller's colleagues, people
+            they follow and the caller count; any other id is ignored.
+        - `chip` is one of the page's Popular chips: `Community`, `Young people`, `Training`,
+          `Leadership`.
+        - `facets` gives each filter's options with how many Ideas each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (saved to the most collections first, the default), `new` or `az`.
+        - Save an Idea to a collection in the app with **Save idea** on Explore Ideas.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: cohesion
+          description: Words to look for in the Idea's title or text
+        - name: shared_by
+          in: query
+          required: false
+          schema:
+            type: string
+          example: colleagues,following
+          description: Shared by option keys, comma-separated or repeated as shared_by[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: leadership
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: audience
+          in: query
+          required: false
+          schema:
+            type: string
+          example: public_impact
+          description: Audience option keys, comma-separated or repeated as audience[]
+        - name: person
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "1204"
+          description: User ids of people who shared Ideas, comma-separated or repeated as person[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Community, Young people, Training, Leadership]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Ideas that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreIdeas'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 77
+                    title: The Resident Leadership Pipeline
+                    themes: [leadership, community_and_culture]
+                    reading_minutes: 4
+                    shared_by: Northside Housing
+                    saved_count: 14
+                    yours: false
+                facets:
+                  - key: theme
+                    label: Theme
+                    options:
+                      - value: leadership
+                        label: Leadership
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/ideas/{id}:
+    get:
+      tags: [Explore]
+      summary: Read an Explore Idea
+      operationId: getExploreIdea
+      description: |
+        One Idea listed on Explore Ideas: the fields of **Explore Ideas** plus its `text`, without
+        formatting. An Idea that isn't approved and shared with everyone is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 77
+      responses:
+        "200":
+          description: The Idea and its text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreIdeaPreview'
+              example:
+                id: 77
+                title: The Resident Leadership Pipeline
+                themes: [leadership]
+                reading_minutes: 1
+                shared_by: Northside Housing
+                saved_count: 14
+                yours: false
+                text: We grew resident leaders who now run three local groups.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /library/search:
     get:
       tags: [Library]
@@ -10820,6 +10970,57 @@ components:
                     type: array
                     items:
                       type: string
+
+    ExploreIdea:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        themes:
+          type: array
+          items:
+            type: string
+        reading_minutes:
+          type: integer
+        shared_by:
+          type: string
+          nullable: true
+        saved_count:
+          type: integer
+          description: How many collections it has been saved to
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreIdeas:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreIdea'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreIdeaPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreIdea'
+        - type: object
+          properties:
+            text:
+              type: string
 
     PaginatedLibrarySearch:
       type: object
