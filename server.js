@@ -900,6 +900,7 @@ function buildDocsPage() {
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Outcomes</a>
         <a href="#library"         class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Library</a>
         <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Surveys</a>
+        <a href="#explore-report-templates" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Report Templates</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
@@ -2045,6 +2046,36 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Survey's fields as above plus <code>sections</code>, each with its <code>title</code> (null before the first section header) and its <code>questions</code> in order" },
             { code: "404", cls: "response-4xx", desc: "Not listed on Explore Surveys (unpublished, unapproved or without a description)" }
           ], "To use a Survey, add it to a project in Makerble with Add to a project on Explore Surveys.")}
+        </div>
+      </section>
+
+      <!-- Explore Report Templates -->
+      <section class="section" id="explore-report-templates">
+        <div class="section-eyebrow">Reporting</div>
+        <h2 class="section-title">Explore Report Templates</h2>
+        <div class="section-desc">
+          <p>Explore Report Templates lists the Report Templates in the Makerble&reg; ImpactStore&trade;: funder reports, trustee updates, contract monitoring returns and other reports, each set out as the questions to answer. The API gives the same search, filters, counts and sort as the Explore Report Templates page. Every caller sees the same Report Templates; only <code>yours</code> and <code>in_your_library</code> depend on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=community</code>) or comma-separated (<code>theme=community,governance</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/report_templates", "Explore Report Templates", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Report Template's name or description, or who it's for or its theme" },
+            { name: "recipient", type: "string", required: false, desc: "Who it's for: <code>funder</code>, <code>trustees</code>, <code>local_authority</code> (Commissioner or contract), <code>corporate_partner</code>, <code>internal</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>children_and_young_people</code>, <code>community</code>, <code>employment</code>, <code>governance</code>, <code>health_and_wellbeing</code>, <code>volunteering</code>" },
+            { name: "output", type: "string", required: false, desc: "Answer formats any of its questions ask for: <code>narrative</code>, <code>number</code>, <code>chart</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (in the most organisations' libraries first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Report Templates per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Report Templates updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Report Templates with <code>id</code>, <code>slug</code>, <code>name</code>, <code>description</code>, <code>recipient</code>, <code>theme</code>, <code>question_count</code>, <code>answer_formats</code>, <code>shared_by</code>, <code>libraries_count</code> (organisations with it in their library), <code>yours</code> and <code>in_your_library</code>, plus <code>facets</code>: each filter's options with how many Report Templates each would return given the other filters" }
+          ])}
+          ${endpointCard("GET", "/explore/report_templates/{id}", "Preview an Explore Report Template", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Report Template's id from Explore Report Templates" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Report Template's fields as above plus <code>questions</code>, each with its <code>title</code> and the <code>answer_formats</code> it asks for, in order" },
+            { code: "404", cls: "response-4xx", desc: "Not in the ImpactStore" }
+          ], "To use a Report Template, add it to your organisation's library in Makerble with Add to your library on Explore Report Templates.")}
         </div>
       </section>
 

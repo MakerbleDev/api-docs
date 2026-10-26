@@ -5154,6 +5154,156 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /explore/report_templates:
+    get:
+      tags: [Explore]
+      summary: Explore Report Templates
+      operationId: listExploreReportTemplates
+      description: |
+        Lists the Report Templates in the Makerble® ImpactStore™, with the same search, filters,
+        counts and sort as the Explore Report Templates page. Every caller sees the same Report
+        Templates; `yours` and `in_your_library` depend on the caller's organisations.
+
+        - `query` matches the Report Template's name or description, or the label of who it's for
+          or its theme.
+        - The filters take option keys, as arrays (`theme[]=community`) or comma-separated
+          (`theme=community,governance`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `recipient` (Who it's for): `funder`, `trustees`, `local_authority` (Commissioner or
+            contract), `corporate_partner`, `internal`
+          - `theme`: `children_and_young_people`, `community`, `employment`, `governance`,
+            `health_and_wellbeing`, `volunteering`
+          - `output` (Answer formats): `narrative`, `number`, `chart`. A Report Template matches
+            when any of its questions asks for that format.
+        - `facets` gives each filter's options with how many Report Templates each would return,
+          given the other filters already chosen.
+        - `sort` is `added` (in the most organisations' libraries first, the default), `new` or `az`.
+        - Add a Report Template to your organisation's library in the app with **Add to your
+          library** on Explore Report Templates.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: end of grant
+          description: Words to look for in the Report Template's name, description, recipient or theme
+        - name: recipient
+          in: query
+          required: false
+          schema:
+            type: string
+          example: funder,trustees
+          description: Who it's for option keys, comma-separated or repeated as recipient[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: community
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: output
+          in: query
+          required: false
+          schema:
+            type: string
+          example: chart
+          description: Answer format option keys, comma-separated or repeated as output[]
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Report Templates that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreReportTemplates'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 18
+                    slug: annual-grant-report-to-a-funder
+                    name: Annual Grant Report to a Funder
+                    description: The yearly report most grant funders ask for.
+                    recipient: funder
+                    theme: community
+                    question_count: 5
+                    answer_formats: [narrative, number, chart]
+                    shared_by: Makerble® ImpactStore™
+                    libraries_count: 31
+                    yours: false
+                    in_your_library: false
+                facets:
+                  - key: recipient
+                    label: Who it's for
+                    options:
+                      - value: funder
+                        label: Funder
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /explore/report_templates/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Report Template
+      operationId: getExploreReportTemplate
+      description: |
+        One Report Template listed on Explore Report Templates, as its Preview shows it: the fields
+        of **Explore Report Templates** plus `questions`, each with its `title` and the
+        `answer_formats` it asks for, in order. A Report Template that isn't in the ImpactStore is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 18
+      responses:
+        "200":
+          description: The Report Template's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreReportTemplatePreview'
+              example:
+                id: 18
+                slug: annual-grant-report-to-a-funder
+                name: Annual Grant Report to a Funder
+                description: The yearly report most grant funders ask for.
+                recipient: funder
+                theme: community
+                question_count: 2
+                answer_formats: [narrative, number]
+                shared_by: Makerble® ImpactStore™
+                libraries_count: 31
+                yours: false
+                in_your_library: false
+                questions:
+                  - title: What did you set out to achieve?
+                    answer_formats: [narrative]
+                  - title: Who did you reach?
+                    answer_formats: [number]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /library/search:
     get:
       tags: [Library]
@@ -10104,7 +10254,7 @@ components:
       properties:
         key:
           type: string
-          enum: [theme, audience, time, feature]
+          description: The filter's query parameter, e.g. theme. Each Explore endpoint lists its own.
         label:
           type: string
         options:
@@ -10118,7 +10268,7 @@ components:
                 type: string
               count:
                 type: integer
-                description: How many Surveys this option would return, given the other filters already chosen
+                description: How many items this option would return, given the other filters already chosen
               selected:
                 type: boolean
 
@@ -10159,6 +10309,82 @@ components:
                     type: array
                     items:
                       type: string
+
+    ExploreReportTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        recipient:
+          type: string
+          nullable: true
+          enum: [funder, trustees, local_authority, corporate_partner, internal, null]
+        theme:
+          type: string
+          nullable: true
+        question_count:
+          type: integer
+        answer_formats:
+          type: array
+          items:
+            type: string
+            enum: [narrative, number, chart]
+        shared_by:
+          type: string
+        libraries_count:
+          type: integer
+          description: How many organisations have it in their library
+        yours:
+          type: boolean
+          description: Whether one of the caller's organisations owns it
+        in_your_library:
+          type: boolean
+          description: Whether it is in the library of one of the caller's organisations
+
+    PaginatedExploreReportTemplates:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreReportTemplate'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreReportTemplatePreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreReportTemplate'
+        - type: object
+          properties:
+            questions:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  answer_formats:
+                    type: array
+                    items:
+                      type: string
+                      enum: [narrative, number, chart]
 
     PaginatedLibrarySearch:
       type: object
