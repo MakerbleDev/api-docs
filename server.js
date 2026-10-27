@@ -902,6 +902,7 @@ function buildDocsPage() {
         <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Explore Surveys</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
+        <a href="#suggested-merges" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Suggested Merges</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
         <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Add Metric To</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
@@ -2134,6 +2135,76 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an organisation admin" },
             { code: "404", cls: "response-4xx", desc: "Not one of the organisation's links" }
           ])}
+        </div>
+      </section>
+
+      <!-- Suggested Merges and Merge Rules -->
+      <section class="section" id="suggested-merges">
+        <div class="section-eyebrow">Contacts</div>
+        <h2 class="section-title">Suggested Merges and Merge Rules</h2>
+        <div class="section-desc">
+          <p>A Suggested Merge is a set of two or more Contacts that Makerble thinks are the same person, waiting for someone to merge them or mark them as Not duplicates. Suggestions come from Merge Rules set to Suggest mode (<code>source: merge_rule</code>) and from contacts with similar names (<code>source: name_scan</code>). Merge Rules say which Contact fields must be identical and whether matches are merged automatically or suggested for review.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> List the suggestions for a Contact with <code>GET /suggested_merges?beneficiary_id=</code>, show them to the person, and merge or reject only after they confirm. Set a Merge Rule to <code>merge_mode: suggest</code> to review its matches before anything is merged.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/suggested_merges", "List Suggested Merges", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "status", type: "string", required: false, desc: "<code>pending</code> (default), <code>merged</code>, <code>rejected</code> (Not duplicates) or <code>stale</code>" },
+            { name: "source", type: "string", required: false, desc: "<code>merge_rule</code> or <code>name_scan</code>" },
+            { name: "beneficiary_id", type: "integer", required: false, desc: "Only suggestions that include this Contact" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (at most 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list: <code>id, status, source, merge_rule {id, name}, match_strength, matched_fields, contacts [{id, name, created_at, created_by}], reviewed_by, reviewed_at</code>. Only suggestions where you can see every Contact; High first, then newest" },
+            { code: "403", cls: "response-4xx", desc: "You can't merge Contacts in the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Unknown <code>status</code> or <code>source</code>" }
+          ])}
+          ${endpointCard("POST", "/suggested_merges/{id}/merge", "Merge a Suggested Merge", true, [
+            { name: "id", type: "integer", required: true, in: "path", desc: "The Suggested Merge ID" },
+            { name: "winner_id", type: "integer", required: false, in: "body", desc: "The Contact to keep. Default: the one created first" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "Merging has begun: <code>suggested_merge</code> (now <code>merged</code>) and <code>merge_request_ids</code>. Undo with Unmerge on the Merge Contacts page" },
+            { code: "404", cls: "response-4xx", desc: "Not a suggestion you can see" },
+            { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: the Contact to keep isn't one of its Contacts, or it has already been reviewed" }
+          ])}
+          ${endpointCard("POST", "/suggested_merges/{id}/reject", "Mark a Suggested Merge as Not duplicates", true, [
+            { name: "id", type: "integer", required: true, in: "path", desc: "The Suggested Merge ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>suggested_merge</code>, now <code>rejected</code>. The pair won't be suggested again" },
+            { code: "404", cls: "response-4xx", desc: "Not a suggestion you can see" },
+            { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: it has already been reviewed" }
+          ])}
+          ${endpointCard("GET", "/merge_rules", "List an Organisation's Merge Rules", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (at most 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list: <code>id, name, conditions [{id, field_name}], match_type, merge_mode, status, created_by, last_edited_by, last_edited_at</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not an Admin or Creator of the Organisation" }
+          ])}
+          ${endpointCard("GET", "/merge_rules/{id}", "Get a Merge Rule", true, [
+            { name: "id", type: "integer", required: true, in: "path", desc: "The Merge Rule ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Merge Rule" },
+            { code: "404", cls: "response-4xx", desc: "Not a rule of an Organisation you manage" }
+          ])}
+          ${endpointCard("POST", "/merge_rules", "Create a Merge Rule", true, [], [
+            { code: "201", cls: "response-2xx", desc: "The new, Active Merge Rule" },
+            { code: "403", cls: "response-4xx", desc: "Not an Admin or Creator of the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors}</code>: no mode chosen, conditions not from this Organisation, or an invalid choice" }
+          ], "Body: <code>charity_id</code>, <code>name</code>, <code>conditions</code> (Contact field ids that must be identical), <code>match_type</code> (<code>and</code>: every condition; <code>or</code>: any one; default <code>and</code>), <code>merge_mode</code> (required: <code>automatic</code> merges matching Contacts within 2 hours, keeping the one created first; <code>suggest</code> puts matches in Suggested Merges).")}
+          ${endpointCard("PATCH", "/merge_rules/{id}", "Update a Merge Rule", true, [
+            { name: "id", type: "integer", required: true, in: "path", desc: "The Merge Rule ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The updated Merge Rule" },
+            { code: "404", cls: "response-4xx", desc: "Not a rule of an Organisation you manage" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors}</code>" }
+          ], "Body: any of <code>name</code>, <code>conditions</code>, <code>match_type</code>, <code>merge_mode</code>, <code>status</code> (<code>Active</code> or <code>Inactive</code>). Anything not sent is kept.")}
         </div>
       </section>
 

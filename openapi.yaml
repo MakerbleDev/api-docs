@@ -225,6 +225,15 @@ tags:
       Referral Link Details — public-facing signup forms, including the
       Offline Collector endpoints that let a form be filled in with no
       network connection and synced back later.
+  - name: Suggested Merges
+    description: |
+      Sets of two or more Contacts (Beneficiaries) that Makerble thinks are the same person,
+      waiting for someone to merge them or mark them as Not duplicates. They come from Merge Rules
+      set to Suggest mode and from contacts with similar names.
+  - name: Merge Rules
+    description: |
+      An Organisation's custom rules for finding duplicate Contacts: which fields must be
+      identical, and whether matches are merged automatically or suggested for review.
   - name: Checklists
     description: |
       An Organisation's lists of actions it expects to be done for each Contact (Beneficiary),
@@ -5854,6 +5863,284 @@ paths:
                   value: { error: "unsupported-contact-form", detail: "..." }
                 invalidSubmission:
                   value: { error: "invalid-submission", detail: ["..."] }
+
+  /suggested_merges:
+    get:
+      tags: [Suggested Merges]
+      summary: List Suggested Merges
+      description: |
+        The Suggested Merges page (Contacts > Merge Contacts > Suggested Merges): sets of Contacts
+        that look like the same person. Only suggestions where the user can see every Contact are
+        returned: all the Organisation's Contacts for an Organisation Admin, the Contacts in their
+        Projects for a Project Admin. Requires permission to merge Contacts in the Organisation.
+        Sorted High match strength first, then newest.
+      operationId: listSuggestedMerges
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, merged, rejected, stale]
+            default: pending
+          description: "pending: waiting for review; rejected: marked Not duplicates; stale: a Contact was deleted"
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [merge_rule, name_scan]
+          description: "merge_rule: from a Merge Rule in Suggest mode; name_scan: from similar names"
+        - name: beneficiary_id
+          in: query
+          schema:
+            type: integer
+          description: Only suggestions that include this Contact
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Suggested Merges
+          content:
+            application/json:
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 42
+                    status: pending
+                    source: merge_rule
+                    merge_rule: { id: 7, name: Same email }
+                    match_strength: high
+                    matched_fields: [{ field_id: 31, field_name: email_address, value: grace@example.com, match_type: exact }]
+                    contacts:
+                      - { id: 101, name: Grace Mensah, created_at: "2026-09-02T10:15:00Z", created_by: { id: 5, name: Asha Patel } }
+                      - { id: 188, name: Grace Mensah, created_at: "2026-10-21T08:02:00Z", created_by: null }
+                    created_at: "2026-10-21T09:00:00Z"
+                    updated_at: "2026-10-21T09:00:00Z"
+                    reviewed_by: null
+                    reviewed_at: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't merge Contacts in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /suggested_merges/{id}/merge:
+    post:
+      tags: [Suggested Merges]
+      summary: Merge a Suggested Merge
+      description: |
+        Merges the suggestion's Contacts into one, as pressing Merge in Compare does. The Contact
+        created first is kept unless `winner_id` names another of its Contacts. One merge request is
+        made per other Contact; they are merged within a few minutes and can be undone with Unmerge
+        on the Merge Contacts page.
+      operationId: mergeSuggestedMerge
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                winner_id:
+                  type: integer
+                  description: The Contact to keep
+            example: { winner_id: 101 }
+      responses:
+        "202":
+          description: Merging has begun. Returns `suggested_merge` (now `merged`) and `merge_request_ids`.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: "`{error}`: the Contact to keep isn't one of the suggestion's, or it has already been reviewed"
+
+  /suggested_merges/{id}/reject:
+    post:
+      tags: [Suggested Merges]
+      summary: Mark a Suggested Merge as Not duplicates
+      description: |
+        Records that the Contacts are different people, as pressing Not duplicates does. The pair
+        is not suggested together again, from any source.
+      operationId: rejectSuggestedMerge
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Returns `suggested_merge`, now `rejected`, with `reviewed_by` and `reviewed_at`
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: "`{error}`: it has already been reviewed"
+
+  /merge_rules:
+    get:
+      tags: [Merge Rules]
+      summary: List an Organisation's Merge Rules
+      description: |
+        The Manage Merge Rules page. Requires an Admin or Creator (editor or reporter) of the
+        Organisation.
+      operationId: listMergeRules
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Merge Rules
+          content:
+            application/json:
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 7
+                    name: Same email
+                    conditions: [{ id: 31, field_name: email_address }]
+                    match_type: and
+                    merge_mode: suggest
+                    status: Active
+                    created_by: { id: 5, name: Asha Patel }
+                    last_edited_by: { id: 5, name: Asha Patel }
+                    last_edited_at: "2026-10-20T14:00:00Z"
+                    created_at: "2026-10-20T14:00:00Z"
+                    updated_at: "2026-10-20T14:00:00Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't an Admin or Creator of the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Merge Rules]
+      summary: Create a Merge Rule
+      description: |
+        Create a Merge Rule. `conditions` are Contact field (Current Field) ids from the
+        Organisation's Contact forms that must be identical. `match_type` `and` needs every
+        condition to match, `or` any one. `merge_mode` is required ("When contacts match this
+        rule"): `automatic` merges matching Contacts within 2 hours, keeping the one created first;
+        `suggest` puts matches in Suggested Merges for someone to review. New rules are Active.
+      operationId: createMergeRule
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, name, conditions, merge_mode]
+              properties:
+                charity_id: { type: integer }
+                name: { type: string }
+                conditions: { type: array, items: { type: integer } }
+                match_type: { type: string, enum: [and, or], default: and }
+                merge_mode: { type: string, enum: [automatic, suggest] }
+                status: { type: string, enum: [Active, Inactive] }
+            example: { charity_id: 12, name: Same email or mobile, conditions: [31, 32], match_type: or, merge_mode: suggest }
+      responses:
+        "201":
+          description: The new Merge Rule
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't an Admin or Creator of the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /merge_rules/{id}:
+    get:
+      tags: [Merge Rules]
+      summary: Get a Merge Rule
+      operationId: getMergeRule
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The Merge Rule
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Merge Rules]
+      summary: Update a Merge Rule
+      description: |
+        Change any of `name`, `conditions`, `match_type`, `merge_mode` and `status`; anything not
+        sent is kept, including the match type when only the conditions change. Set `merge_mode` to
+        `suggest` to stop a rule merging automatically, or `status` to `Inactive` to turn it off.
+      operationId: updateMergeRule
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                conditions: { type: array, items: { type: integer } }
+                match_type: { type: string, enum: [and, or] }
+                merge_mode: { type: string, enum: [automatic, suggest] }
+                status: { type: string, enum: [Active, Inactive] }
+            example: { merge_mode: suggest }
+      responses:
+        "200":
+          description: The updated Merge Rule
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /checklists:
     get:
