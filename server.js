@@ -2266,6 +2266,14 @@ function buildDocsPage() {
           ${endpointCard("GET", "/checklists/stage_icons", "List the icons a Checklist stage can have", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>{data: [{icon, name}]}</code>: clipboard, calendar, people, chart, flag, message, home, heart, school, book" }
           ])}
+          ${endpointCard("GET", "/checklists/sketch", "Draft a Checklist from a Project's setup", true, [
+            { name: "charity_id", in: "query", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "project_id", in: "query", type: "integer", required: false, desc: "Draft from this Project instead of the one Makerble would choose" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{project_id, project_name, name, summary, checklist: {name, stages: [{key, name, icon, position}], actions: [{title, action_type, criteria, stage_key, position}]}}</code>, all null when no Project has enough to draft from" },
+            { code: "403", cls: "response-4xx", desc: "Can't create Checklists for the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's Project" }
+          ], "\"Sketched from your setup\" on the Checklists page. Nothing is saved. Without <code>project_id</code>, drafts from the running Project with the most Contacts that has at least two of: an active Signup Page, a Contact Form (other than the default), a Waiting List or Alumni status, and a Survey. The draft uses the five Participant Journey stages, leaving out any with nothing found: Sign up (one \"Complete a form\" step per Signup Page), Arrange support (the Contact Forms, then Waiting List → Enrolled), Provide support (each Survey's first Wave, and \"Invite to an event\" for the Project's Event Formats), Monitor progress (later Waves) and Achieve the goal (Move to Alumni). Every step already says what counts as done, and <code>checklist</code> can be sent to <code>POST /checklists</code> as it is.")}
           ${endpointCard("GET", "/checklists/{id}/journey", "Get a Checklist's Participant Journey", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
