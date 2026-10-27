@@ -1959,6 +1959,15 @@ function buildDocsPage() {
             { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse instead of the new ones, each with its <code>question</code>" },
             { code: "422", cls: "response-4xx", desc: "Invalid input; nothing is created and the error names the question" }
           ], "Reuse what your library already has by id, and define only what's missing. Nothing is created unless everything is.")}
+          ${endpointCard("POST", "/surveys/{id}/projects", "Add a Survey to Projects", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Survey's (Story Category's) id: one you can see in your library" },
+            { name: "project_ids", in: "body", type: "array", required: true, desc: "The Projects to add it to. You must manage each one, or be an Admin of its organisation" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code> has <code>survey_id</code>, <code>added_project_ids</code> and <code>existing_project_ids</code> (Projects that already used it)" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "404", cls: "response-4xx", desc: "The Survey, or a Project, isn't one you can use; the error names it. Nothing is added" },
+            { code: "422", cls: "response-4xx", desc: "No <code>project_ids</code>, or a Project is closed or its Project Category doesn't allow other Surveys. Nothing is added" }
+          ], "The same as Add survey to project(s) on a Survey's page.")}
           ${endpointCard("POST", "/contact_forms", "Create a Contact Form with its fields", true, [
             { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
             { name: "name", in: "body", type: "string", required: true, desc: "e.g. <code>Young person registration</code>" },
