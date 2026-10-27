@@ -6056,6 +6056,74 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /checklists/sketch:
+    get:
+      tags: [Checklists]
+      summary: Draft a Checklist from a Project's setup
+      description: |
+        "Sketched from your setup" on the Checklists page: a participant journey drafted from what one of
+        the Organisation's Projects already has. Nothing is saved. Without `project_id`, the draft comes
+        from the running Project with the most Contacts that has at least two of: an active Signup Page, a
+        Contact Form (other than the Organisation's default), a Waiting List or Alumni status, and a
+        Survey. With `project_id`, it comes from that Project.
+
+        The draft uses the five Participant Journey stages, leaving out any with nothing found: Sign up
+        (one "Complete a form" step per Signup Page), Arrange support (the Contact Forms, then Waiting
+        List → Enrolled), Provide support (each Survey's first Wave, and "Invite to an event" for the
+        Project's Event Formats), Monitor progress (later Waves) and Achieve the goal (Move to Alumni).
+        Every step already says what counts as done.
+
+        `checklist` is in the shape `POST /checklists` takes, so it can be created as it is or after
+        changes. Every field is null when no Project has enough to draft from. Needs someone who can
+        create Checklists for the Organisation.
+      operationId: sketchChecklist
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Draft from this Project instead of the one Makerble would choose
+      responses:
+        "200":
+          description: The draft
+          content:
+            application/json:
+              example:
+                project_id: 7
+                project_name: "Youth Programme 2026"
+                name: "Youth Programme 2026 journey"
+                summary: "Youth Programme 2026 has the Referral Signup Page, the Intake form, a Waiting List → Enrolled → Alumni flow and the Wellbeing survey."
+                checklist:
+                  name: "Youth Programme 2026 journey"
+                  stages:
+                    - {key: "stage0", name: "Sign up", icon: "clipboard", position: 0}
+                    - {key: "stage1", name: "Arrange support", icon: "calendar", position: 1}
+                  actions:
+                    - title: "Referral"
+                      action_type: "complete_form"
+                      criteria: {beneficiary_category_ids: ["31"]}
+                      stage_key: "stage0"
+                      position: 0
+                    - title: "Waiting List → Enrolled"
+                      action_type: "add_to_project"
+                      criteria: {project_states: ["7:2"]}
+                      stage_key: "stage1"
+                      position: 1
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't create Checklists for the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /checklists/{id}:
     get:
       tags: [Checklists]
