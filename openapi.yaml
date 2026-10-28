@@ -1508,6 +1508,167 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /beneficiaries/bulk_project_moves:
+    post:
+      tags: [Beneficiaries]
+      summary: Move many Contacts through Projects at once
+      description: |
+        Adds many Contacts (Beneficiaries) to Projects, changes their status (Beneficiary State, e.g.
+        Enrolled, Waiting List, Alumni, Declined) in them, or removes them from them, in one request.
+        This is **Move through projects** for the Contacts selected on the Manage Contacts page. Each
+        change is made the same way as moving one Contact from their profile, so it appears in each
+        Contact's History and the Project's team is notified.
+
+        **Which Contacts.** Either
+        - `beneficiary_ids`: at most 500 Contacts of the organisation; or
+        - everyone matching `filter_data` (the Manage Contacts filters, e.g.
+          `{"project_ids": ["572"], "beneficiary_state_ids": ["1"]}`), leaving out `excluded_ids`. Give
+          `project_id` as a shortcut for the Project filter. With neither, every Contact the user can
+          see in the organisation is selected.
+
+        **What changes.** `changes` lists one entry per Project: `project_id` and `state`, which is a
+        status id switched on for that Project (`beneficiary_states` in `GET /projects/{id}`) or
+        `remove`. Projects must be open (not closed) and in the organisation.
+
+        **Skipped Contacts.** Contacts are skipped, not refused, and counted in `skip_counts`:
+        - `headline_only`: the user only has Headline Only Access to them;
+        - `not_allowed`: the user may not move them between Projects (Organisation Editors, Reporters
+          and Observers may move any Contact; others only Contacts they may edit).
+        A Contact already in the chosen status, or not in a Project they'd be removed from, is left as
+        they are and isn't counted as changed.
+
+        **Small and large requests.** Up to 50 Contacts change straight away and the reply is `200`
+        with the counts. More than 50 run in the background: the reply is `202` with an `id`, and
+        `GET /beneficiaries/bulk_project_moves/{id}` reports the progress until `status` is
+        `completed` or `failed`. The user also gets a notification when it finishes.
+
+        `charity_id` may be left out when the user belongs to one organisation. Not available to
+        connected apps (OAuth tokens) yet.
+      operationId: moveBeneficiariesThroughProjects
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [changes]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to move
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to move, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                project_id:
+                  type: integer
+                  description: Shortcut for the Project filter (Contacts in this Project)
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+                changes:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [project_id, state]
+                    properties:
+                      project_id:
+                        type: integer
+                      state:
+                        description: A status id switched on for the Project, or `remove`
+                        oneOf:
+                          - type: integer
+                          - type: string
+                            enum: [remove]
+            example:
+              charity_id: 12
+              beneficiary_ids: [160498, 160499, 160500]
+              changes:
+                - project_id: 572
+                  state: 3
+                - project_id: 573
+                  state: remove
+      responses:
+        "200":
+          description: The Contacts were moved straight away
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkProjectMove'
+              example:
+                id: 41
+                status: completed
+                total_count: 3
+                processed_count: 3
+                changed_count: 2
+                skip_counts: { headline_only: 1 }
+                background: false
+                summary: "2 contacts changed. 1 skipped: 1 because you have Headline Only Access to them."
+        "202":
+          description: More than 50 Contacts, so the move runs in the background. Poll GET /beneficiaries/bulk_project_moves/{id}.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkProjectMove'
+              example:
+                id: 42
+                status: pending
+                total_count: 812
+                processed_count: 0
+                changed_count: 0
+                skip_counts: {}
+                background: true
+                summary: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_project_moves/{id}:
+    get:
+      tags: [Beneficiaries]
+      summary: Get the progress of a bulk project move
+      description: |
+        The progress of a move started with `POST /beneficiaries/bulk_project_moves`. Only the user
+        who started it can see it. `status` is `pending`, `running`, `completed` or `failed`;
+        `processed_count` of `total_count` Contacts have been reached so far, and `summary` is filled in
+        once it has finished.
+      operationId: getBulkProjectMove
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The move's progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkProjectMove'
+              example:
+                id: 42
+                status: running
+                total_count: 812
+                processed_count: 240
+                changed_count: 231
+                skip_counts: { not_allowed: 9 }
+                background: true
+                summary: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /project_beneficiaries:
     get:
       tags: [Beneficiaries]
@@ -10949,6 +11110,35 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    BulkProjectMove:
+      type: object
+      description: A move of many Contacts through Projects, and how far it has got
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, running, completed, failed, undone]
+        total_count:
+          type: integer
+          description: Contacts the move will try to change (the selection, less Headline Only Contacts)
+        processed_count:
+          type: integer
+          description: Contacts reached so far
+        changed_count:
+          type: integer
+          description: Contacts whose Projects or status changed
+        skip_counts:
+          type: object
+          additionalProperties: { type: integer }
+          description: Skipped Contacts by reason, e.g. headline_only, not_allowed or error
+        background:
+          type: boolean
+          description: True when the move runs in the background (more than 50 Contacts)
+        summary:
+          type: string
+          nullable: true
+          description: The finished message, e.g. "12 contacts changed. 3 skipped …"; null until it has finished
     FocusSource:
       type: object
       required: [key, label, shown]
