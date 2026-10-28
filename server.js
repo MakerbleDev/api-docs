@@ -1442,6 +1442,27 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Project not found, or in an organisation you aren't in" },
             { code: "422", cls: "response-4xx", desc: "Contacts not found in the Project's organisation (<code>beneficiary_ids_not_found</code>), a status not switched on for the Project, a closed Project, no ids, or more than 200" }
           ], "The same as <strong>Assign Contacts to projects</strong> on the Contacts page: each Contact added gets an activity timeline entry and the Project's team is notified. Contacts already in the Project are left as they are (<code>already_in_project: true</code>). Nothing is added if any Contact is refused. Use it before generating survey links with <code>beneficiary_ids</code> for Contacts who aren't in the Survey Campaign's Project yet. Requires an Organisation Editor, Reporter or Observer, or a user who may edit the Contact.")}
+          ${endpointCard("POST", "/beneficiaries/bulk_project_moves", "Move many Contacts through Projects at once", true, [
+            { name: "changes", in: "body", type: "object[]", required: true, desc: "One entry per Project: <code>project_id</code> and <code>state</code>, a status id switched on for the Project (<code>beneficiary_states</code> in <code>GET /projects/{id}</code>) or <code>remove</code>" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts to move, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts, e.g. <code>{\"project_ids\": [\"572\"]}</code>" },
+            { name: "project_id", in: "body", type: "integer", required: false, desc: "Shortcut for <code>filter_data</code>: the Contacts in this Project" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, moved straight away: <code>id</code>, <code>status</code>, <code>total_count</code>, <code>processed_count</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: the move runs in the background. Poll <code>GET /beneficiaries/bulk_project_moves/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "No changes, a closed Project, a status not switched on for the Project, more than 500 <code>beneficiary_ids</code>, or no <code>charity_id</code> when you belong to several organisations" }
+          ], "<strong>Move through projects</strong> for the Contacts selected on the Manage Contacts page: add them to Projects, change their status (Enrolled, Waiting List, Alumni, Declined) or remove them. Each change appears in the Contact's History, as when one Contact is moved. Contacts you only have Headline Only Access to (<code>skip_counts.headline_only</code>), or may not move between Projects (<code>skip_counts.not_allowed</code>), are skipped. A Contact already in the chosen status is left as they are. Not available to connected apps (OAuth tokens) yet.")}
+          ${endpointCard("GET", "/beneficiaries/bulk_project_moves/{id}", "Get the progress of a bulk project move", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The <code>id</code> returned by <code>POST /beneficiaries/bulk_project_moves</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>status</code> (pending, running, completed or failed), <code>processed_count</code> of <code>total_count</code>, <code>changed_count</code>, <code>skip_counts</code>, and <code>summary</code> once finished" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or started by someone else" }
+          ], "Only the user who started the move can see it.")}
         </div>
       </section>
 
