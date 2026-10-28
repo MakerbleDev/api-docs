@@ -163,6 +163,10 @@ tags:
       Focus under Today: one list of everything that needs the signed-in user, grouped by when it's
       due (Overdue, Today, This week, Later) and filtered by type. The first source is Checklist
       Actions: the next step on each Contact's Checklist that the user is responsible for.
+  - name: Start page
+    description: |
+      The page the signed-in user lands on after signing in, and whenever they click Home or the
+      Makerble logo: one of the Today pages, chosen under Personal Settings › Preferences › Start page.
   - name: Snapshot
     description: |
       The Snapshot under Today: one Album's (Portfolio's) or Project's headline numbers on one page.
@@ -4747,6 +4751,54 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /registers:
+    get:
+      tags: [Events]
+      summary: List my Registers
+      operationId: listRegisters
+      description: |
+        The Registers of the recurring event series the user staffs: each series in which they
+        are an Event Worker or Event Manager of an event starting today or later, with that next
+        event, soonest first. This is the list the Registers tab of the Events tile on My Homepage
+        shows.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: A page of series
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            master_event_id: { type: integer }
+                            name: { type: string, description: The series name, without the event's number }
+                            project:
+                              type: object
+                              properties: { id: { type: integer }, name: { type: string } }
+                            next_event:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                name: { type: string }
+                                start_datetime: { type: string, format: date-time }
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data: [{ master_event_id: 812, name: Ruby Training, project: { id: 41, name: Coding Club }, next_event: { id: 815, name: Ruby Training 4, start_datetime: "2026-11-23T10:00:00Z" } }]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
   /events/{id}/register:
     get:
       tags: [Events]
@@ -4850,6 +4902,66 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         "404":
           $ref: '#/components/responses/NotFound'
+  /events/{id}/register/cells:
+    patch:
+      tags: [Events]
+      summary: Save one answer on an event series' Register
+      operationId: updateEventRegisterCell
+      description: |
+        Saves one guest's answer to one question of the attendance Survey for one event, as the
+        pencil in a Register cell does. `id` is the event the answer is for. The answer goes in the
+        guest's latest attendance Story for that event; if they have none, they are added to the
+        event's latest Story, or a Story is created. Only that answer changes, and compulsory
+        questions may be left unanswered. For an Activity metric, which is counted once per event,
+        leave out `contact_id` and send the event's total as a whole number. The guest must already
+        be in the event. The event's Event Workers and Event Managers, its Project Managers and
+        Organisation Admins may save answers.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_field_id, value]
+              properties:
+                contact_id: { type: integer, description: The guest; leave out for an Activity metric total }
+                current_field_id: { type: integer, description: "The question, from the Register's columns or an event's totals" }
+                value:
+                  description: |
+                    scale: an array of answer choice (sub-ratio) ids; binary and participation: true or
+                    false; value: a number of 0 or more; custom_field: text, a date as YYYY-MM-DD or a
+                    time as HH:MM. An empty value clears the answer.
+                  oneOf:
+                    - { type: array, items: { type: integer } }
+                    - { type: boolean }
+                    - { type: number }
+                    - { type: string }
+            example: { contact_id: 5521, current_field_id: 9001, value: "4" }
+      responses:
+        "200":
+          description: The saved answer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id: { type: integer }
+                  contact_id: { type: integer, nullable: true }
+                  current_field_id: { type: integer }
+                  story_id: { type: integer, nullable: true }
+                  answer: { description: The answer as the Register shows it, or the event's total }
+              example: { event_id: 812, contact_id: 5521, current_field_id: 9001, story_id: 33410, answer: "4" }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
   /events/{id}/guests:
     get:
       tags: [Events]
@@ -10240,6 +10352,67 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /start_page:
+    get:
+      tags: [Start page]
+      summary: Get your start page
+      description: |
+        The Today page you land on after signing in, and whenever you click Home or the Makerble logo,
+        as chosen under Personal Settings › Preferences › Start page, and the pages you can choose.
+        Newsfeed (formerly My Home) is the default. Focus and Snapshot are offered while they are in
+        the Today section of your sidebar, and Autopilot while it is on for one of your organisations.
+        If you chose a page that is no longer offered to you, `start_page` is `newsfeed`.
+      operationId: getStartPage
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Your start page and the pages you can choose
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartPage'
+              example:
+                start_page: focus
+                options:
+                  - {key: newsfeed, label: Newsfeed, description: "What’s happened across your projects. Formerly My Home."}
+                  - {key: focus, label: Focus, description: "Your next steps across checklists, overdue first."}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Start page]
+      summary: Choose your start page
+      description: |
+        Choose the Today page you land on after signing in and when you click Home or the Makerble logo,
+        as Personal Settings › Preferences › Start page does. Saved for you only. If you choose Focus
+        but can neither see nor create a Checklist, Home takes you to Newsfeed with a note saying why.
+      operationId: updateStartPage
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start_page]
+              properties:
+                start_page:
+                  type: string
+                  enum: [newsfeed, focus, snapshot, autopilot]
+                  description: The key of one of the `options` GET /start_page returns.
+            example:
+              start_page: focus
+      responses:
+        "200":
+          description: Your start page after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartPage'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /snapshot:
     get:
       tags: [Snapshot]
@@ -11139,6 +11312,30 @@ components:
           type: string
           nullable: true
           description: The finished message, e.g. "12 contacts changed. 3 skipped …"; null until it has finished
+    StartPage:
+      type: object
+      required: [start_page, options]
+      properties:
+        start_page:
+          type: string
+          enum: [newsfeed, focus, snapshot, autopilot]
+          description: The key of your start page; newsfeed when you have never chosen
+        options:
+          type: array
+          description: The pages you can choose, in the order the Today section lists them
+          items:
+            type: object
+            required: [key, label, description]
+            properties:
+              key:
+                type: string
+                description: e.g. focus
+              label:
+                type: string
+                description: Its name under Today, e.g. Focus
+              description:
+                type: string
+                description: The line under it in Personal Settings › Preferences
     FocusSource:
       type: object
       required: [key, label, shown]
