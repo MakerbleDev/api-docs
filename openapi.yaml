@@ -4586,6 +4586,54 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /registers:
+    get:
+      tags: [Events]
+      summary: List my Registers
+      operationId: listRegisters
+      description: |
+        The Registers of the recurring event series the user staffs: each series in which they
+        are an Event Worker or Event Manager of an event starting today or later, with that next
+        event, soonest first. This is the list the Registers tab of the Events tile on My Homepage
+        shows.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: A page of series
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            master_event_id: { type: integer }
+                            name: { type: string, description: The series name, without the event's number }
+                            project:
+                              type: object
+                              properties: { id: { type: integer }, name: { type: string } }
+                            next_event:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                name: { type: string }
+                                start_datetime: { type: string, format: date-time }
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data: [{ master_event_id: 812, name: Ruby Training, project: { id: 41, name: Coding Club }, next_event: { id: 815, name: Ruby Training 4, start_datetime: "2026-11-23T10:00:00Z" } }]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
   /events/{id}/register:
     get:
       tags: [Events]
