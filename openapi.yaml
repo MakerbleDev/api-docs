@@ -3047,6 +3047,46 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+    patch:
+      tags: [Indicators, Library]
+      summary: Change a Metric's name or question
+      operationId: updateIndicator
+      description: |
+        Renames a Metric (an Indicator) or rewords its default question, the question people see
+        when it is asked in a Survey. Nothing else about the Metric changes, and results already
+        recorded stay against it, so only reword a Metric when its meaning stays the same.
+
+        You must be able to edit the Metric: it belongs to one of your organisations. A Metric you
+        can see but not edit, such as another organisation's public Metric, is `403`; one you can't
+        see is `404`. Sending neither `name` nor `default_question` is `422`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                default_question:
+                  type: string
+            example:
+              default_question: "How confident do you feel about getting a job?"
+      responses:
+        "200":
+          $ref: '#/components/responses/LibraryItemUpdated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /scale_indicator_choices:
     get:
       tags: [Indicators]
@@ -5515,6 +5555,53 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /lists/{id}:
+    patch:
+      tags: [Library]
+      summary: Change a List
+      operationId: updateList
+      description: |
+        Renames a List (a Ratio Set) or changes its answer choices. Choices keep their place: the
+        first choice you send renames the first choice, and so on. Extra choices are added at the
+        end, and saved choices past the last one you send are removed.
+
+        Every Metric and Survey that uses the List sees the change. Check where it is used first
+        (**See where a library item is used**), and create a new List instead when other Surveys use it.
+        You must be able to edit the List: its creator, or an editor of the organisation that owns
+        it. A List you can see but not edit is `403`; one you can't see is `404`. No choices, or
+        nothing to change, is `422`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                choices:
+                  type: array
+                  items:
+                    type: string
+                  description: Every choice, in order
+            example:
+              name: "Interview confidence scale"
+              choices: ["Very confident", "Quite confident", "Not very confident", "Not at all confident"]
+      responses:
+        "200":
+          $ref: '#/components/responses/LibraryItemUpdated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /units:
     post:
       tags: [Library]
@@ -5704,6 +5791,119 @@ paths:
           $ref: '#/components/responses/NotFound'
         "409":
           $ref: '#/components/responses/LibraryDuplicates'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /surveys/{id}:
+    patch:
+      tags: [Library, Story Categories]
+      summary: Change a Survey
+      operationId: updateSurvey
+      description: |
+        Changes a Survey's (Story Category's) name, description and intro message, as the Survey's
+        Edit page does. Send only what changes. You must be able to edit the Survey: an editor of the
+        organisation that owns it.
+
+        A name your organisation already uses for another Survey (ignoring case) is `422`, naming
+        that Survey. A Survey you can see but not edit, such as another organisation's public
+        Survey, is `403`; one you can't see is `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                intro_message:
+                  type: string
+                  description: Shown to people before they start
+            example:
+              name: "Job readiness check-in"
+              intro_message: "This takes about two minutes."
+      responses:
+        "200":
+          $ref: '#/components/responses/LibraryItemUpdated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /surveys/{id}/questions:
+    patch:
+      tags: [Library, Story Categories]
+      summary: Change a Survey's questions
+      operationId: updateSurveyQuestions
+      description: |
+        Adds, removes, replaces and moves a Survey's questions, as the Survey's Edit page does. Send
+        the changes in order: each applies to the questions as the changes before it left them.
+        Question numbers are as **Get a library item** lists the Survey's questions, starting at 1.
+
+        - `add`: `question`, and optionally `number` to put it at (default: the end).
+        - `remove`: `number`. The question is taken off the Survey; the Metric or Field behind it is kept.
+        - `replace`: `number` and `question`.
+        - `move`: `number` and `to`.
+
+        A new question takes the same format as in **Create a Survey with its questions**: reuse a
+        Metric, Field or Activity tracker by id, or define `new_metric` or `new_field`. A new item
+        with the same or a near-identical name as one you could reuse is `422`; send `force: true`
+        only if none fits.
+
+        Nothing is changed unless every change can be made. A bad change is `422` naming it, e.g.
+        "Change 2: there is no question 5".
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [changes]
+              properties:
+                changes:
+                  type: array
+                  items:
+                    type: object
+                    required: [action]
+                    properties:
+                      action:
+                        type: string
+                        enum: [add, remove, replace, move]
+                      number:
+                        type: integer
+                      to:
+                        type: integer
+                        description: move only
+                      question:
+                        $ref: '#/components/schemas/SurveyDraftQuestion'
+                force:
+                  $ref: '#/components/schemas/ForceCreate'
+            example:
+              changes:
+                - {action: add, number: 1, question: {metric_id: 14702, is_mandatory: true}}
+                - {action: remove, number: 3}
+                - {action: move, number: 2, to: 4}
+      responses:
+        "200":
+          $ref: '#/components/responses/LibraryItemUpdated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -10740,6 +10940,24 @@ components:
                 - {id: 90101, name: "Agree", points: null}
                 - {id: 90102, name: "Disagree", points: null}
               approved: false
+    LibraryItemUpdated:
+      description: Changed. The item as **Get a library item** shows it
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: '#/components/schemas/LibraryItem'
+          example:
+            data:
+              id: 5521
+              type: list
+              name: "Interview confidence scale"
+              owner: your organisation
+              choices:
+                - {id: 90101, name: "Very confident", points: null}
+                - {id: 90102, name: "Not confident", points: null}
     LibraryDuplicates:
       description: |
         Nothing was created: items you can reuse already have the same or a near-identical name. Reuse
