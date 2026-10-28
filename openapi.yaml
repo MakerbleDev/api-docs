@@ -4586,6 +4586,109 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /events/{id}/register:
+    get:
+      tags: [Events]
+      summary: Get an event series' Register
+      operationId: getEventRegister
+      description: |
+        The Register page of a recurring event series: a row per guest (Contact) invited to any
+        event in the series, in alphabetical order, and for every event in the series, in date
+        order, that guest's answers in their latest attendance Story for it. The attendance Survey
+        is the one set on the master event's Event Format. Activity metrics are counted once per
+        event, so they are returned as each event's `totals` rather than per guest. `id` is any
+        event in the series; a one-off event has no register. Anyone who can open the event page
+        can read it.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The series and a page of its guests
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      master_event_id: { type: integer }
+                      name: { type: string, description: "The series name, without the event's number" }
+                      schedule: { type: string, example: Weekly on Mondays from 2nd November 2026 to 14th December 2026 }
+                      project:
+                        type: object
+                        properties: { id: { type: integer }, name: { type: string } }
+                      survey:
+                        type: object
+                        nullable: true
+                        description: The attendance Survey, or null when the Event Format has none
+                        properties: { id: { type: integer }, name: { type: string } }
+                      columns:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            current_field_id: { type: integer }
+                            name: { type: string }
+                            type: { type: string, enum: [scale, binary, value, participation, custom_field] }
+                            compulsory: { type: boolean }
+                      events:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            name: { type: string }
+                            start_datetime: { type: string, format: date-time }
+                            full: { type: boolean, description: The event has reached its guest capacity }
+                            totals:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  current_field_id: { type: integer }
+                                  name: { type: string }
+                                  total: { type: number }
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            contact_id: { type: integer }
+                            name: { type: string }
+                            events:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  event_id: { type: integer }
+                                  in_event: { type: boolean }
+                                  story_id: { type: integer, nullable: true }
+                                  answers:
+                                    type: object
+                                    description: Answers by current_field_id; empty when the guest is not in the event
+                                    additionalProperties: { type: string, nullable: true }
+              example:
+                master_event_id: 812
+                name: Ruby Training
+                schedule: Weekly on Mondays from 2nd November 2026 to 14th December 2026
+                project: { id: 41, name: Coding Club }
+                survey: { id: 77, name: Attendance }
+                columns: [{ current_field_id: 9001, name: Minutes late, type: value, compulsory: false }]
+                events: [{ id: 812, name: Ruby Training 1, start_datetime: "2026-11-02T10:00:00Z", full: false, totals: [] }]
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data: [{ contact_id: 5521, name: Ann Smith, events: [{ event_id: 812, in_event: true, story_id: 33410, answers: { "9001": "4" } }] }]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /events/{id}/guests:
     get:
       tags: [Events]

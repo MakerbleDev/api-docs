@@ -3040,6 +3040,14 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "An unknown delete_option" }
           ])}
+          ${endpointCard("GET", "/events/{id}/register", "Get an event series' Register", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Any event in the series" },
+            { name: "page / per_page", type: "integer", required: false, desc: "Pagination of guests" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The series, its columns and events, and a page of guests with their answers per event" },
+            { code: "403", cls: "response-4xx", desc: "You may not see this event" },
+            { code: "404", cls: "response-4xx", desc: "Not found, not part of a series, or in an organisation you are not in" }
+          ])}
           ${endpointCard("GET", "/events/{id}/guests", "List an event's guests", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
             { name: "search", type: "string", required: false, desc: "Part of a guest's name or Contact ID" },
