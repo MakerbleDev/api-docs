@@ -926,6 +926,7 @@ function buildDocsPage() {
         <a href="#age-bands"       class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Age Bands</a>
         <a href="#focus"           class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Focus</a>
         <a href="#snapshot"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Snapshot</a>
+        <a href="#start-page"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Start page</a>
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Case Forms</a>
       </div>
@@ -3372,6 +3373,27 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "<code>{sources: [{key, label, shown}]}</code>" },
             { code: "422", cls: "response-4xx", desc: "No <code>shown_sources</code>" }
           ], "As under ⚙ What Focus shows you. Saved for you only; your email and web notification settings are unchanged.")}
+        </div>
+      </section>
+
+      <!-- Start page -->
+      <section class="section" id="start-page">
+        <div class="section-eyebrow">Today</div>
+        <h2 class="section-title">Start page</h2>
+        <div class="section-desc">
+          <p>Your start page is where you land after signing in, and where <strong>Home</strong> and the Makerble logo take you. You choose it under <strong>Personal Settings › Preferences › Start page</strong> from the Today pages: <strong>Newsfeed</strong> (formerly My Home, the default), <strong>Focus</strong>, <strong>Snapshot</strong> and <strong>Autopilot</strong>.</p>
+          <p>Focus and Snapshot are offered while they are in the Today section of your sidebar, and Autopilot while it is on for one of your Organisations. If the page you chose is no longer offered, Newsfeed is used instead. If you choose Focus but can neither see nor create a Checklist, Home takes you to Newsfeed with a note saying why.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/start_page", "Get your start page", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>{start_page, options: [{key, label, description}]}</code>" }
+          ], "<code>options</code> lists only the pages you can choose.")}
+          ${endpointCard("PATCH", "/start_page", "Choose your start page", true, [
+            { name: "start_page", in: "body", type: "string", required: true, desc: "<code>newsfeed</code>, <code>focus</code>, <code>snapshot</code> or <code>autopilot</code>: one of the <code>options</code> GET returns" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{start_page, options}</code>, as GET returns" },
+            { code: "422", cls: "response-4xx", desc: "No <code>start_page</code>, or a page not offered to you" }
+          ], "Saved for you only.")}
         </div>
       </section>
 

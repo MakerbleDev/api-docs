@@ -163,6 +163,10 @@ tags:
       Focus under Today: one list of everything that needs the signed-in user, grouped by when it's
       due (Overdue, Today, This week, Later) and filtered by type. The first source is Checklist
       Actions: the next step on each Contact's Checklist that the user is responsible for.
+  - name: Start page
+    description: |
+      The page the signed-in user lands on after signing in, and whenever they click Home or the
+      Makerble logo: one of the Today pages, chosen under Personal Settings › Preferences › Start page.
   - name: Snapshot
     description: |
       The Snapshot under Today: one Album's (Portfolio's) or Project's headline numbers on one page.
@@ -10187,6 +10191,67 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /start_page:
+    get:
+      tags: [Start page]
+      summary: Get your start page
+      description: |
+        The Today page you land on after signing in, and whenever you click Home or the Makerble logo,
+        as chosen under Personal Settings › Preferences › Start page, and the pages you can choose.
+        Newsfeed (formerly My Home) is the default. Focus and Snapshot are offered while they are in
+        the Today section of your sidebar, and Autopilot while it is on for one of your organisations.
+        If you chose a page that is no longer offered to you, `start_page` is `newsfeed`.
+      operationId: getStartPage
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Your start page and the pages you can choose
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartPage'
+              example:
+                start_page: focus
+                options:
+                  - {key: newsfeed, label: Newsfeed, description: "What’s happened across your projects. Formerly My Home."}
+                  - {key: focus, label: Focus, description: "Your next steps across checklists, overdue first."}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Start page]
+      summary: Choose your start page
+      description: |
+        Choose the Today page you land on after signing in and when you click Home or the Makerble logo,
+        as Personal Settings › Preferences › Start page does. Saved for you only. If you choose Focus
+        but can neither see nor create a Checklist, Home takes you to Newsfeed with a note saying why.
+      operationId: updateStartPage
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start_page]
+              properties:
+                start_page:
+                  type: string
+                  enum: [newsfeed, focus, snapshot, autopilot]
+                  description: The key of one of the `options` GET /start_page returns.
+            example:
+              start_page: focus
+      responses:
+        "200":
+          description: Your start page after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartPage'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /snapshot:
     get:
       tags: [Snapshot]
@@ -11057,6 +11122,30 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    StartPage:
+      type: object
+      required: [start_page, options]
+      properties:
+        start_page:
+          type: string
+          enum: [newsfeed, focus, snapshot, autopilot]
+          description: The key of your start page; newsfeed when you have never chosen
+        options:
+          type: array
+          description: The pages you can choose, in the order the Today section lists them
+          items:
+            type: object
+            required: [key, label, description]
+            properties:
+              key:
+                type: string
+                description: e.g. focus
+              label:
+                type: string
+                description: Its name under Today, e.g. Focus
+              description:
+                type: string
+                description: The line under it in Personal Settings › Preferences
     FocusSource:
       type: object
       required: [key, label, shown]
