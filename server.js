@@ -903,6 +903,7 @@ function buildDocsPage() {
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Framework Sets</a>
         <a href="#suggested-merges" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Suggested Merges</a>
+        <a href="#duplicate-contacts" class="nav-link"><span class="nav-method method-GET" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">GET</span>Duplicate Contacts</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Checklists</a>
         <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Add Metric To</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
@@ -2205,6 +2206,62 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not a rule of an Organisation you manage" },
             { code: "422", cls: "response-4xx", desc: "<code>{errors}</code>" }
           ], "Body: any of <code>name</code>, <code>conditions</code>, <code>match_type</code>, <code>merge_mode</code>, <code>status</code> (<code>Active</code> or <code>Inactive</code>). Anything not sent is kept.")}
+        </div>
+      </section>
+
+      <!-- Duplicate Contacts -->
+      <section class="section" id="duplicate-contacts">
+        <div class="section-eyebrow">Contacts</div>
+        <h2 class="section-title">Duplicate Contacts</h2>
+        <div class="section-desc">
+          <p>Scan for duplicate contacts finds sets of Contacts that look like the same person, as the Duplicate Contacts page does. <code>match=similar</code> (the default) ignores titles (Mr, Mrs, Dr), capital letters, punctuation, word order and small spelling differences; <code>match=exact</code> finds only names spelt exactly the same. Each set has a <code>match_strength</code>: <code>high</code> when the names are the same once normalised or the Contacts share a date of birth, email or mobile, otherwise <code>medium</code>. Only Contacts you could merge are scanned, and sets marked as Not duplicates are left out.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> A similar-name scan of a large Organisation runs in the background: while <code>GET /duplicate_contacts</code> answers <code>202</code> with <code>status: running</code>, wait <code>retry_after</code> seconds and call again. Show the sets to the person, and merge or mark Not duplicates only after they confirm.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/duplicate_contacts", "Scan for duplicate Contacts", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "match", type: "string", required: false, desc: "<code>similar</code> (default) or <code>exact</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (at most 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list with <code>match, status: completed, scanned_at</code>: each set has <code>contacts [{id, name, created_at, created_by}], match_strength, reasons</code>. High first" },
+            { code: "202", cls: "response-2xx", desc: "A similar-name scan is running: <code>{match, status: running, retry_after}</code>. Call again after <code>retry_after</code> seconds" },
+            { code: "403", cls: "response-4xx", desc: "You can't merge Contacts in the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Unknown <code>match</code>" }
+          ])}
+          ${endpointCard("POST", "/duplicate_contacts/not_duplicates", "Mark Contacts as Not duplicates", true, [
+            { name: "contact_ids", type: "array", required: true, in: "body", desc: "At least two Contacts" },
+            { name: "match_strength", type: "string", required: false, in: "body", desc: "<code>high</code> or <code>medium</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{contact_ids, message}</code>. They won't be suggested together again, from any source" },
+            { code: "403", cls: "response-4xx", desc: "You can't merge Contacts in the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: fewer than two Contacts, or one you can't merge" }
+          ])}
+          ${endpointCard("POST", "/duplicate_contacts/merge", "Merge a set of duplicate Contacts", true, [
+            { name: "contact_ids", type: "array", required: true, in: "body", desc: "At least two Contacts" },
+            { name: "winner_id", type: "integer", required: false, in: "body", desc: "The Contact to keep. Default: the one created first" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "Merging has begun: <code>{winner_id, merge_request_ids, message}</code>. Undo with Unmerge on the Merge Contacts page" },
+            { code: "403", cls: "response-4xx", desc: "You can't merge Contacts in the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: fewer than two Contacts, one you can't merge, or a Contact to keep that isn't one of them" }
+          ])}
+          ${endpointCard("GET", "/duplicate_contacts/settings", "Read \"Suggest possible duplicates when contacts are created\"", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{charity_id, suggest_on_create}</code>. When on (the default), new Contacts with similar names appear in Suggested Merges each hour" },
+            { code: "403", cls: "response-4xx", desc: "You can't merge Contacts in the Organisation" }
+          ])}
+          ${endpointCard("PATCH", "/duplicate_contacts/settings", "Change \"Suggest possible duplicates when contacts are created\"", true, [
+            { name: "charity_id", type: "integer", required: true, in: "body", desc: "The Organisation ID" },
+            { name: "suggest_on_create", type: "boolean", required: true, in: "body", desc: "<code>true</code> or <code>false</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{charity_id, suggest_on_create}</code>" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Admin" },
+            { code: "422", cls: "response-4xx", desc: "<code>suggest_on_create</code> isn't true or false" }
+          ])}
         </div>
       </section>
 
