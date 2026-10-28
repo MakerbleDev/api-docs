@@ -4620,6 +4620,66 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         "404":
           $ref: '#/components/responses/NotFound'
+  /events/{id}/register/cells:
+    patch:
+      tags: [Events]
+      summary: Save one answer on an event series' Register
+      operationId: updateEventRegisterCell
+      description: |
+        Saves one guest's answer to one question of the attendance Survey for one event, as the
+        pencil in a Register cell does. `id` is the event the answer is for. The answer goes in the
+        guest's latest attendance Story for that event; if they have none, they are added to the
+        event's latest Story, or a Story is created. Only that answer changes, and compulsory
+        questions may be left unanswered. For an Activity metric, which is counted once per event,
+        leave out `contact_id` and send the event's total as a whole number. The guest must already
+        be in the event. The event's Event Workers and Event Managers, its Project Managers and
+        Organisation Admins may save answers.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_field_id, value]
+              properties:
+                contact_id: { type: integer, description: The guest; leave out for an Activity metric total }
+                current_field_id: { type: integer, description: "The question, from the Register's columns or an event's totals" }
+                value:
+                  description: |
+                    scale: an array of answer choice (sub-ratio) ids; binary and participation: true or
+                    false; value: a number of 0 or more; custom_field: text, a date as YYYY-MM-DD or a
+                    time as HH:MM. An empty value clears the answer.
+                  oneOf:
+                    - { type: array, items: { type: integer } }
+                    - { type: boolean }
+                    - { type: number }
+                    - { type: string }
+            example: { contact_id: 5521, current_field_id: 9001, value: "4" }
+      responses:
+        "200":
+          description: The saved answer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id: { type: integer }
+                  contact_id: { type: integer, nullable: true }
+                  current_field_id: { type: integer }
+                  story_id: { type: integer, nullable: true }
+                  answer: { description: The answer as the Register shows it, or the event's total }
+              example: { event_id: 812, contact_id: 5521, current_field_id: 9001, story_id: 33410, answer: "4" }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
   /events/{id}/guests:
     get:
       tags: [Events]
