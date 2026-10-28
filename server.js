@@ -3048,6 +3048,17 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "You may not see this event" },
             { code: "404", cls: "response-4xx", desc: "Not found, not part of a series, or in an organisation you are not in" }
           ])}
+          ${endpointCard("PATCH", "/events/{id}/register/cells", "Save one answer on an event series' Register", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The event the answer is for" },
+            { name: "contact_id", type: "integer", required: false, desc: "The guest; leave out for an Activity metric total" },
+            { name: "current_field_id", type: "integer", required: true, desc: "The question" },
+            { name: "value", type: "mixed", required: true, desc: "Answer choice ids, true/false, a number, text, YYYY-MM-DD or HH:MM; empty clears" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The saved answer and its story" },
+            { code: "403", cls: "response-4xx", desc: "You may not edit this event" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or in an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "Not a guest, not a question on the register, or an answer the question can't take" }
+          ])}
           ${endpointCard("GET", "/events/{id}/guests", "List an event's guests", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
             { name: "search", type: "string", required: false, desc: "Part of a guest's name or Contact ID" },
