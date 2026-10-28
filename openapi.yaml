@@ -5550,10 +5550,11 @@ paths:
         Reads one library item in full, so it can be reused or copied. Use the `type` and `id` from
         **Search the library**. Besides `id`, `type`, `name` and `owner`:
 
-        - **survey**: `description` and `questions` in the order the Survey shows them. A question
-          has `question` (its wording), `mandatory` and `item` (the Metric, List, Field or Activity
-          tracker behind it, with `metric_type`, `unit` and `choices` where they apply). A section
-          title is `{section, text}`.
+        - **survey**: `description`, `intervals` (its Shared Intervals in order) and `questions` in
+          the order the Survey shows them. A question has `question` (its wording), `mandatory` and
+          `item` (the Metric, List, Field or Activity tracker behind it, with `metric_type`, `unit`
+          and `choices` where they apply), and `by_interval` when it is reworded or hidden in an
+          Interval (see **Create a Survey with its questions**). A section title is `{section, text}`.
         - **metric**: `description`, `metric_type`, `default_question`, `unit`, `list` (with
           `choices`), `success_direction` and `outcomes`.
         - **list**: `choices` in order, each with `id`, `name` and `points`.
