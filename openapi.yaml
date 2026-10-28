@@ -5553,8 +5553,9 @@ paths:
         - **survey**: `description`, `intervals` (its Shared Intervals in order) and `questions` in
           the order the Survey shows them. A question has `question` (its wording), `mandatory` and
           `item` (the Metric, List, Field or Activity tracker behind it, with `metric_type`, `unit`
-          and `choices` where they apply), and `by_interval` when it is reworded or hidden in an
-          Interval (see **Create a Survey with its questions**). A section title is `{section, text}`.
+          and `choices` where they apply), `by_interval` when it is reworded or hidden in an
+          Interval, and `display_if` (a list) and `skip_to` when it has those rules (see **Create a
+          Survey with its questions**). A section title is `{section, text}`.
         - **metric**: `description`, `metric_type`, `default_question`, `unit`, `list` (with
           `choices`), `success_direction` and `outcomes`.
         - **list**: `choices` in order, each with `id`, `name` and `points`.
@@ -5865,6 +5866,18 @@ paths:
 
         Projects the Survey is added to later use its Intervals. An Interval the Survey doesn't
         have, or wording without `intervals`, is `422` and creates nothing.
+
+        **Questions that only apply after a certain answer.** Questions are numbered by their place
+        in `questions`, counting section headings.
+
+        - `display_if`: `{question, answers}` shows the question only when that earlier question is
+          answered with one of `answers` (Display If). A list of them shows it when any is met.
+        - `skip_to`: `[{answers, question}]` jumps forward, past the questions in between, to a later
+          question that isn't mandatory (Skip To). Each answer may appear in one entry only.
+
+        The question whose answer decides must be a scale Metric, whose answers are its List: for
+        yes/no, use a scale Metric on a Yes - No List, not a binary Metric. A Survey can't skip to its
+        end. Anything else is `422`, naming the question.
       security: [{tokenAuth: []}]
       requestBody:
         required: true
@@ -11580,6 +11593,41 @@ components:
           type: array
           description: Needs the Survey's `intervals`. Show the question only in these.
           items: {type: string}
+        display_if:
+          description: Display If. Show the question only when an earlier scale question is answered with one of the answers; a list is met when any one is.
+          oneOf:
+            - $ref: '#/components/schemas/SurveyCondition'
+            - type: array
+              items:
+                $ref: '#/components/schemas/SurveyCondition'
+        skip_to:
+          type: array
+          description: Skip To, on a scale question. For these answers, jump to a later question that isn't mandatory.
+          items:
+            type: object
+            required: [answers, question]
+            properties:
+              answers:
+                type: array
+                items: {type: string}
+                example: ["No"]
+              question:
+                type: integer
+                example: 6
+
+    SurveyCondition:
+      type: object
+      required: [question, answers]
+      properties:
+        question:
+          type: integer
+          description: The earlier question's number, counting section headings
+          example: 2
+        answers:
+          type: array
+          description: Answers from that question's List
+          items: {type: string}
+          example: ["No"]
 
     SurveyIntervalWording:
       type: object
