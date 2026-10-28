@@ -12433,6 +12433,10 @@ components:
           type: integer
           nullable: true
           description: The Contact Form for Contacts with the Declined status
+        display_register_for_event_series:
+          type: boolean
+          nullable: true
+          description: "Display a register for each event series: every recurring Event gets a Register page with a row per guest and columns per Event. Switching it on also switches on edit_story_on_event_attendance; switching edit_story_on_event_attendance off switches it off. Switching Events on (is_creation_of_events_required) switches it on."
         edit_story_on_event_attendance:
           type: boolean
           nullable: true
