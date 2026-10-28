@@ -1900,7 +1900,7 @@ function buildDocsPage() {
             { name: "item_type", in: "path", type: "string", required: true, desc: "The item's type, as returned by Search the library" },
             { name: "id", in: "path", type: "integer", required: true, desc: "The item's id" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The item: a Survey's questions in order with the Metric, List or Field behind each; a Metric's type, default question, Unit, List and Outcomes; a List's choices; a form's fields; a framework's stages; a toolkit's contents" },
+            { code: "200", cls: "response-2xx", desc: "The item: a Survey's questions in order with the Metric, List or Field behind each, its <code>intervals</code> and any <code>by_interval</code> wording; a Metric's type, default question, Unit, List and Outcomes; a List's choices; a form's fields; a framework's stages; a toolkit's contents" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" },
             { code: "422", cls: "response-4xx", desc: "Unknown <code>item_type</code>" }
           ])}
@@ -1993,19 +1993,22 @@ function buildDocsPage() {
           ${endpointCard("POST", "/surveys", "Create a Survey with its questions", true, [
             { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
             { name: "name", in: "body", type: "string", required: true, desc: "The Survey's name" },
-            { name: "questions", in: "body", type: "array", required: true, desc: "In order, at most 50. Each has exactly one of <code>metric_id</code>, <code>field_id</code>, <code>activity_tracker_id</code> (reuse), <code>new_metric</code> {name, metric_type, default_question, outcome_id, list_id or list {name, choices}, unit_id} or <code>new_field</code> {field_name, field_data_type}; plus optional <code>is_mandatory</code>, <code>choice</code>, <code>external_description</code>" },
+            { name: "questions", in: "body", type: "array", required: true, desc: "In order, at most 50. Each has exactly one of <code>metric_id</code>, <code>field_id</code>, <code>activity_tracker_id</code> (reuse), <code>new_metric</code> {name, metric_type, default_question, outcome_id, list_id or list {name, choices}, unit_id} or <code>new_field</code> {field_name, field_data_type}; plus optional <code>is_mandatory</code>, <code>choice</code>, <code>external_description</code>, and, with <code>intervals</code>, <code>by_interval</code> and <code>only_in_intervals</code>" },
+            { name: "intervals", in: "body", type: "array", required: false, desc: "The Survey's Shared Intervals in order, at most 10, e.g. <code>[\"Baseline\", \"Endpoint\"]</code>, for a Survey answered more than once. Projects it is added to later use them" },
+            { name: "questions[].by_interval", in: "body", type: "array", required: false, desc: "Adjust When: entries <code>{interval, respondent, question}</code> reword the question, <code>{interval, respondent, hide: true}</code> hide it. Leave out <code>interval</code> for every Interval and <code>respondent</code> (<code>participant</code>, <code>colleague</code>, <code>observer</code>, <code>public</code>) for everyone; where two cover the same place, the one naming more wins" },
+            { name: "questions[].only_in_intervals", in: "body", type: "array", required: false, desc: "Show the question only in these Intervals, e.g. <code>[\"Endpoint\"]</code>" },
             { name: "description / intro_message", in: "body", type: "string", required: false, desc: "Shown with the Survey" },
             { name: "departments / causes / sub_causes", in: "body", type: "array", required: false, desc: "Names, for the Explore filters" },
             { name: "approved", in: "body", type: "boolean", required: false, desc: "Makerble staff only: show it to every organisation and approve its new Metrics and Lists" },
             { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create new items even though near-identical ones exist (see 409)" }
           ], [
-            { code: "201", cls: "response-2xx", desc: "Created: <code>data</code> is the Survey as Get a library item shows it, with its questions in order, plus <code>approved</code>" },
+            { code: "201", cls: "response-2xx", desc: "Created: <code>data</code> is the Survey as Get a library item shows it, with its <code>intervals</code> and questions in order (each with any <code>by_interval</code> wording), plus <code>approved</code>" },
             { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
             { code: "403", cls: "response-4xx", desc: "You may not create Surveys, as in the Makerble app" },
             { code: "404", cls: "response-4xx", desc: "The organisation, or an id in a question, isn't one you can use; the error names the question" },
             { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse instead of the new ones, each with its <code>question</code>" },
-            { code: "422", cls: "response-4xx", desc: "Invalid input; nothing is created and the error names the question" }
-          ], "Reuse what your library already has by id, and define only what's missing. Nothing is created unless everything is.")}
+            { code: "422", cls: "response-4xx", desc: "Invalid input, including an Interval the Survey doesn't have; nothing is created and the error names the question" }
+          ], "Reuse what your library already has by id, and define only what's missing. Nothing is created unless everything is. For a Survey answered at the start and end of a programme, keep one Survey with the same Metrics and give it <code>intervals</code>, rewording questions with <code>by_interval</code>.")}
           ${endpointCard("POST", "/surveys/{id}/projects", "Add a Survey to Projects", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The Survey's (Story Category's) id: one you can see in your library" },
             { name: "project_ids", in: "body", type: "array", required: true, desc: "The Projects to add it to. You must manage each one, or be an Admin of its organisation" }
