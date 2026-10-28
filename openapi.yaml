@@ -260,6 +260,11 @@ tags:
       Metrics that count records Makerble's own features create, e.g. Signpostings made or
       Contacts referred to another Project, rather than Contacts tagged in updates. Placed in an
       Impact Scorecard column like other metrics.
+  - name: Automations
+    description: |
+      Contact Automations (when Contacts in a Project meet a criteria, do actions such as sending a
+      Survey), Project Automations (settings copied onto Projects that match a saved project filter)
+      and Automation Templates (saved Contact Automations applied to other Projects).
   - name: Filtered Metrics
     description: |
       Filtered versions of standard metrics: a Change (Activity or Engagement tracker) or an
@@ -1512,6 +1517,167 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /beneficiaries/bulk_project_moves:
+    post:
+      tags: [Beneficiaries]
+      summary: Move many Contacts through Projects at once
+      description: |
+        Adds many Contacts (Beneficiaries) to Projects, changes their status (Beneficiary State, e.g.
+        Enrolled, Waiting List, Alumni, Declined) in them, or removes them from them, in one request.
+        This is **Move through projects** for the Contacts selected on the Manage Contacts page. Each
+        change is made the same way as moving one Contact from their profile, so it appears in each
+        Contact's History and the Project's team is notified.
+
+        **Which Contacts.** Either
+        - `beneficiary_ids`: at most 500 Contacts of the organisation; or
+        - everyone matching `filter_data` (the Manage Contacts filters, e.g.
+          `{"project_ids": ["572"], "beneficiary_state_ids": ["1"]}`), leaving out `excluded_ids`. Give
+          `project_id` as a shortcut for the Project filter. With neither, every Contact the user can
+          see in the organisation is selected.
+
+        **What changes.** `changes` lists one entry per Project: `project_id` and `state`, which is a
+        status id switched on for that Project (`beneficiary_states` in `GET /projects/{id}`) or
+        `remove`. Projects must be open (not closed) and in the organisation.
+
+        **Skipped Contacts.** Contacts are skipped, not refused, and counted in `skip_counts`:
+        - `headline_only`: the user only has Headline Only Access to them;
+        - `not_allowed`: the user may not move them between Projects (Organisation Editors, Reporters
+          and Observers may move any Contact; others only Contacts they may edit).
+        A Contact already in the chosen status, or not in a Project they'd be removed from, is left as
+        they are and isn't counted as changed.
+
+        **Small and large requests.** Up to 50 Contacts change straight away and the reply is `200`
+        with the counts. More than 50 run in the background: the reply is `202` with an `id`, and
+        `GET /beneficiaries/bulk_project_moves/{id}` reports the progress until `status` is
+        `completed` or `failed`. The user also gets a notification when it finishes.
+
+        `charity_id` may be left out when the user belongs to one organisation. Not available to
+        connected apps (OAuth tokens) yet.
+      operationId: moveBeneficiariesThroughProjects
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [changes]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to move
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to move, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                project_id:
+                  type: integer
+                  description: Shortcut for the Project filter (Contacts in this Project)
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+                changes:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [project_id, state]
+                    properties:
+                      project_id:
+                        type: integer
+                      state:
+                        description: A status id switched on for the Project, or `remove`
+                        oneOf:
+                          - type: integer
+                          - type: string
+                            enum: [remove]
+            example:
+              charity_id: 12
+              beneficiary_ids: [160498, 160499, 160500]
+              changes:
+                - project_id: 572
+                  state: 3
+                - project_id: 573
+                  state: remove
+      responses:
+        "200":
+          description: The Contacts were moved straight away
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkProjectMove'
+              example:
+                id: 41
+                status: completed
+                total_count: 3
+                processed_count: 3
+                changed_count: 2
+                skip_counts: { headline_only: 1 }
+                background: false
+                summary: "2 contacts changed. 1 skipped: 1 because you have Headline Only Access to them."
+        "202":
+          description: More than 50 Contacts, so the move runs in the background. Poll GET /beneficiaries/bulk_project_moves/{id}.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkProjectMove'
+              example:
+                id: 42
+                status: pending
+                total_count: 812
+                processed_count: 0
+                changed_count: 0
+                skip_counts: {}
+                background: true
+                summary: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_project_moves/{id}:
+    get:
+      tags: [Beneficiaries]
+      summary: Get the progress of a bulk project move
+      description: |
+        The progress of a move started with `POST /beneficiaries/bulk_project_moves`. Only the user
+        who started it can see it. `status` is `pending`, `running`, `completed` or `failed`;
+        `processed_count` of `total_count` Contacts have been reached so far, and `summary` is filled in
+        once it has finished.
+      operationId: getBulkProjectMove
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The move's progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkProjectMove'
+              example:
+                id: 42
+                status: running
+                total_count: 812
+                processed_count: 240
+                changed_count: 231
+                skip_counts: { not_allowed: 9 }
+                background: true
+                summary: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /project_beneficiaries:
     get:
       tags: [Beneficiaries]
@@ -6006,6 +6172,82 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /surveys/{id}/projects:
+    post:
+      tags: [Library, Story Categories]
+      summary: Add a Survey to Projects
+      operationId: addSurveyToProjects
+      description: |
+        Adds a Survey (Story Category) to Projects, as **Add survey to project(s)** on a Survey's
+        page does, so people in those Projects can answer it and its results show there.
+
+        - The Survey must be one you can see in your library: your organisation's own, or the
+          public library. Otherwise `404`.
+        - You must manage each Project, or be an Admin of its organisation. Otherwise `404`,
+          naming the Project.
+        - A closed Project, or one whose Project Category doesn't allow other Surveys, is `422`.
+
+        Every Project is checked first, so if one is refused none is added. A Project that
+        already uses the Survey is left as it is and listed in `existing_project_ids`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: The Survey's (Story Category's) id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_ids]
+              properties:
+                project_ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: integer
+                  description: The Projects to add it to
+            example:
+              project_ids: [4021, 4022]
+      responses:
+        "200":
+          description: The Survey is in every Project given
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      survey_id:
+                        type: integer
+                      added_project_ids:
+                        type: array
+                        items:
+                          type: integer
+                        description: Projects the Survey was added to now
+                      existing_project_ids:
+                        type: array
+                        items:
+                          type: integer
+                        description: Projects that already used it
+              example:
+                data:
+                  survey_id: 812
+                  added_project_ids: [4021]
+                  existing_project_ids: [4022]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /contact_forms:
     post:
       tags: [Library, Beneficiary Categories]
@@ -8531,6 +8773,530 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "403":
           description: The user can't edit this Album's targets
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /contact_automations:
+    get:
+      tags: [Automations]
+      summary: List Contact Automations
+      description: |
+        The Contact Automations the user can see: those of Organisations where they are an editor or
+        observer, those on Projects they manage, and those they made. `active` false means paused.
+      operationId: listContactAutomations
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: Only the Contact Automations on this Project
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Contact Automations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedContactAutomations'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Automations]
+      summary: Create a Contact Automation
+      description: |
+        Creates a Contact Automation on a Project, the same as one made on the Contact Automations
+        page: when the Project's Contacts meet the `criteria`, the `actions` run, once per Contact until
+        that alert is resolved.
+
+        `criteria` names one field: `field` (an `other_fields` key from the options, e.g.
+        `minutes_since_contact_enrolled`), `current_field_id` (a Contact or Survey field),
+        `relationship_category_id` or `event_state_id`. Then a `condition` from that field's
+        conditions and a `value` (minutes, for the "Amount of time" fields), `state_ids` (Ratio Set
+        states) or `text`. For `field: survey_verdict_is`, give `survey_id` and `verdict_ids`.
+
+        `actions` can be any of `send_survey`, `in_app_alert`, `change_status` (statuses on this
+        Project, or `removed`) and `flags`. Every id must be one that
+        `GET /contact_automations/options` offers; any other is refused with 422, naming it.
+
+        `active` defaults to true; send false to save the automation paused, then check who it would
+        act on with `GET /contact_automations/{id}/matching_contacts` before resuming it. Requires an
+        editor of the Organisation or of the Project.
+      operationId: createContactAutomation
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactAutomationRequest'
+            examples:
+              surveyOnEnrolment:
+                summary: Send a Survey an hour after a Contact is enrolled, saved paused
+                value:
+                  project_id: 821
+                  active: false
+                  criteria:
+                    field: minutes_since_contact_enrolled
+                    condition: greater_than_or_equal_to
+                    value: 60
+                  actions:
+                    send_survey:
+                      survey_id: 5194
+                      via_email: true
+                      email_message: "Please tell us how you are getting on."
+      responses:
+        "201":
+          description: Contact Automation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /contact_automations/options:
+    get:
+      tags: [Automations]
+      summary: What a new Contact Automation can use
+      description: |
+        For one Project: its criteria fields (Contact fields and Survey fields by `current_field_id`,
+        each with its `conditions` and, for a Ratio Set or scale Indicator, its `states`;
+        `other_fields` by key with a `value_unit`; `relationships`; `event_states`) and the choices for
+        its actions (`surveys` with their verdicts, `statuses`, `flags`, `colleagues`,
+        `in_app_alert_recipients`). Built from the same lists as the Contact Automation page.
+      operationId: getContactAutomationOptions
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project_id:
+                    type: integer
+                  criteria:
+                    type: object
+                  actions:
+                    type: object
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /contact_automations/{id}:
+    get:
+      tags: [Automations]
+      summary: Get a Contact Automation
+      operationId: getContactAutomation
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The Contact Automation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /contact_automations/{id}/pause:
+    post:
+      tags: [Automations]
+      summary: Pause a Contact Automation
+      description: A paused Contact Automation acts on nobody until it is resumed. Requires an editor of the Organisation or of the Project.
+      operationId: pauseContactAutomation
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The paused Contact Automation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /contact_automations/{id}/resume:
+    post:
+      tags: [Automations]
+      summary: Resume a Contact Automation
+      description: Resuming lets it act on every Contact it matches. Requires an editor of the Organisation or of the Project.
+      operationId: resumeContactAutomation
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The resumed Contact Automation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /contact_automations/{id}/matching_contacts:
+    get:
+      tags: [Automations]
+      summary: Contacts a Contact Automation would act on now
+      description: |
+        The Contacts the automation would act on if it ran now, limited to those the user can see, the
+        same as the page's Test button. It leaves out Contacts the automation has already acted on and
+        not resolved. Works on a paused automation.
+      operationId: listContactAutomationMatchingContacts
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of Contacts, each with id and name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginationEnvelope'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /project_automations:
+    get:
+      tags: [Automations]
+      summary: List Project Automations
+      description: The Project Automations of Organisations where the user is an editor or observer, in priority order.
+      operationId: listProjectAutomations
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          schema:
+            type: integer
+          description: Only this Organisation's
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Project Automations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectAutomations'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Automations]
+      summary: Create a Project Automation
+      description: |
+        Creates a Project Automation, the same as one made on the Project Automations page: whenever a
+        Project matching its saved project filter is created or edited, its `settings` are copied onto
+        the Project. It goes last in priority.
+
+        `settings` takes true or false for the setting names in the options, `default_story_privacy`,
+        and id lists for Contact Forms, Surveys, Event Formats, colleagues and Contact Automation
+        Templates. A setting that isn't sent takes the page's own default for a new automation (the
+        statuses, Events, Timesheets, Cases and the Survey Progress Board switched on; privacy "Only
+        organisation colleagues"). An unknown setting, or an id not in the options, is refused with 422.
+        `active` defaults to true. Requires an editor of the Organisation.
+      operationId: createProjectAutomation
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectAutomationRequest'
+            examples:
+              youthProjects:
+                summary: Cases and a baseline Survey for youth Projects
+                value:
+                  charity_id: 324
+                  name: "Youth project set-up"
+                  saved_filter_id: 2493
+                  settings:
+                    is_creation_of_new_cases_enabled: true
+                    default_story_privacy: only_project_colleagues
+                    enrolled_state_baseline_survey_ids: [5194]
+      responses:
+        "201":
+          description: Project Automation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /project_automations/options:
+    get:
+      tags: [Automations]
+      summary: What a new Project Automation can use
+      description: |
+        For one Organisation: `saved_filters` (the user's saved project filters and those colleagues
+        have shared), `contact_forms`, `surveys`, `event_formats`, `colleagues`,
+        `contact_automation_templates`, the `settings` names and `default_story_privacy_values`.
+      operationId: getProjectAutomationOptions
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The options
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /project_automations/{id}:
+    get:
+      tags: [Automations]
+      summary: Get a Project Automation
+      operationId: getProjectAutomation
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The Project Automation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /project_automations/{id}/pause:
+    post:
+      tags: [Automations]
+      summary: Pause a Project Automation
+      description: New and edited Projects skip a paused Project Automation. Requires an editor of the Organisation.
+      operationId: pauseProjectAutomation
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The paused Project Automation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /project_automations/{id}/resume:
+    post:
+      tags: [Automations]
+      summary: Resume a Project Automation
+      operationId: resumeProjectAutomation
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The resumed Project Automation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /automation_templates:
+    get:
+      tags: [Automations]
+      summary: List Automation Templates
+      description: The Automation Templates of Organisations where the user is an editor or observer, each with the Contact Automation it copies.
+      operationId: listAutomationTemplates
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, hide]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Automation Templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAutomationTemplates'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /automation_templates/{id}:
+    get:
+      tags: [Automations]
+      summary: Get an Automation Template
+      operationId: getAutomationTemplate
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The Automation Template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutomationTemplate'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /automation_templates/{id}/apply:
+    post:
+      tags: [Automations]
+      summary: Apply an Automation Template to a Project
+      description: |
+        Copies the template's Contact Automation onto a Project in the template's Organisation, the same
+        as "+ Add to Project" on the Automation Templates page. Refused with 422, naming what to add
+        first, if the Project hasn't got the template's Survey, or (for an Event criteria) Events switched
+        on and its Event Format; and if the template is already on that Project. `active` defaults to
+        true. Requires an editor of the Organisation or of the Project.
+      operationId: applyAutomationTemplate
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id]
+              properties:
+                project_id:
+                  type: integer
+                active:
+                  type: boolean
+                  default: true
+            examples:
+              paused:
+                summary: Add it to a Project, paused
+                value:
+                  project_id: 821
+                  active: false
+      responses:
+        "201":
+          description: The new Contact Automation on the Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactAutomation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
         "404":
           $ref: '#/components/responses/NotFound'
         "422":
@@ -11206,6 +11972,35 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    BulkProjectMove:
+      type: object
+      description: A move of many Contacts through Projects, and how far it has got
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, running, completed, failed, undone]
+        total_count:
+          type: integer
+          description: Contacts the move will try to change (the selection, less Headline Only Contacts)
+        processed_count:
+          type: integer
+          description: Contacts reached so far
+        changed_count:
+          type: integer
+          description: Contacts whose Projects or status changed
+        skip_counts:
+          type: object
+          additionalProperties: { type: integer }
+          description: Skipped Contacts by reason, e.g. headline_only, not_allowed or error
+        background:
+          type: boolean
+          description: True when the move runs in the background (more than 50 Contacts)
+        summary:
+          type: string
+          nullable: true
+          description: The finished message, e.g. "12 contacts changed. 3 skipped …"; null until it has finished
     StartPage:
       type: object
       required: [start_page, options]
@@ -16239,6 +17034,156 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/WorkflowTracker'
+    ContactAutomation:
+      type: object
+      description: A Contact Automation (AlertTrigger)
+      properties:
+        id: {type: integer}
+        project_id: {type: integer}
+        charity_id: {type: integer}
+        user_id: {type: integer}
+        active: {type: boolean, description: false when paused}
+        action_types: {type: array, items: {type: string}, example: ["Survey", "In-App-alert with no escalation"]}
+        criteria:
+          type: object
+          properties:
+            field_type: {type: string, nullable: true, enum: [CurrentField, EventState, Relationships]}
+            field_id: {type: integer, nullable: true}
+            field: {type: string, nullable: true, example: minutes_since_contact_enrolled}
+            condition: {type: string}
+            value: {type: integer, description: Minutes for the "Amount of time" fields}
+            state_ids: {type: array, items: {type: integer}}
+            text: {type: string, nullable: true}
+            survey_id: {type: integer, nullable: true}
+            verdict_ids: {type: array, items: {type: integer}}
+            contact_filter: {type: boolean}
+            contact_criteria: {type: string, nullable: true}
+        actions:
+          type: object
+          properties:
+            in_app_alert: {type: object}
+            send_survey: {type: object}
+            change_status: {type: array, items: {type: object}}
+            flags: {type: array, items: {type: object}}
+            email_enabled: {type: boolean}
+            sms_enabled: {type: boolean}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ContactAutomationRequest:
+      type: object
+      required: [project_id, criteria]
+      properties:
+        project_id: {type: integer}
+        active: {type: boolean, default: true}
+        criteria:
+          type: object
+          required: [condition]
+          properties:
+            field: {type: string}
+            current_field_id: {type: integer}
+            relationship_category_id: {type: integer}
+            event_state_id: {type: integer}
+            condition: {type: string}
+            value: {type: integer}
+            state_ids: {type: array, items: {type: integer}}
+            text: {type: string}
+            survey_id: {type: integer}
+            verdict_ids: {type: array, items: {type: integer}}
+        actions:
+          type: object
+          properties:
+            send_survey:
+              type: object
+              properties:
+                survey_id: {type: integer}
+                via_email: {type: boolean}
+                via_sms: {type: boolean}
+                email_message: {type: string}
+                sms_message: {type: string}
+                expire: {type: boolean, default: true}
+            in_app_alert:
+              type: object
+              properties:
+                message: {type: string, maxLength: 40}
+                recipients: {type: array, items: {type: string, enum: [beneficiary_workers, project_editors, charity_editors, charity_relationships]}}
+                user_ids: {type: array, items: {type: integer}}
+            change_status:
+              type: array
+              items:
+                type: object
+                properties:
+                  status_id: {description: A status id from the options, or "removed"}
+            flags:
+              type: array
+              items:
+                type: object
+                properties:
+                  flag_id: {type: integer}
+                  description: {type: string}
+    PaginatedContactAutomations:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ContactAutomation'
+    ProjectAutomation:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        charity_id: {type: integer}
+        user_id: {type: integer}
+        active: {type: boolean, description: false when paused}
+        priority: {type: integer, description: Lower runs first}
+        saved_filter_id: {type: integer}
+        settings: {type: object, description: The settings copied onto each matching Project}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ProjectAutomationRequest:
+      type: object
+      required: [charity_id, name, saved_filter_id]
+      properties:
+        charity_id: {type: integer}
+        name: {type: string}
+        saved_filter_id: {type: integer}
+        active: {type: boolean, default: true}
+        settings: {type: object}
+    PaginatedProjectAutomations:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectAutomation'
+    AutomationTemplate:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        charity_id: {type: integer}
+        user_id: {type: integer}
+        status: {type: string, enum: [available, hide]}
+        project_ids: {type: array, items: {type: integer}, description: The Projects it has been applied to}
+        contact_automation:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ContactAutomation'
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    PaginatedAutomationTemplates:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/AutomationTemplate'
     FilteredMetric:
       type: object
       description: A filtered version of a Change or Indicator
