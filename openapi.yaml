@@ -3652,6 +3652,70 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /ratio_sets/{id}/records_populated:
+    get:
+      tags: [Ratio Sets]
+      summary: Count the records holding answers from a Dropdown
+      description: |
+        Records populated on Manage Dropdowns. For a Dropdown (Ratio Set), how many Contacts, Stories, Projects and
+        Events hold an option chosen from it, and how many Surveys and Ideas are set up with its options, in each
+        organisation the user is an Organisation Admin of. `external_usage` says whether records outside those
+        organisations hold any, without counting them. A Dropdown can be deleted (`deletable`) once it is in no form
+        and no record holds answers from it.
+      operationId: getRatioSetRecordsPopulated
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: Records holding answers, per organisation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ratio_set_id, title, deletable, records]
+                properties:
+                  ratio_set_id:
+                    type: integer
+                    example: 412
+                  title:
+                    type: string
+                    example: Do you have a Freedom Pass?
+                  deletable:
+                    type: boolean
+                    example: false
+                  records:
+                    type: array
+                    items:
+                      type: object
+                      required: [record, organisations, external_usage]
+                      properties:
+                        record:
+                          type: string
+                          enum: [Contacts, Stories, Projects, Events, Surveys, Ideas]
+                        organisations:
+                          type: array
+                          items:
+                            type: object
+                            required: [id, name, count]
+                            properties:
+                              id:
+                                type: integer
+                                example: 16
+                              name:
+                                type: string
+                                example: Riverside Trust
+                              count:
+                                type: integer
+                                example: 1
+                        external_usage:
+                          type: boolean
+                          example: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /sub_ratios:
     get:
       tags: [Sub Ratios]
