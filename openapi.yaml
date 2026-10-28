@@ -5850,6 +5850,20 @@ paths:
         Nothing is created unless everything is: an invalid question creates nothing, and the error
         names it ("Question 3: ..."). The Survey and its new items stay private to your organisation
         unless you are Makerble staff and send `approved: true`.
+
+        **Surveys answered more than once.** Keep one Survey with the same Metrics and name its Shared
+        Intervals in `intervals`, e.g. `["Baseline", "Endpoint"]`, so Distance Travelled works. Each
+        question can then be reworded or hidden in them (Adjust When):
+
+        - `by_interval`: entries `{interval, respondent, question}` to reword it, or
+          `{interval, respondent, hide: true}` to hide it. Leave out `interval` for every Interval and
+          `respondent` (`participant`, `colleague`, `observer` or `public`) for everyone. Where two
+          entries cover the same Interval and respondent, the one naming more wins; two naming the
+          same amount are `422`.
+        - `only_in_intervals`: show the question only in these Intervals.
+
+        Projects the Survey is added to later use its Intervals. An Interval the Survey doesn't
+        have, or wording without `intervals`, is `422` and creates nothing.
       security: [{tokenAuth: []}]
       requestBody:
         required: true
@@ -5877,6 +5891,11 @@ paths:
                 sub_causes:
                   type: array
                   items: {type: string}
+                intervals:
+                  type: array
+                  maxItems: 10
+                  description: The Survey's Shared Intervals in order, when it is answered more than once
+                  items: {type: string, maxLength: 255}
                 approved:
                   type: boolean
                   description: Makerble staff only
@@ -5891,9 +5910,13 @@ paths:
             example:
               organisation_id: 913
               name: "Job readiness check-in"
+              intervals: [Baseline, Endpoint]
               questions:
                 - metric_id: 4412
                   is_mandatory: true
+                  by_interval:
+                    - interval: Endpoint
+                      question: "How confident do you feel about getting a job now, after the course?"
                 - new_metric:
                     name: "Job search hours"
                     metric_type: value
@@ -11547,6 +11570,35 @@ components:
           type: string
         internal_description:
           type: string
+        by_interval:
+          type: array
+          description: Needs the Survey's `intervals`. How the question is reworded or hidden in them.
+          items:
+            $ref: '#/components/schemas/SurveyIntervalWording'
+        only_in_intervals:
+          type: array
+          description: Needs the Survey's `intervals`. Show the question only in these.
+          items: {type: string}
+
+    SurveyIntervalWording:
+      type: object
+      description: |
+        How a question reads in an Interval, for a kind of respondent. Give `question` or `hide: true`.
+        Leave out `interval` for every Interval and `respondent` for everyone. When reading a Survey,
+        a respondent type set up for a relationship (e.g. "Parent") is given as stored.
+      properties:
+        interval:
+          type: string
+          example: Endpoint
+        respondent:
+          type: string
+          description: participant (the Contact), colleague, observer (a 360° observer) or public (anyone with the universal link)
+          example: participant
+        question:
+          type: string
+          example: How confident do you feel about getting a job now, after the course?
+        hide:
+          type: boolean
 
     ContactFormDraftQuestion:
       type: object
