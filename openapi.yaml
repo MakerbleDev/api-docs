@@ -5757,7 +5757,7 @@ paths:
         **Search the library**. Besides `id`, `type`, `name` and `owner`:
 
         - **survey**: `description`, `intervals` (its Shared Intervals in order), `question_grids`
-          (`{outcome_id, heading, questions}`) and `questions` in
+          (`{outcome_id, heading, questions}`), `scoring` (`{questions, verdicts}` when it is scored) and `questions` in
           the order the Survey shows them. A question has `question` (its wording), `mandatory` and
           `item` (the Metric, List, Field or Activity tracker behind it, with `metric_type`, `unit`
           and `choices` where they apply), `by_interval` when it is reworded or hidden in an
@@ -6137,6 +6137,14 @@ paths:
         measure one Outcome first and share one List as one table, headed by the Outcome's title.
         Every scale question of that Outcome in the Survey must be in the grid, on the same List, and
         grid questions can't have `display_if` or `skip_to`. Anything else is `422`, naming the grid.
+
+        **Scoring and Verdicts.** A new scale Metric can have `points` for every answer on its List,
+        e.g. `{"Never": 0, "Often": 2}`. `scoring: {questions, verdicts}` adds up those questions'
+        points and names each band of totals (Verdicts), e.g. Low 0-4, Medium 5-9, High 10-15.
+        Only new Metrics can be given points: a reused Metric's points are shared by every Survey
+        using it, so a reused Metric can be scored only if it already has them. The bands must be
+        whole numbers covering every possible total with no gaps or overlaps; anything else is
+        `422`, naming the question or band.
       security: [{tokenAuth: []}]
       requestBody:
         required: true
@@ -6164,6 +6172,26 @@ paths:
                 sub_causes:
                   type: array
                   items: {type: string}
+                scoring:
+                  type: object
+                  description: A scored Survey (Verdicts)
+                  required: [questions, verdicts]
+                  properties:
+                    questions:
+                      type: array
+                      description: The numbers of the scale questions whose points add up
+                      items: {type: integer}
+                    verdicts:
+                      type: array
+                      description: The bands of totals, covering every possible total with no gaps or overlaps
+                      items:
+                        type: object
+                        required: [name, from, to]
+                        properties:
+                          name: {type: string, example: Low}
+                          from: {type: integer, example: 0}
+                          to: {type: integer, example: 4}
+                          description: {type: string}
                 question_grids:
                   type: array
                   description: Question Grids, each an Outcome and the numbers of the scale questions shown as one table under its title
@@ -12590,6 +12618,11 @@ components:
               enum: [top to bottom, bottom to top, none]
             description:
               type: string
+            points:
+              type: object
+              description: Scale only, for a scored Survey. Whole-number points for every answer on its List.
+              additionalProperties: {type: integer}
+              example: {"Never": 0, "Sometimes": 1, "Often": 2}
         new_field:
           type: object
           required: [field_name, field_data_type]
