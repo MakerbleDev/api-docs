@@ -1925,6 +1925,28 @@ function buildDocsPage() {
             { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse with the same or a near-identical name. Resend with <code>force: true</code> to create anyway" },
             { code: "422", cls: "response-4xx", desc: "Invalid input, e.g. a missing name; nothing is created" }
           ], "A List (Ratio Set) of answer choices, private to your organisation. Nothing is created unless the List and all its choices are.")}
+          ${endpointCard("PATCH", "/lists/{id}", "Change a List", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The List (Ratio Set) id" },
+            { name: "name", in: "body", type: "string", required: false, desc: "A new name" },
+            { name: "choices", in: "body", type: "array", required: false, desc: "Every choice, in order. The first renames the first choice, and so on; extras are added and saved choices past the last are removed" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Changed: <code>data</code> is the List as Get a library item shows it, with its choices" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "You can see it but may not change it, e.g. another organisation's public item" },
+            { code: "404", cls: "response-4xx", desc: "Not one you can see" },
+            { code: "422", cls: "response-4xx", desc: "No choices, or nothing to change" }
+          ], "Every Metric and Survey using the List sees the change: check where it is used first, and create a new List when other Surveys use it.")}
+          ${endpointCard("PATCH", "/indicators/{id}", "Change a Metric's name or question", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Metric (Indicator) id" },
+            { name: "name", in: "body", type: "string", required: false, desc: "A new name" },
+            { name: "default_question", in: "body", type: "string", required: false, desc: "New wording for the question people see in a Survey" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Changed: <code>data</code> is the Metric as Get a library item shows it" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "You can see it but may not change it, e.g. another organisation's public item" },
+            { code: "404", cls: "response-4xx", desc: "Not one you can see" },
+            { code: "422", cls: "response-4xx", desc: "Neither <code>name</code> nor <code>default_question</code> given" }
+          ], "Nothing else about the Metric changes, and results already recorded stay against it, so only reword it when its meaning stays the same.")}
           ${endpointCard("POST", "/units", "Create a Unit", true, [
             { name: "name", in: "body", type: "string", required: true, desc: "e.g. <code>hours</code>" },
             { name: "alignment", in: "body", type: "string", required: true, desc: "<code>left</code> (£10) or <code>right</code> (10 hours)" },
@@ -1993,6 +2015,28 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "The Survey, or a Project, isn't one you can use; the error names it. Nothing is added" },
             { code: "422", cls: "response-4xx", desc: "No <code>project_ids</code>, or a Project is closed or its Project Category doesn't allow other Surveys. Nothing is added" }
           ], "The same as Add survey to project(s) on a Survey's page.")}
+          ${endpointCard("PATCH", "/surveys/{id}", "Change a Survey", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Survey (Story Category) id" },
+            { name: "name", in: "body", type: "string", required: false, desc: "A new name; one your organisation already uses for another Survey is 422" },
+            { name: "description / intro_message", in: "body", type: "string", required: false, desc: "Shown with the Survey, and to people before they start" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Changed: <code>data</code> is the Survey as Get a library item shows it" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "You can see it but may not change it, e.g. another organisation's public item" },
+            { code: "404", cls: "response-4xx", desc: "Not one you can see" },
+            { code: "422", cls: "response-4xx", desc: "The name is blank or already used; nothing is changed" }
+          ], "As the Survey's Edit page does. Send only what changes; you must be an editor of the organisation that owns it.")}
+          ${endpointCard("PATCH", "/surveys/{id}/questions", "Change a Survey's questions", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Survey (Story Category) id" },
+            { name: "changes", in: "body", type: "array", required: true, desc: "In order, each applied to the questions as the changes before it left them. Each has an <code>action</code>: <code>add</code> (<code>question</code>, optional <code>number</code>), <code>remove</code> (<code>number</code>), <code>replace</code> (<code>number</code>, <code>question</code>) or <code>move</code> (<code>number</code>, <code>to</code>). A <code>question</code> is as in Create a Survey with its questions" },
+            { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create new items even though near-identical ones exist" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Changed: <code>data</code> is the Survey as Get a library item shows it, with its questions in their new order" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "You can see it but may not change it, e.g. another organisation's public item" },
+            { code: "404", cls: "response-4xx", desc: "Not one you can see" },
+            { code: "422", cls: "response-4xx", desc: "A change can't be made, e.g. <code>Change 2: there is no question 5</code>; nothing is changed" }
+          ], "Question numbers start at 1, as Get a library item lists them. Removing a question keeps the Metric or Field behind it. Nothing is changed unless every change can be made.")}
           ${endpointCard("POST", "/contact_forms", "Create a Contact Form with its fields", true, [
             { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
             { name: "name", in: "body", type: "string", required: true, desc: "e.g. <code>Young person registration</code>" },
