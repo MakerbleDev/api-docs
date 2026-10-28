@@ -5756,7 +5756,8 @@ paths:
         Reads one library item in full, so it can be reused or copied. Use the `type` and `id` from
         **Search the library**. Besides `id`, `type`, `name` and `owner`:
 
-        - **survey**: `description`, `intervals` (its Shared Intervals in order) and `questions` in
+        - **survey**: `description`, `intervals` (its Shared Intervals in order), `question_grids`
+          (`{outcome_id, heading, questions}`) and `questions` in
           the order the Survey shows them. A question has `question` (its wording), `mandatory` and
           `item` (the Metric, List, Field or Activity tracker behind it, with `metric_type`, `unit`
           and `choices` where they apply), `by_interval` when it is reworded or hidden in an
@@ -6131,6 +6132,11 @@ paths:
         The question whose answer decides must be a scale Metric, whose answers are its List: for
         yes/no, use a scale Metric on a Yes - No List, not a binary Metric. A Survey can't skip to its
         end. Anything else is `422`, naming the question.
+
+        **Question Grids.** `question_grids: [{outcome_id, questions}]` shows scale questions that
+        measure one Outcome first and share one List as one table, headed by the Outcome's title.
+        Every scale question of that Outcome in the Survey must be in the grid, on the same List, and
+        grid questions can't have `display_if` or `skip_to`. Anything else is `422`, naming the grid.
       security: [{tokenAuth: []}]
       requestBody:
         required: true
@@ -6158,6 +6164,19 @@ paths:
                 sub_causes:
                   type: array
                   items: {type: string}
+                question_grids:
+                  type: array
+                  description: Question Grids, each an Outcome and the numbers of the scale questions shown as one table under its title
+                  items:
+                    type: object
+                    required: [outcome_id, questions]
+                    properties:
+                      outcome_id:
+                        type: integer
+                      questions:
+                        type: array
+                        minItems: 2
+                        items: {type: integer}
                 intervals:
                   type: array
                   maxItems: 10
