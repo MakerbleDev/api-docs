@@ -908,6 +908,7 @@ function buildDocsPage() {
         <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Add Metric To</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Cohort Trackers</a>
         <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Workflow Trackers</a>
+        <a href="#automations" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Automations</a>
         <a href="#formula-trackers" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Formula Trackers</a>
         <a href="#filtered-metrics" class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Filtered Metrics</a>
       </div>
@@ -2729,6 +2730,98 @@ function buildDocsPage() {
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
           ])}
+        </div>
+      </section>
+
+      <section class="section" id="automations">
+        <div class="section-eyebrow">Case management</div>
+        <h2 class="section-title">Automations</h2>
+        <div class="section-desc">
+          <p><strong>Contact Automations</strong> watch the Contacts in a Project and, when one meets the criteria (for example, enrolled for an hour, or a Survey verdict), run actions: send a Survey, show an in-app alert, change their status or add Flags. Each acts once per Contact until that alert is resolved. <strong>Project Automations</strong> copy their settings (Contact Forms, statuses, baseline Surveys, Event Formats, Cases, default privacy) onto every Project that matches a saved project filter when it is created or edited. <strong>Automation Templates</strong> are saved Contact Automations that can be applied to other Projects. Everything made here is the same as one made on the automation pages, and a paused automation (<code>active: false</code>) does nothing until it is resumed.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Look for an existing automation or template first. Get the choices from <code>/contact_automations/options</code>, create the automation with <code>active: false</code>, check who it would act on with <code>/contact_automations/{id}/matching_contacts</code>, then <code>resume</code> it.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/contact_automations", "List Contact Automations", true, [
+            { name: "project_id", type: "integer", required: false, desc: "Only this Project's" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of the Contact Automations you can see" }
+          ])}
+          ${endpointCard("GET", "/contact_automations/options", "What a new Contact Automation can use", true, [
+            { name: "project_id", type: "integer", required: true, desc: "The Project" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>criteria</code> (contact_fields, survey_fields, other_fields, relationships, event_states, each with its conditions) and <code>actions</code> (surveys, statuses, flags, colleagues, in_app_alert_recipients)" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor of the Organisation or the Project" }
+          ])}
+          ${endpointCard("POST", "/contact_automations", "Create a Contact Automation", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Contact Automation created" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor of the Organisation or the Project" },
+            { code: "422", cls: "response-4xx", desc: "An id not in the options, or the form's own validation; each named" }
+          ], "Body: <code>project_id</code>, <code>active</code> (default true), <code>criteria: {field | current_field_id | relationship_category_id | event_state_id, condition, value, state_ids, text, survey_id, verdict_ids}</code> and <code>actions: {send_survey: {survey_id, via_email, via_sms, email_message, sms_message, expire}, in_app_alert: {message, recipients, user_ids}, change_status: [{status_id}], flags: [{flag_id, description}]}</code>. <code>value</code> is in minutes for the \"Amount of time\" fields.")}
+          ${endpointCard("GET", "/contact_automations/{id}", "Get a Contact Automation", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Contact Automation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Contact Automation, with its criteria and actions" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one you can see" }
+          ])}
+          ${endpointCard("GET", "/contact_automations/{id}/matching_contacts", "Contacts it would act on now", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Contact Automation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Contacts (id, name) you can see; works on a paused automation" }
+          ])}
+          ${endpointCard("POST", "/contact_automations/{id}/pause", "Pause a Contact Automation", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Contact Automation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paused" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor of the Organisation or the Project" }
+          ], "<code>POST /contact_automations/{id}/resume</code> resumes it.")}
+          ${endpointCard("GET", "/project_automations", "List Project Automations", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only this Organisation's" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list, in priority order" }
+          ])}
+          ${endpointCard("GET", "/project_automations/options", "What a new Project Automation can use", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "saved_filters, contact_forms, surveys, event_formats, colleagues, contact_automation_templates, settings and default_story_privacy_values" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor of the Organisation" }
+          ])}
+          ${endpointCard("POST", "/project_automations", "Create a Project Automation", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Project Automation created" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor of the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "An unknown setting or an id not in the options; each named" }
+          ], "Body: <code>charity_id</code>, <code>name</code>, <code>saved_filter_id</code>, <code>active</code> (default true) and <code>settings</code>. Settings not sent take the page's defaults for a new automation.")}
+          ${endpointCard("GET", "/project_automations/{id}", "Get a Project Automation", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Project Automation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Project Automation, with its settings" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
+          ], "<code>POST /project_automations/{id}/pause</code> and <code>/resume</code> pause and resume it (Organisation editors).")}
+          ${endpointCard("GET", "/automation_templates", "List Automation Templates", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only this Organisation's" },
+            { name: "status", type: "string", required: false, desc: "<code>available</code> or <code>hide</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list, each with the Contact Automation it copies and the Projects it is on" }
+          ], "<code>GET /automation_templates/{id}</code> gets one.")}
+          ${endpointCard("POST", "/automation_templates/{id}/apply", "Apply an Automation Template to a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Automation Template ID" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The new Contact Automation on the Project" },
+            { code: "403", cls: "response-4xx", desc: "Not an editor of the Project, or a Project of another Organisation" },
+            { code: "422", cls: "response-4xx", desc: "The Project lacks the template's Survey, Events or Event Format (named), or already has it" }
+          ], "Body: <code>project_id</code> and <code>active</code> (default true).")}
         </div>
       </section>
 
