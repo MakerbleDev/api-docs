@@ -3372,6 +3372,12 @@ function buildDocsPage() {
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [{ code: "200", cls: "response-2xx", desc: "Paginated list — type: identity (Contact Bio Forms) or progress (Scale Indicators)" }])}
+          ${endpointCard("GET", "/ratio_sets/{id}/records_populated", "Count the records holding answers from a Dropdown", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Dropdown (Ratio Set) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Records populated, as on Manage Dropdowns: for Contacts, Stories, Projects, Events, Surveys and Ideas, the count in each organisation you are an Organisation Admin of, and external_usage (whether other organisations' records hold its answers). deletable is true once the Dropdown is in no form and no record holds its answers" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Dropdown you can't see" }
+          ])}
           ${endpointCard("GET", "/sub_ratios", "List Sub Ratios (Answer Choices)", true, [
             { name: "ratio_set_ids[]", type: "integer", required: false, desc: "Filter by Ratio Set ID (repeat for multiple)" },
             { name: "page", type: "integer", required: false, desc: "Page number" }
