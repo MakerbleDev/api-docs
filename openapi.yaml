@@ -6088,6 +6088,82 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /surveys/{id}/projects:
+    post:
+      tags: [Library, Story Categories]
+      summary: Add a Survey to Projects
+      operationId: addSurveyToProjects
+      description: |
+        Adds a Survey (Story Category) to Projects, as **Add survey to project(s)** on a Survey's
+        page does, so people in those Projects can answer it and its results show there.
+
+        - The Survey must be one you can see in your library: your organisation's own, or the
+          public library. Otherwise `404`.
+        - You must manage each Project, or be an Admin of its organisation. Otherwise `404`,
+          naming the Project.
+        - A closed Project, or one whose Project Category doesn't allow other Surveys, is `422`.
+
+        Every Project is checked first, so if one is refused none is added. A Project that
+        already uses the Survey is left as it is and listed in `existing_project_ids`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: The Survey's (Story Category's) id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_ids]
+              properties:
+                project_ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: integer
+                  description: The Projects to add it to
+            example:
+              project_ids: [4021, 4022]
+      responses:
+        "200":
+          description: The Survey is in every Project given
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      survey_id:
+                        type: integer
+                      added_project_ids:
+                        type: array
+                        items:
+                          type: integer
+                        description: Projects the Survey was added to now
+                      existing_project_ids:
+                        type: array
+                        items:
+                          type: integer
+                        description: Projects that already used it
+              example:
+                data:
+                  survey_id: 812
+                  added_project_ids: [4021]
+                  existing_project_ids: [4022]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /contact_forms:
     post:
       tags: [Library, Beneficiary Categories]
