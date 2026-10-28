@@ -230,6 +230,11 @@ tags:
       Sets of two or more Contacts (Beneficiaries) that Makerble thinks are the same person,
       waiting for someone to merge them or mark them as Not duplicates. They come from Merge Rules
       set to Suggest mode and from contacts with similar names.
+  - name: Duplicate Contacts
+    description: |
+      Scan for duplicate contacts (Contacts > Merge Contacts > Scan for duplicates): sets of
+      Contacts (Beneficiaries) whose names are spelt exactly the same or look similar, and the
+      "Suggest possible duplicates when contacts are created" setting.
   - name: Merge Rules
     description: |
       An Organisation's custom rules for finding duplicate Contacts: which fields must be
@@ -6062,6 +6067,216 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           description: "`{error}`: it has already been reviewed"
+
+  /duplicate_contacts:
+    get:
+      tags: [Duplicate Contacts]
+      summary: Scan for duplicate Contacts
+      description: |
+        The Duplicate Contacts page: sets of Contacts that look like the same person. Only Contacts
+        the user could merge are scanned (all the Organisation's Contacts for an Organisation Admin,
+        the Contacts in their Projects for a Project Admin), and sets someone marked as Not
+        duplicates are left out. Requires permission to merge Contacts in the Organisation.
+
+        `match: similar` (the default) ignores titles (Mr, Mrs, Dr), capital letters, punctuation,
+        word order and small spelling differences. It runs in the background because a large
+        Organisation takes several seconds: while it runs the call answers 202 with
+        `status: running`; call again after `retry_after` seconds to get the sets. A finished scan
+        is reused for 10 minutes. `match: exact` finds only names spelt exactly the same and
+        answers straight away.
+
+        `match_strength` is `high` when the names are the same once normalised or the Contacts
+        share a date of birth, email or mobile, and `medium` otherwise. `reasons` are
+        `similar_name`, `same_name`, `same_date_of_birth`, `same_email` and `same_mobile`.
+      operationId: listDuplicateContacts
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - name: match
+          in: query
+          schema:
+            type: string
+            enum: [similar, exact]
+            default: similar
+          description: "similar: names that look alike; exact: names spelt exactly the same"
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of sets of duplicate Contacts, High first
+          content:
+            application/json:
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                match: similar
+                status: completed
+                scanned_at: "2026-10-28T09:00:00Z"
+                data:
+                  - contacts:
+                      - { id: 101, name: Jane Doe, created_at: "2026-09-02T10:15:00Z", created_by: { id: 5, name: Asha Patel } }
+                      - { id: 188, name: Mrs Jane Doe, created_at: "2026-10-21T08:02:00Z", created_by: null }
+                    match_strength: high
+                    reasons: [similar_name, same_date_of_birth]
+        "202":
+          description: A similar-name scan is running; call again after `retry_after` seconds
+          content:
+            application/json:
+              example: { match: similar, status: running, retry_after: 5 }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't merge Contacts in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /duplicate_contacts/not_duplicates:
+    post:
+      tags: [Duplicate Contacts]
+      summary: Mark Contacts as Not duplicates
+      description: |
+        Records that a set of Contacts are different people, as pressing Not duplicates on the
+        Duplicate Contacts page does. They are never suggested together again: not by the scan,
+        the background check of new Contacts or a Merge Rule.
+      operationId: markNotDuplicates
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_ids]
+              properties:
+                contact_ids:
+                  type: array
+                  items: { type: integer }
+                  description: At least two Contacts
+                match_strength:
+                  type: string
+                  enum: [high, medium]
+            example: { contact_ids: [101, 188], match_strength: high }
+      responses:
+        "200":
+          description: "`{contact_ids, message}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't merge Contacts in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: "`{error}`: fewer than two Contacts, or a Contact the user can't merge"
+
+  /duplicate_contacts/merge:
+    post:
+      tags: [Duplicate Contacts]
+      summary: Merge a set of duplicate Contacts
+      description: |
+        Merges the Contacts into one, as Merge Selected Contacts on the Duplicate Contacts page
+        does. The Contact created first is kept unless `winner_id` names another of them. One merge
+        request is made per other Contact; they are merged within a few minutes and can be undone
+        with Unmerge on the Merge Contacts page.
+      operationId: mergeDuplicateContacts
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_ids]
+              properties:
+                contact_ids:
+                  type: array
+                  items: { type: integer }
+                  description: At least two Contacts
+                winner_id:
+                  type: integer
+                  description: The Contact to keep
+            example: { contact_ids: [101, 188], winner_id: 101 }
+      responses:
+        "202":
+          description: "Merging has begun: `{winner_id, merge_request_ids, message}`"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't merge Contacts in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: "`{error}`: fewer than two Contacts, a Contact the user can't merge, or a Contact to keep that isn't one of them"
+
+  /duplicate_contacts/settings:
+    get:
+      tags: [Duplicate Contacts]
+      summary: Read "Suggest possible duplicates when contacts are created"
+      description: |
+        The setting on the Merge Contacts page. When it is on (the default), every Contact created
+        is compared with the Organisation's other Contacts each hour, and similar names appear in
+        Suggested Merges for someone to review. Requires permission to merge Contacts in the
+        Organisation.
+      operationId: getDuplicateContactSettings
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The setting
+          content:
+            application/json:
+              example: { charity_id: 12, suggest_on_create: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't merge Contacts in the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Duplicate Contacts]
+      summary: Change "Suggest possible duplicates when contacts are created"
+      description: Turns the setting on or off. Requires an Organisation Admin (editor).
+      operationId: updateDuplicateContactSettings
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, suggest_on_create]
+              properties:
+                charity_id: { type: integer }
+                suggest_on_create: { type: boolean }
+            example: { charity_id: 12, suggest_on_create: false }
+      responses:
+        "200":
+          description: The setting, changed
+          content:
+            application/json:
+              example: { charity_id: 12, suggest_on_create: false }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't an Organisation Admin
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /merge_rules:
     get:
