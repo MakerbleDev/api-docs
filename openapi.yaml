@@ -4093,6 +4093,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /referral_link_details/{id}/email_settings:
+    put:
+      tags: [Signup Pages]
+      summary: Set a Signup Page's Send Emails settings
+      description: |
+        Saves what the **Send Emails** screen saves for a Signup Page: the confirmation email each
+        individual (or audience) receives after the Signup Page is completed, and the email sent
+        to Additional Recipients. Name each individual by the `label` that
+        `GET /referral_link_details/{id}/definition` returns (e.g. `Individual A`); individuals left
+        out keep their settings. Use `{{Field name}}` merge tags in the subject line and body to
+        personalise an individual's email with their answers. Additional Recipients' emails aren't
+        personalised.
+
+        Only Organisation Editors can set these (403 otherwise), and the Organisation must have email
+        messaging switched on in its Preferences (422 otherwise). Everything is saved or nothing is.
+        Returns the new `send_emails` in the definition's shape, including when every email is off.
+      operationId: updateReferralLinkDetailEmailSettings
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupPageEmailSettingsRequest'
+            example:
+              individuals:
+                - label: "Individual A"
+                  enabled: true
+                  subject_line: "Welcome to the club, {{name}}"
+                  message_body: "<p>Hi {{name}}, thanks for signing up.</p>"
+                  recipient_field_ids: [4521]
+                  include_submission_details: true
+                  included_individuals: ["Individual A", "Individual B"]
+                - label: "Individual B"
+                  enabled: false
+              additional_recipients:
+                enabled: true
+                recipients: ["office@example.org"]
+                subject_line: "New family signup"
+                message_body: "<p>A family has signed up.</p>"
+                include_submission_details: true
+                included_individuals: ["Individual A"]
+      responses:
+        "200":
+          description: The Signup Page's Send Emails settings, as saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  send_emails:
+                    $ref: '#/components/schemas/SignupPageSendEmails'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You can see the Signup Page but aren't an Organisation Editor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /offline_collector_definition:
     get:
       tags: [Signup Pages]
@@ -16378,47 +16445,102 @@ components:
         - type: object
           properties:
             send_emails:
-              type: object
+              allOf: [{ $ref: '#/components/schemas/SignupPageSendEmails' }]
               description: Present only when a Send Emails email is switched on
+
+    SignupPageSendEmails:
+      type: object
+      properties:
+        individuals:
+          type: array
+          items:
+            allOf:
+              - type: object
+                properties:
+                  label:
+                    type: string
+                  audience:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                  contact_form:
+                    $ref: '#/components/schemas/IdName'
+                  enabled:
+                    type: boolean
+                  recipient_fields:
+                    type: array
+                    description: The Contact Form's email fields the email is sent to. Only when enabled
+                    items:
+                      $ref: '#/components/schemas/IdName'
+              - $ref: '#/components/schemas/SignupPageEmail'
+        additional_recipients:
+          allOf:
+            - type: object
               properties:
-                individuals:
+                enabled:
+                  type: boolean
+                recipients:
                   type: array
                   items:
-                    allOf:
-                      - type: object
-                        properties:
-                          label:
-                            type: string
-                          audience:
-                            type: object
-                            nullable: true
-                            properties:
-                              id:
-                                type: integer
-                              name:
-                                type: string
-                          contact_form:
-                            $ref: '#/components/schemas/IdName'
-                          enabled:
-                            type: boolean
-                          recipient_fields:
-                            type: array
-                            description: The Contact Form's email fields the email is sent to. Only when enabled
-                            items:
-                              $ref: '#/components/schemas/IdName'
-                      - $ref: '#/components/schemas/SignupPageEmail'
-                additional_recipients:
-                  allOf:
-                    - type: object
-                      properties:
-                        enabled:
-                          type: boolean
-                        recipients:
-                          type: array
-                          items:
-                            type: string
-                            format: email
-                    - $ref: '#/components/schemas/SignupPageEmail'
+                    type: string
+                    format: email
+            - $ref: '#/components/schemas/SignupPageEmail'
+
+    SignupPageEmailSettingsRequest:
+      type: object
+      properties:
+        individuals:
+          type: array
+          items:
+            type: object
+            required: [label]
+            properties:
+              label:
+                type: string
+                description: The individual's label from the definition, e.g. "Individual A"
+              enabled:
+                type: boolean
+              subject_line:
+                type: string
+              message_body:
+                type: string
+                description: HTML. May contain {{Field name}} merge tags
+              recipient_field_ids:
+                type: array
+                description: Email fields on the individual's Contact Form to send to
+                items:
+                  type: integer
+              include_submission_details:
+                type: boolean
+              included_individuals:
+                type: array
+                description: Labels of the individuals whose submitted details are added
+                items:
+                  type: string
+        additional_recipients:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            recipients:
+              type: array
+              items:
+                type: string
+                format: email
+            subject_line:
+              type: string
+            message_body:
+              type: string
+            include_submission_details:
+              type: boolean
+            included_individuals:
+              type: array
+              items:
+                type: string
 
     SignupPageEmail:
       type: object

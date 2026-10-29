@@ -1362,6 +1362,17 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found, or a Signup Page you can't see" }
           ], "The same document the Offline Collector uses. When any <b>Send Emails</b> email is switched on, <code>send_emails</code> gives, for each individual and for Additional Recipients, whether the email is on and, if so, its <code>subject_line</code>, <code>message_body</code>, <code>merge_tags</code> (each <code>{{Field name}}</code> tag with the matching Contact Form field's <code>id</code> and <code>field_type</code>, or <code>null</code>), the email fields or addresses it goes to, and <code>included_individuals</code> (whose submitted details are added). Without <code>send_emails</code>, no email is on.")}
+          ${endpointCard("PUT", "/referral_link_details/{id}/email_settings", "Set a Signup Page's Send Emails settings", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Signup Page ID" },
+            { name: "individuals", in: "body", type: "object[]", required: false, desc: "One per individual: <code>label</code> (as the definition gives it, e.g. <code>Individual A</code>), <code>enabled</code>, <code>subject_line</code>, <code>message_body</code> (HTML), <code>recipient_field_ids</code> (email fields on the individual's Contact Form), <code>include_submission_details</code> and <code>included_individuals</code> (labels)" },
+            { name: "additional_recipients", in: "body", type: "object", required: false, desc: "<code>enabled</code>, <code>recipients</code> (email addresses), <code>subject_line</code>, <code>message_body</code>, <code>include_submission_details</code> and <code>included_individuals</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>send_emails</code> as saved, in the definition's shape" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You can see the Signup Page but aren't an Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Signup Page you can't see" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>: email messaging is switched off for the Organisation, an individual isn't on the Signup Page, a field isn't an email field, or an enabled email has no subject line, body or recipient" }
+          ], "Saves what the <b>Send Emails</b> screen saves. Personalise an individual's email with <code>{{Field name}}</code> merge tags; Additional Recipients' emails aren't personalised. Individuals left out keep their settings. Everything is saved or nothing is.")}
         </div>
       </section>
 
