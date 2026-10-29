@@ -923,6 +923,7 @@ function buildDocsPage() {
         <a href="#organisations"   class="nav-link"><span class="nav-method method-GET">GET</span>Organisations</a>
         <a href="#projects"        class="nav-link"><span class="nav-method method-GET">GET</span>Projects</a>
         <a href="#albums"          class="nav-link"><span class="nav-method method-GET">GET</span>Albums (Portfolios)</a>
+        <a href="#signup-pages"    class="nav-link"><span class="nav-method method-GET">GET</span>Signup Pages</a>
         <a href="#users"           class="nav-link"><span class="nav-method method-POST">POST</span>Users</a>
         <a href="#contacts"        class="nav-link"><span class="nav-method method-POST">POST</span>Contacts</a>
         <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET">GET</span>Contact Bio Forms</a>
@@ -1379,6 +1380,33 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" },
             { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. a metric or tracker that isn't on the Album; nothing is saved" }
           ], "Saves what the Album's <b>Set Targets</b> page saves. Only metrics and trackers already on the Album can be given a target. Metric, tracker and deadline targets are only saved while the Album uses manual targets.")}
+        </div>
+      </section>
+
+      <!-- Signup Pages -->
+      <section class="section" id="signup-pages">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Signup Pages</h2>
+        <div class="section-desc">
+          <p>A Signup Page (<code>referral_link_details</code> in the API) is a public form people fill in to sign themselves, and often their family, up. Each person becomes a Contact in a Project. A <strong>fixed</strong> Signup Page collects individuals A, B, C in a fixed order; a <strong>flexible</strong> one collects people per audience (a Beneficiary Role), in any number and order. Organisation Editors see all their Organisation's Signup Pages; Project Editors, Reporters and Observers see those that collect into their Projects.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/referral_link_details", "List Signup Pages", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only this Organisation's Signup Pages" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — return only Signup Pages updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Signup Pages, ordered by name" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" }
+          ], "What the <b>Manage Sign-up Pages</b> table shows for each Signup Page: <code>type</code> (<code>fixed</code> or <code>flexible</code>), <code>status</code> and <code>active</code>, <code>public_link</code> (the customised link when there is one), <code>emails_enabled</code>, who created and last updated it and when, and <code>individuals</code>: each individual or audience with its Contact Form, Project, project status, Surveys and any Wave, and <code>send_emails</code>. Deactivated Signup Pages are included.")}
+          ${endpointCard("GET", "/referral_link_details/{id}/definition", "Get a Signup Page's Form Definition", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Signup Page ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Form Definition: the Signup Page's Contact Form and Survey fields, skip logic, branding and settings, and <code>send_emails</code> when an email is on" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Signup Page you can't see" }
+          ], "The same document the Offline Collector uses. When any <b>Send Emails</b> email is switched on, <code>send_emails</code> gives, for each individual and for Additional Recipients, whether the email is on and, if so, its <code>subject_line</code>, <code>message_body</code>, <code>merge_tags</code> (each <code>{{Field name}}</code> tag with the matching Contact Form field's <code>id</code> and <code>field_type</code>, or <code>null</code>), the email fields or addresses it goes to, and <code>included_individuals</code> (whose submitted details are added). Without <code>send_emails</code>, no email is on.")}
         </div>
       </section>
 

@@ -4010,6 +4010,48 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /referral_link_details:
+    get:
+      tags: [Signup Pages]
+      summary: List Signup Pages
+      description: |
+        The Signup Pages the user can see, with what the **Manage Sign-up Pages** table shows for
+        each. A Signup Page (Referral Link Detail in the API) is a public form people fill in to sign
+        themselves, and often their family, up; each person becomes a Contact in a Project.
+
+        Organisation Editors see all their Organisation's Signup Pages. Project Editors, Project
+        Reporters and Project Observers see the Signup Pages that collect into one of their Projects,
+        through the Signup Page itself or one of its individuals or audiences. Organisations with
+        Signup Pages switched off show none. Deactivated Signup Pages are included, with
+        `active: false`.
+
+        `type` is `fixed` (each person is an individual, A, B, C, filled in a fixed order) or
+        `flexible` (people are added per audience, a Beneficiary Role, in any number and order).
+        `individuals` lists each individual or audience with its Contact Form, Project, project
+        status (Beneficiary State), Surveys and any Wave, and whether a Send Emails email goes to
+        that person. `public_link` is the customised link when there is one.
+      operationId: listReferralLinkDetails
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          description: Only this Organisation's Signup Pages
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Signup Pages, ordered by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupPageList'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
   /referral_link_details/{id}/definition:
     get:
       tags: [Signup Pages]
@@ -4024,9 +4066,13 @@ paths:
         authenticated user has access to. Useful for testing or integration work
         without a browser session.
 
-        Unlike the anonymous device-fetch variant (`GET /offline_collector_definition`),
-        this response does **not** include `submission_credential` — that bearer token
-        is only issued to the offline device itself.
+        When any **Send Emails** email is switched on for the Signup Page, the response also has
+        `send_emails`: for each individual (or audience) whether its confirmation email is on and,
+        if so, its subject line, body, merge tags (the `{{Field name}}` personalisation tags, each
+        matched to the Contact Form field's ID and type, or `null` when no field matches), the
+        email fields it is sent to and whose submitted details are included; and the same for
+        Additional Recipients, whose emails aren't personalised. Without `send_emails`, no email
+        is on. The anonymous device-fetch variant never includes it.
       operationId: getReferralLinkDetailDefinition
       security: [{tokenAuth: []}]
       parameters:
@@ -4037,7 +4083,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FormDefinition'
+                $ref: '#/components/schemas/StaffFormDefinition'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -16207,6 +16253,210 @@ components:
               type: integer
             name:
               type: string
+
+    SignupPageList:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignupPage'
+
+    SignupPage:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 123
+        name:
+          type: string
+          example: "Family signup"
+        organisation:
+          $ref: '#/components/schemas/IdName'
+        type:
+          type: string
+          enum: [fixed, flexible]
+        status:
+          type: string
+          example: "activated"
+        active:
+          type: boolean
+        public_link:
+          type: string
+          example: "https://app.makerble.com/charities/42/projects/7/beneficiaries/new?referral_link_detail_id=123"
+        emails_enabled:
+          type: boolean
+          description: Whether any Send Emails email is switched on
+        created_by:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+          description: "`null` when the Signup Page predates this being recorded; the screen shows the Organisation's name"
+        created_at:
+          type: string
+          format: date-time
+        last_updated_by:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        updated_at:
+          type: string
+          format: date-time
+        individuals:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignupPageIndividual'
+
+    SignupPageIndividual:
+      type: object
+      properties:
+        label:
+          type: string
+          example: "Individual A"
+        audience:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+          description: The audience (Beneficiary Role), on a flexible Signup Page
+        contact_form:
+          $ref: '#/components/schemas/IdName'
+        project:
+          $ref: '#/components/schemas/IdName'
+        beneficiary_state:
+          $ref: '#/components/schemas/IdName'
+        surveys:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              wave:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+        send_emails:
+          type: boolean
+
+    IdName:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    StaffFormDefinition:
+      allOf:
+        - $ref: '#/components/schemas/FormDefinition'
+        - type: object
+          properties:
+            send_emails:
+              type: object
+              description: Present only when a Send Emails email is switched on
+              properties:
+                individuals:
+                  type: array
+                  items:
+                    allOf:
+                      - type: object
+                        properties:
+                          label:
+                            type: string
+                          audience:
+                            type: object
+                            nullable: true
+                            properties:
+                              id:
+                                type: integer
+                              name:
+                                type: string
+                          contact_form:
+                            $ref: '#/components/schemas/IdName'
+                          enabled:
+                            type: boolean
+                          recipient_fields:
+                            type: array
+                            description: The Contact Form's email fields the email is sent to. Only when enabled
+                            items:
+                              $ref: '#/components/schemas/IdName'
+                      - $ref: '#/components/schemas/SignupPageEmail'
+                additional_recipients:
+                  allOf:
+                    - type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        recipients:
+                          type: array
+                          items:
+                            type: string
+                            format: email
+                    - $ref: '#/components/schemas/SignupPageEmail'
+
+    SignupPageEmail:
+      type: object
+      description: Only when the email is enabled
+      properties:
+        subject_line:
+          type: string
+          example: "Welcome {{name}}"
+        message_body:
+          type: string
+          description: HTML
+        merge_tags:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "name"
+              id:
+                type: integer
+                nullable: true
+                description: The Contact Form field, or null when no field has this name
+              field_type:
+                type: string
+                nullable: true
+        include_submission_details:
+          type: boolean
+        included_individuals:
+          type: array
+          description: The individuals whose submitted details are added to the email
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              contact_form:
+                $ref: '#/components/schemas/IdName'
 
     FormDefinition:
       type: object
