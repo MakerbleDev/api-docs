@@ -16296,15 +16296,25 @@ components:
           type: boolean
           description: Whether any Send Emails email is switched on
         created_by:
-          allOf: [{ $ref: '#/components/schemas/IdName' }]
+          type: object
           nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
           description: "`null` when the Signup Page predates this being recorded; the screen shows the Organisation's name"
         created_at:
           type: string
           format: date-time
         last_updated_by:
-          allOf: [{ $ref: '#/components/schemas/IdName' }]
+          type: object
           nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
         updated_at:
           type: string
           format: date-time
@@ -16320,8 +16330,13 @@ components:
           type: string
           example: "Individual A"
         audience:
-          allOf: [{ $ref: '#/components/schemas/IdName' }]
+          type: object
           nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
           description: The audience (Beneficiary Role), on a flexible Signup Page
         contact_form:
           $ref: '#/components/schemas/IdName'
@@ -16339,8 +16354,13 @@ components:
               name:
                 type: string
               wave:
-                allOf: [{ $ref: '#/components/schemas/IdName' }]
+                type: object
                 nullable: true
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
         send_emails:
           type: boolean
 
@@ -16370,8 +16390,13 @@ components:
                           label:
                             type: string
                           audience:
-                            allOf: [{ $ref: '#/components/schemas/IdName' }]
+                            type: object
                             nullable: true
+                            properties:
+                              id:
+                                type: integer
+                              name:
+                                type: string
                           contact_form:
                             $ref: '#/components/schemas/IdName'
                           enabled:
