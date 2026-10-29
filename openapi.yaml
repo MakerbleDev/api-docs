@@ -4051,6 +4051,69 @@ paths:
                 $ref: '#/components/schemas/SignupPageList'
         "401":
           $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Signup Pages]
+      summary: Make a Signup Page
+      description: |
+        Makes a Signup Page as the **New Signup Page** screen does, active unless `active: false`.
+        Only Organisation Editors can (403 otherwise). Returns the Signup Page in the list's shape,
+        with its `public_link`.
+
+        - **Fixed** (`type: fixed`): Individual A is the person signing up, with `project_id`,
+          `beneficiary_state_id` (project status), `contact_form_id` and `surveys`. Each entry in
+          `individuals` adds Individual B, C, ... in that order, related to Individual A through
+          one of the Organisation's Relationship Categories (`relationship` is its parent or child
+          title, e.g. "Child"). The Organisation needs at least one Relationship Category.
+        - **Flexible** (`type: flexible`): each entry in `audiences` is a Beneficiary Role
+          respondents can add any number of people as, in any order. Each audience must be a role
+          with a permitted relationship (role-holder relationship) in the Organisation. The first
+          audience's project, status and Contact Form are the Signup Page's own unless given.
+
+        Every Project, Contact Form, Relationship Category and audience must be the
+        Organisation's, and each survey one its Project collects (with `wave_id` one of that
+        survey's waves). Otherwise the response is 422, naming each problem in `errors`.
+      operationId: createReferralLinkDetail
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupPageCreateRequest'
+            example:
+              charity_id: 42
+              name: "Family signup"
+              type: fixed
+              project_id: 7
+              beneficiary_state_id: 1
+              contact_form_id: 155
+              surveys: [{ id: 391, wave_id: 12 }]
+              thank_you_message: "Thanks for signing up!"
+              individuals:
+                - relationship_category_id: 3
+                  relationship: "Child"
+                  project_id: 8
+                  beneficiary_state_id: 1
+                  contact_form_id: 156
+      responses:
+        "201":
+          description: The new Signup Page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupPage'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You're in the Organisation but aren't an Organisation Editor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /referral_link_details/{id}/definition:
     get:
@@ -16489,6 +16552,84 @@ components:
                     type: string
                     format: email
             - $ref: '#/components/schemas/SignupPageEmail'
+
+    SignupPageCreateRequest:
+      type: object
+      required: [charity_id, name, type]
+      properties:
+        charity_id:
+          type: integer
+          description: The Organisation
+        name:
+          type: string
+        type:
+          type: string
+          enum: [fixed, flexible]
+        active:
+          type: boolean
+          default: true
+        project_id:
+          type: integer
+          description: Individual A's Project (fixed), or the Signup Page's (flexible; defaults to the first audience's)
+        beneficiary_state_id:
+          type: integer
+          description: The project status (Beneficiary State) people are added with
+        contact_form_id:
+          type: integer
+          description: Individual A's Contact Form (Beneficiary Category)
+        surveys:
+          $ref: '#/components/schemas/SignupPageSurveyChoice'
+        description:
+          type: string
+        thank_you_message:
+          type: string
+        individuals:
+          type: array
+          description: Fixed only. Individual B, C, ... in order
+          items:
+            type: object
+            properties:
+              relationship_category_id:
+                type: integer
+              relationship:
+                type: string
+                description: The Relationship Category's parent or child title for this individual, e.g. "Child"
+              project_id:
+                type: integer
+              beneficiary_state_id:
+                type: integer
+              contact_form_id:
+                type: integer
+              surveys:
+                $ref: '#/components/schemas/SignupPageSurveyChoice'
+        audiences:
+          type: array
+          description: Flexible only. One per audience (Beneficiary Role)
+          items:
+            type: object
+            properties:
+              beneficiary_role_id:
+                type: integer
+              project_id:
+                type: integer
+              beneficiary_state_id:
+                type: integer
+              contact_form_id:
+                type: integer
+              surveys:
+                $ref: '#/components/schemas/SignupPageSurveyChoice'
+
+    SignupPageSurveyChoice:
+      type: array
+      description: Surveys (Story Categories) the Project collects, each optionally with one of its waves
+      items:
+        type: object
+        required: [id]
+        properties:
+          id:
+            type: integer
+          wave_id:
+            type: integer
 
     SignupPageEmailSettingsRequest:
       type: object
