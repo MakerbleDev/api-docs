@@ -878,7 +878,7 @@ function buildDocsPage() {
         <a href="#organisations"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Organisations</a>
         <a href="#projects"        class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Projects</a>
         <a href="#albums"          class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Albums (Portfolios)</a>
-        <a href="#signup-pages"    class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Signup Pages</a>
+        <a href="#signup-pages"    class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Signup Pages</a>
         <a href="#users"           class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Users</a>
         <a href="#contacts"        class="nav-link"><span class="nav-method method-POST" style="background:rgba(34,181,115,0.15);color:#22b573;border-color:rgba(34,181,115,0.2)">POST</span>Contacts</a>
         <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Contact Bio Forms</a>
@@ -1355,6 +1355,24 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Paginated list of Signup Pages, ordered by name" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" }
           ], "What the <b>Manage Sign-up Pages</b> table shows for each Signup Page: <code>type</code> (<code>fixed</code> or <code>flexible</code>), <code>status</code> and <code>active</code>, <code>public_link</code> (the customised link when there is one), <code>emails_enabled</code>, who created and last updated it and when, and <code>individuals</code>: each individual or audience with its Contact Form, Project, project status, Surveys and any Wave, and <code>send_emails</code>. Deactivated Signup Pages are included.")}
+          ${endpointCard("POST", "/referral_link_details", "Make a Signup Page", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation. You must be an Organisation Editor of it" },
+            { name: "name", in: "body", type: "string", required: true, desc: "The Signup Page's name" },
+            { name: "type", in: "body", type: "string", required: true, desc: "<code>fixed</code> or <code>flexible</code>" },
+            { name: "active", in: "body", type: "boolean", required: false, desc: "Default <code>true</code>" },
+            { name: "project_id", in: "body", type: "integer", required: false, desc: "Individual A's Project (fixed). For flexible, defaults to the first audience's" },
+            { name: "beneficiary_state_id", in: "body", type: "integer", required: false, desc: "The project status people are added with" },
+            { name: "contact_form_id", in: "body", type: "integer", required: false, desc: "Individual A's Contact Form" },
+            { name: "surveys", in: "body", type: "object[]", required: false, desc: "<code>{id, wave_id}</code>: Surveys the Project collects, each with an optional Wave" },
+            { name: "individuals", in: "body", type: "object[]", required: false, desc: "Fixed: Individual B, C, ... each with <code>relationship_category_id</code>, <code>relationship</code> (its parent or child title, e.g. <code>Child</code>), <code>project_id</code>, <code>beneficiary_state_id</code>, <code>contact_form_id</code> and <code>surveys</code>" },
+            { name: "audiences", in: "body", type: "object[]", required: false, desc: "Flexible: one per audience with <code>beneficiary_role_id</code>, <code>project_id</code>, <code>beneficiary_state_id</code>, <code>contact_form_id</code> and <code>surveys</code>" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The new Signup Page, as the list shows it, with its <code>public_link</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "An Organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code> naming each problem, e.g. no Relationship Category for a fixed Signup Page, an audience without a permitted relationship, or another Organisation's Project or Contact Form" }
+          ], "Makes a Signup Page as the <b>New Signup Page</b> screen does. A <b>fixed</b> Signup Page needs the Organisation to have a Relationship Category; each audience on a <b>flexible</b> one needs a permitted relationship.")}
           ${endpointCard("GET", "/referral_link_details/{id}/definition", "Get a Signup Page's Form Definition", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Signup Page ID" }
           ], [
