@@ -1678,6 +1678,51 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+  /beneficiaries/bulk_actions/{id}:
+    get:
+      tags: [Beneficiaries]
+      summary: Get the progress of a bulk action on Contacts
+      description: |
+        The progress of any change to many Contacts at once, such as adding everyone matching
+        `filter_data` as an event's guests (`POST /events/{id}/guests`). Only the user who started
+        it can see it. `action_name` says which change it is (e.g. `add_to_event`,
+        `move_through_projects`). `status` is `pending`, `running`, `completed`, `failed` or
+        `undone`; `processed_count` of `total_count` Contacts have been reached so far, and `summary`
+        is filled in once it has finished.
+      operationId: getBeneficiaryBulkAction
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The bulk action's progress
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BeneficiaryBulkAction'
+                  - type: object
+                    properties:
+                      action_name:
+                        type: string
+                        description: Which change this is, e.g. add_to_event or move_through_projects
+              example:
+                id: 52
+                status: running
+                total_count: 812
+                processed_count: 240
+                changed_count: 231
+                skip_counts: { not_in_project: 9 }
+                background: true
+                summary: null
+                action_name: add_to_event
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /project_beneficiaries:
     get:
       tags: [Beneficiaries]
@@ -5353,6 +5398,21 @@ paths:
         Roles for guests. A fixed guest limit is respected. For an event in a recurring
         series, `apply_to: this_and_upcoming_events` adds them to the later events too.
         Anyone who can open the event page can add guests.
+
+        **Adding everyone who matches the Manage Contacts filters.** Instead of `contact_ids`, give
+        `filter_data` (the Manage Contacts filters, e.g. `{"beneficiary_state_ids": ["1"]}`; `{}`
+        for every Contact the user can see), leaving out `excluded_ids`. `project_id` is a shortcut
+        for the Project filter. This is **Add to › An event** for the Contacts selected on Manage
+        Contacts. Each Contact is added in turn, and those that can't be added are skipped and
+        counted in `skip_counts` rather than refusing the whole request:
+        - `headline_only`: the user only has Headline Only Access to them;
+        - `not_in_project`: they aren't in the event's project;
+        - `event_full`: the event's guest limit has been reached;
+        - `requirements_not_met`: they don't meet the Guest Status's requirements.
+        Contacts already on the event keep their Guest Status. Up to 50 Contacts are added
+        straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `filter_data` adds guests to
+        this event only, and can't be combined with `contact_ids` or `event_role_id`.
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -5362,22 +5422,65 @@ paths:
           application/json:
             schema:
               type: object
-              required: [contact_ids]
               properties:
-                contact_ids: { type: array, items: { type: integer } }
+                contact_ids:
+                  type: array
+                  items: { type: integer }
+                  description: The Contacts to add. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts to add, used instead of contact_ids
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: With filter_data, Contacts matching the filters to leave out
+                project_id:
+                  type: integer
+                  description: With filter_data, a shortcut for the Project filter (Contacts in this Project)
                 guest_status_id: { type: integer }
                 event_role_id: { type: integer }
                 apply_to: { type: string, enum: [this_event, this_and_upcoming_events], default: this_event }
-            example:
-              contact_ids: [5501, 5502]
-              guest_status_id: 12
-              event_role_id: 4
+            examples:
+              contacts:
+                summary: Named Contacts
+                value:
+                  contact_ids: [5501, 5502]
+                  guest_status_id: 12
+                  event_role_id: 4
+              matching:
+                summary: Everyone matching the Manage Contacts filters
+                value:
+                  filter_data: { beneficiary_state_ids: ["1"] }
+                  excluded_ids: [5503]
+                  guest_status_id: 12
       responses:
+        "200":
+          description: filter_data was given and the matching Contacts were added straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestsBulkAdd' }
+              example:
+                id: 51
+                status: completed
+                total_count: 8
+                processed_count: 8
+                changed_count: 6
+                skip_counts: { not_in_project: 1 }
+                background: false
+                summary: "6 contacts changed. 1 skipped: 1 because they aren't in Youth Mentoring, the event's project."
+                event_id: 2201
+                guests_count: 14
         "201":
           description: The guests were added
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EventGuestCount' }
+        "202":
+          description: filter_data was given and more than 50 Contacts match, so they are added in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestsBulkAdd' }
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -13709,6 +13812,46 @@ components:
       properties:
         event_id: { type: integer }
         guests_count: { type: integer }
+
+    BeneficiaryBulkAction:
+      type: object
+      description: A change to many Contacts at once, and how far it has got
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, running, completed, failed, undone]
+        total_count:
+          type: integer
+          description: Contacts it will try to change (the selection, less Headline Only Contacts)
+        processed_count:
+          type: integer
+          description: Contacts reached so far
+        changed_count:
+          type: integer
+          description: Contacts it changed
+        skip_counts:
+          type: object
+          additionalProperties: { type: integer }
+          description: Skipped Contacts by reason, e.g. headline_only, not_in_project or error
+        background:
+          type: boolean
+          description: True when it runs in the background (more than 50 Contacts)
+        summary:
+          type: string
+          nullable: true
+          description: The finished message, e.g. "6 contacts changed. 1 skipped …"; null until it has finished
+
+    EventGuestsBulkAdd:
+      allOf:
+        - $ref: '#/components/schemas/BeneficiaryBulkAction'
+        - type: object
+          properties:
+            event_id: { type: integer }
+            guests_count:
+              type: integer
+              description: The event's guests now (while it runs in the background, so far)
 
     EventStaffMember:
       type: object
