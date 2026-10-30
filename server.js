@@ -1579,6 +1579,31 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
             { code: "422", cls: "response-4xx", desc: "A Checklist or Project you can't start it through, more than 500 <code>beneficiary_ids</code>, or no <code>charity_id</code> when you belong to several organisations" }
           ], "<strong>Add to › A Checklist</strong> for the Contacts selected on the Manage Contacts page. Each Contact is started as Add a Checklist on their profile does, and steps their records already prove done are ticked off. Contacts outside the Project are skipped (<code>skip_counts.not_in_project</code>), as are those you only have Headline Only Access to (<code>skip_counts.headline_only</code>). Contacts who already have the Checklist keep their progress. Organisation Editors and Reporters may use any open Project; others only Projects they are an Editor or Reporter of.")}
+          ${endpointCard("POST", "/beneficiaries/bulk_relationships", "Link many Contacts to one Contact with the same relationship", true, [
+            { name: "relationship_category_id", in: "body", type: "integer", required: true, desc: "One of the organisation's Relationship Categories (<code>GET /relationship_categories</code>)" },
+            { name: "related_contact_id", in: "body", type: "integer", required: true, desc: "The Contact everyone is linked to" },
+            { name: "related_contact_is", in: "body", type: "string", required: true, desc: "<code>parent</code> or <code>child</code>: which side of the category the related Contact takes. The selected Contacts take the other" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, linked straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: linked in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "Another organisation's category or Contact, an unknown side, more than 500 <code>beneficiary_ids</code>, or no <code>charity_id</code> when you belong to several organisations" }
+          ], "<strong>Add to › A relationship</strong> for the Contacts selected on the Manage Contacts page, e.g. making Oakfield School the School of every selected pupil. Each relationship is added as Add a Relationship on a Contact's profile does and appears on both Contacts' History. Skipped Contacts are counted in <code>skip_counts</code>: <code>already_linked</code> (they already have that relationship with that Contact), <code>same_contact</code>, <code>headline_only</code> and <code>not_allowed</code>.")}
+          ${endpointCard("GET", "/relationship_categories", "List the organisation's Relationship Categories", true, [
+            { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only categories changed since then" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each category's <code>id</code>, <code>parent_title</code> and <code>child_title</code> (e.g. School and Pupil), in the paginated envelope" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
+          ], "The kinds of relationship Contacts can have with each other in the organisation. Any member of the organisation can list them.")}
           ${endpointCard("GET", "/beneficiaries/bulk_actions/{id}", "Get the progress of a bulk action on Contacts", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The <code>id</code> returned by a bulk change, e.g. <code>POST /events/{id}/guests</code> with <code>filter_data</code>" }
           ], [
