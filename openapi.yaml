@@ -7768,7 +7768,8 @@ paths:
         for whom it is the furthest action done) and `waiting` (Contacts for whom it is the first action
         not done, so a Contact who did steps 1 and 3 is waiting on step 2). Each list gives its full
         count (`completed_count`, `furthest_count`, `waiting_count`) and the first `list_limit` (30)
-        Contacts alphabetically as `{beneficiary_id, name}`. Each Contact in `waiting` also has the Board's
+        Contacts alphabetically as `{beneficiary_id, name, actions_done}`, where `actions_done` is how many
+        of the Checklist's actions the Contact has done (shown as "3 of 8 actions done"). Each Contact in `waiting` also has the Board's
         details: `days_waiting` (since the Checklist was added or the previous action was done),
         `overdue` (the action is past its due date), `skipped_a_step` (a colleague logged starting a later
         action first) and `responsible` (who is responsible for the action). `contacts_count` is every
@@ -7807,18 +7808,18 @@ paths:
                 complete_count: 1
                 overdue_count: 1
                 list_limit: 30
-                complete: [{beneficiary_id: 904, name: "Refilwe Mahlangu"}]
+                complete: [{beneficiary_id: 904, name: "Refilwe Mahlangu", actions_done: 4}]
                 actions:
                   - id: 55
                     number: 1
                     action_type: "complete_form"
                     title: "Complete the Intake form"
                     completed_count: 2
-                    completed: [{beneficiary_id: 901, name: "Ayanda Dlamini"}, {beneficiary_id: 902, name: "Kagiso Mokoena"}]
+                    completed: [{beneficiary_id: 901, name: "Ayanda Dlamini", actions_done: 2}, {beneficiary_id: 902, name: "Kagiso Mokoena", actions_done: 3}]
                     furthest_count: 0
                     furthest: []
                     waiting_count: 1
-                    waiting: [{beneficiary_id: 903, name: "Mpho Sithole", days_waiting: 9, overdue: true, skipped_a_step: false, responsible: "Anyone in Youth Workers"}]
+                    waiting: [{beneficiary_id: 903, name: "Mpho Sithole", actions_done: 0, days_waiting: 9, overdue: true, skipped_a_step: false, responsible: "Anyone in Youth Workers"}]
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
