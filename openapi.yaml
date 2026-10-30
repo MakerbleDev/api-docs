@@ -1769,6 +1769,140 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_relationships:
+    post:
+      tags: [Beneficiaries]
+      summary: Link many Contacts to one Contact with the same relationship
+      description: |
+        Gives many Contacts (Beneficiaries) the same relationship with one Contact, in one request.
+        This is **Add to › A relationship** for the Contacts selected on the Manage Contacts page,
+        e.g. making Oakfield School the School of every selected pupil. Each relationship is added
+        the same way as Add a Relationship on a Contact's profile, so it appears on both Contacts'
+        History.
+
+        **Which relationship.** `relationship_category_id` is one of the organisation's
+        Relationship Categories (`GET /relationship_categories`), which has two sides, e.g. School &
+        Pupil. `related_contact_id` is the one Contact everyone is linked to, and
+        `related_contact_is` says which side that Contact takes: `parent` (the first title, School)
+        or `child` (the second, Pupil). Each selected Contact takes the other side.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` (the user only has
+        Headline Only Access to them), `already_linked` (they already have that relationship with
+        that Contact), `same_contact` (the chosen Contact itself), `not_allowed` (the relationship
+        couldn't be saved for them).
+
+        Up to 50 Contacts are linked straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: linkBeneficiariesToContact
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [relationship_category_id, related_contact_id, related_contact_is]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to link
+                relationship_category_id:
+                  type: integer
+                  description: One of the organisation's Relationship Categories
+                related_contact_id:
+                  type: integer
+                  description: The Contact every selected Contact is linked to
+                related_contact_is:
+                  type: string
+                  enum: [parent, child]
+                  description: Which side of the category the related Contact takes; the selected Contacts take the other
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to link, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              relationship_category_id: 8
+              related_contact_id: 160400
+              related_contact_is: parent
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Contacts were linked straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiaryBulkAction' }
+              example:
+                id: 71
+                status: completed
+                total_count: 5
+                processed_count: 5
+                changed_count: 5
+                skip_counts: {}
+                background: false
+                summary: "5 contacts changed."
+        "202":
+          description: More than 50 Contacts, so they are linked in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiaryBulkAction' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /relationship_categories:
+    get:
+      tags: [Beneficiaries]
+      summary: List the organisation's Relationship Categories
+      description: |
+        The kinds of relationship Contacts can have with each other in the organisation, each with
+        its two sides, e.g. School & Pupil or Mother & Son. Use an `id` with
+        `POST /beneficiaries/bulk_relationships`. Any member of the organisation can list them.
+        `charity_id` may be left out when the user belongs to one organisation.
+      operationId: listRelationshipCategories
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of Relationship Categories, by title
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/RelationshipCategory' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /beneficiaries/bulk_actions/{id}:
     get:
       tags: [Beneficiaries]
@@ -13815,6 +13949,20 @@ components:
           type: string
           nullable: true
           description: The finished message, e.g. "6 contacts changed. 1 skipped …"; null until it has finished
+
+    RelationshipCategory:
+      type: object
+      description: A kind of relationship between Contacts, with its two sides
+      properties:
+        id: { type: integer }
+        parent_title:
+          type: string
+          description: The first side, e.g. School
+        child_title:
+          type: string
+          description: The second side, e.g. Pupil
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
 
     EventGuestsBulkAdd:
       allOf:
