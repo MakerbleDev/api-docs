@@ -928,6 +928,7 @@ function buildDocsPage() {
         <a href="#contacts"        class="nav-link"><span class="nav-method method-POST">POST</span>Contacts</a>
         <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET">GET</span>Contact Bio Forms</a>
         <a href="#cases"           class="nav-link"><span class="nav-method method-POST">POST</span>Cases</a>
+        <a href="#audio-notes"     class="nav-link"><span class="nav-method method-POST">POST</span>Audio Notes</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Surveys &amp; stories</div>
@@ -1622,6 +1623,55 @@ function buildDocsPage() {
           ${endpointCard("GET", "/projects_beneficiaries_cases", "List Project–Contact–Case associations", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" }
           ], [{ code: "200", cls: "response-2xx", desc: "Join table records" }])}
+        </div>
+      </section>
+
+      <!-- Audio Notes -->
+      <section class="section" id="audio-notes">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Audio Notes</h2>
+        <div class="section-desc">
+          <p>AI AudioNotes (CaseNotes in the API) are audio recordings of a conversation with one Contact (<code>note_type: case_note</code>) or of an Event session (<code>note_type: session_note</code>). Makerble transcribes and summarises each one, then writes a draft survey response from the summary for a colleague to check and save. These endpoints return the same Audio Notes the user sees on the <strong>Audio Notes</strong> page: every one in the Organisations they are an admin of and the Projects they are a Project Editor of, plus the ones they recorded themselves.</p>
+          <p><code>source</code> is <code>product</code> for a recording made in Makerble and <code>manual</code> for an attached audio file. <code>platform</code> is <code>desktop_web</code>, <code>mobile_web</code> or <code>api</code>, and null for notes made before it was recorded.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/case_notes", "List Audio Notes", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only Audio Notes in this Organisation" },
+            { name: "project_id", type: "integer", required: false, desc: "Only Audio Notes in this Project" },
+            { name: "beneficiary_id", type: "integer", required: false, desc: "Only CaseNotes about this Contact" },
+            { name: "event_id", type: "integer", required: false, desc: "Only SessionNotes about this Event" },
+            { name: "note_type", type: "string", required: false, desc: "<code>case_note</code> or <code>session_note</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list of Audio Notes, newest first" }])}
+          ${endpointCard("GET", "/case_notes/{id}", "Get an Audio Note", true, [
+            { name: "id", type: "integer", required: true, in: "path", desc: "Audio Note (CaseNote) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Audio Note with its <code>transcript</code> and <code>summary</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one the user may see" }
+          ])}
+          ${endpointCard("POST", "/case_notes", "Attach an audio file as a new Audio Note", true, [
+            { name: "charity_id", type: "integer", required: true, in: "form", desc: "An Organisation with AI AudioNotes turned on" },
+            { name: "project_id", type: "integer", required: true, in: "form", desc: "One of its running Projects the user is a member of" },
+            { name: "note_type", type: "string", required: true, in: "form", desc: "<code>case_note</code> or <code>session_note</code>" },
+            { name: "beneficiary_id", type: "integer", required: false, in: "form", desc: "Required for a <code>case_note</code>: a Contact in the Project the user may see" },
+            { name: "event_id", type: "integer", required: false, in: "form", desc: "Optional for a <code>session_note</code>: an Event in the Project the user manages or works on" },
+            { name: "audio_file", type: "file", required: true, in: "form", desc: "MP3, M4A, MP4, WAV, WEBM, OGG, OGA, AAC or FLAC, up to 200 MB" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created and queued for transcription" },
+            { code: "422", cls: "response-4xx", desc: "A choice is missing or not allowed, or the file is not supported audio" },
+            { code: "503", cls: "response-5xx", desc: "The file could not be stored; nothing was created" }
+          ], "Send as <code>multipart/form-data</code>, then poll <code>GET /case_notes/{id}</code> until <code>status</code> is <code>completed</code>.")}
+          ${endpointCard("DELETE", "/case_notes/{id}/recording", "Delete an Audio Note's recording", true, [
+            { name: "id", type: "integer", required: true, in: "path", desc: "Audio Note (CaseNote) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Audio Note, with <code>has_recording: false</code>" },
+            { code: "403", cls: "response-4xx", desc: "Only the Organisation's admins may delete a recording" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one the user may see" },
+            { code: "422", cls: "response-4xx", desc: "Still being transcribed" },
+            { code: "503", cls: "response-5xx", desc: "Could not be removed from storage; nothing changed" }
+          ], "Keeps the note, its transcript, summary and survey response. Cannot be undone.")}
         </div>
       </section>
 

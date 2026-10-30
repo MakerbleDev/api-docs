@@ -180,6 +180,10 @@ tags:
     description: Contact Bio Forms — field schemas for creating and editing Beneficiary records
   - name: Beneficiary Types
     description: The four contact types — Person, Organisation, Animal, Object
+  - name: Audio Notes
+    description: |
+      AI AudioNotes (CaseNotes): audio recordings of a conversation with a Contact (Beneficiary) or
+      of an Event session, which Makerble transcribes and summarises into a draft survey response.
   - name: Cases
     description: Cases linked to a Beneficiary and a Project
   - name: Stories
@@ -2670,6 +2674,203 @@ paths:
                 $ref: '#/components/schemas/PaginatedGeneric'
         "401":
           $ref: '#/components/responses/Unauthorized'
+
+  /case_notes:
+    get:
+      tags: [Audio Notes]
+      summary: List Audio Notes
+      description: |
+        The Audio Notes (CaseNotes) the user may see on the **Audio Notes** page, newest first:
+        every one in the Organisations (Charities) they are an admin (Charity Editor) of and the
+        Projects they are a Project Editor of, plus the ones they recorded themselves. Each is a
+        CaseNote (`note_type: case_note`, about one Contact) or a SessionNote
+        (`note_type: session_note`, about an Event). Get one to read its transcript and summary.
+      operationId: listCaseNotes
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          schema:
+            type: integer
+          description: Only Audio Notes in this Organisation (Charity)
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: Only Audio Notes in this Project
+        - name: beneficiary_id
+          in: query
+          schema:
+            type: integer
+          description: Only CaseNotes about this Contact (Beneficiary)
+        - name: event_id
+          in: query
+          schema:
+            type: integer
+          description: Only SessionNotes about this Event
+        - name: note_type
+          in: query
+          schema:
+            type: string
+            enum: [case_note, session_note]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Audio Notes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCaseNotes'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Audio Notes]
+      summary: Attach an audio file as a new Audio Note
+      description: |
+        Creates an Audio Note (CaseNote) from an audio file, as the **New AudioNote** popup on the Audio
+        Notes page does. Send it as `multipart/form-data`. Makerble then transcribes and summarises it
+        and writes a draft survey response, the same as for a recording made in Makerble; poll
+        **Get an Audio Note** until `status` is `completed`. The note's `source` is `manual` and its
+        `platform` is `api`.
+
+        Choose an Organisation (Charity) with AI AudioNotes turned on and one of its running Projects
+        the user is a member of. For a `case_note` give a Contact (Beneficiary) in that Project whom
+        the user may see. For a `session_note` the `event_id` is optional; it must be an Event in that
+        Project that the user is an Event Manager or Event Worker of (a Project or Organisation admin
+        may choose any of the Project's Events). The file must be MP3, M4A, MP4, WAV, WEBM, OGG, OGA,
+        AAC or FLAC audio, up to 200 MB.
+      operationId: createCaseNote
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [charity_id, project_id, note_type, audio_file]
+              properties:
+                charity_id:
+                  type: integer
+                project_id:
+                  type: integer
+                note_type:
+                  type: string
+                  enum: [case_note, session_note]
+                beneficiary_id:
+                  type: integer
+                  description: Required for a `case_note`
+                event_id:
+                  type: integer
+                  description: Optional, for a `session_note`
+                audio_file:
+                  type: string
+                  format: binary
+            example:
+              charity_id: 913
+              project_id: 2201
+              note_type: case_note
+              beneficiary_id: 50412
+              audio_file: "(binary) session.mp3"
+      responses:
+        "201":
+          description: The Audio Note, queued for transcription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseNoteDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          description: A choice was missing or not allowed, or the file is not a supported audio file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Choose a contact."
+        "503":
+          description: The audio file could not be stored; nothing was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /case_notes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Audio Notes]
+      summary: Get an Audio Note
+      description: |
+        One Audio Note (CaseNote) with its transcript and AI summary, if the user may see it on the
+        **Audio Notes** page (otherwise `404`).
+      operationId: getCaseNote
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Audio Note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseNoteDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /case_notes/{id}/recording:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    delete:
+      tags: [Audio Notes]
+      summary: Delete an Audio Note's recording
+      description: |
+        Deletes the audio recording of an Audio Note (CaseNote), for example to meet a privacy request,
+        as **Delete Recording** does on the Audio Note page. The note itself is kept, with its transcript,
+        summary and draft or saved survey response; `has_recording` becomes false and `audio_deleted_at`
+        is set. This cannot be undone. Only the Organisation's admins (Charity Editors) and Makerble
+        System Access admins may do this (`403`), and only once the note has finished processing
+        (`status` is `completed` or `failed`; otherwise `422`). Deleting an already deleted recording
+        returns the note unchanged. `503` means the recording could not be removed from storage and
+        nothing was changed: try again.
+      operationId: deleteCaseNoteRecording
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Audio Note, without its recording
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseNoteDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user is not an admin of the Audio Note's Organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an organisation admin can delete a recording."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: The Audio Note is still being processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "The recording can be deleted once it has been transcribed."
+        "503":
+          description: The recording could not be removed from storage; nothing was changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /cases:
     get:
@@ -18585,6 +18786,99 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/SeatColleague'
+
+    CaseNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        charity_id:
+          type: integer
+        project_id:
+          type: integer
+        user_id:
+          type: integer
+          description: The colleague who recorded it
+        user_name:
+          type: string
+          nullable: true
+        note_type:
+          type: string
+          enum: [case_note, session_note]
+          description: "`case_note` is about one Contact (Beneficiary); `session_note` is about an Event"
+        status:
+          type: string
+          enum: [queued, recording, transcribing, completed, failed, stitching, summarizing]
+        beneficiary_id:
+          type: integer
+          nullable: true
+        beneficiary_name:
+          type: string
+          nullable: true
+        event_id:
+          type: integer
+          nullable: true
+        draft_story_id:
+          type: integer
+          nullable: true
+          description: The draft survey response written from the summary, once there is one
+        story_id:
+          type: integer
+          nullable: true
+          description: The survey response (Story) saved from that draft
+        started_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          nullable: true
+        source:
+          type: string
+          enum: [product, manual]
+          description: "`product` when recorded in Makerble, `manual` when an audio file was attached"
+        platform:
+          type: string
+          enum: [desktop_web, mobile_web, api]
+          nullable: true
+          description: Where it was started; null for Audio Notes made before this was recorded
+        has_recording:
+          type: boolean
+          description: false once the recording has been deleted, or before it is uploaded
+        audio_deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the recording was deleted, if it has been
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CaseNoteDetail:
+      allOf:
+        - $ref: '#/components/schemas/CaseNote'
+        - type: object
+          properties:
+            transcript:
+              type: string
+              nullable: true
+              description: "The transcript, one paragraph per speaker turn (Speaker A: ...)"
+            summary:
+              type: string
+              nullable: true
+              description: The AI summary
+
+    PaginatedCaseNotes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CaseNote'
 
     PaginatedWebhookEndpoints:
       allOf:
