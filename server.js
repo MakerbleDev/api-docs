@@ -1681,14 +1681,15 @@ function buildDocsPage() {
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "beneficiary_id", type: "integer", required: false, desc: "Only this Contact's links" },
             { name: "send_survey_wave_id", type: "integer", required: false, desc: "Only links for this Wave" },
+            { name: "in_progress", type: "boolean", required: false, desc: "<code>true</code>: only links where the Contact has started a response but not finished it" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (max 200)" },
             { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated list of links" },
+            { code: "200", cls: "response-2xx", desc: "Paginated list of links, each with <code>responses_in_progress</code>: <code>[{send_survey_wave_id, last_updated_at}]</code>, newest first" },
             { code: "403", cls: "response-4xx", desc: "Not a Project Editor or Organisation Editor" },
             { code: "404", cls: "response-4xx", desc: "Survey Campaign not found" }
-          ], "Use it to reuse a Contact's existing link. A <code>use_once</code> link that has been answered has <code>expired: true</code>.")}
+          ], "Use it to reuse a Contact's existing link. A <code>use_once</code> link that has been answered has <code>expired: true</code>. <code>responses_in_progress</code> lists the responses the Contact started on the link but hasn't finished (the <strong>Surveys in progress</strong> column on the Response Rates tab); they're kept for 30 days after they were last updated.")}
         </div>
       </section>
 

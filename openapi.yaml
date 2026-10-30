@@ -2479,6 +2479,13 @@ paths:
         Lists the personal survey links already generated for a Survey Campaign, e.g. to
         reuse a Contact's existing link. A `use_once` link that has been answered has
         `expired: true`. Requires Project Editor or Organisation Editor access.
+
+        Each link's `responses_in_progress` lists the survey responses the Contact has
+        started on it but not finished (saved with Finish Later), newest first. This is the
+        **Surveys in progress** column on the Survey Campaign's Response Rates tab. Pass
+        `in_progress=true` to list only links with one. Unfinished responses are kept for 30
+        days after they were last updated. Saving one doesn't change the link's `updated_at`,
+        so `last_synced_datetime` doesn't pick it up.
       operationId: listSurveyLinks
       security: [{tokenAuth: []}]
       parameters:
@@ -2495,6 +2502,11 @@ paths:
           schema:
             type: integer
           description: Only links for this Wave
+        - name: in_progress
+          in: query
+          schema:
+            type: boolean
+          description: "`true`: only links where the Contact has started a response but not finished it"
       responses:
         "200":
           description: Paginated list
@@ -2502,6 +2514,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedSurveyLinks'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 812
+                    send_survey_id: 340
+                    beneficiary_id: 5521
+                    email: sam@example.org
+                    survey_token: 0f8c1d2e3b4a59687a6b5c4d3e2f1a0b
+                    survey_url: https://app.makerble.com/stories/new/0f8c1d2e3b4a59687a6b5c4d3e2f1a0b
+                    link_expiry: use_once
+                    is_anonymised: false
+                    send_survey_wave_id: 12
+                    expired: false
+                    created_at: "2026-10-01T09:00:00Z"
+                    updated_at: "2026-10-01T09:00:00Z"
+                    responses_in_progress:
+                      - send_survey_wave_id: 12
+                        last_updated_at: "2026-10-03T14:30:00Z"
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -15755,6 +15788,21 @@ components:
         updated_at:
           type: string
           format: date-time
+        responses_in_progress:
+          type: array
+          description: |
+            Survey responses the Contact has started on this link but not finished (saved with
+            Finish Later), newest first; empty when there are none. Only those updated in the
+            last 30 days. Not counted as completed responses.
+          items:
+            type: object
+            properties:
+              send_survey_wave_id:
+                type: integer
+                nullable: true
+              last_updated_at:
+                type: string
+                format: date-time
 
     SurveyWave:
       type: object
