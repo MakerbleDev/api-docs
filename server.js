@@ -970,6 +970,7 @@ function buildDocsPage() {
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
+        <a href="#two-step-verification" class="nav-link"><span class="nav-method method-POST">POST</span>Two-step Verification</a>
         <a href="#age-bands"       class="nav-link"><span class="nav-method method-GET">GET</span>Age Bands</a>
         <a href="#focus"           class="nav-link"><span class="nav-method method-GET">GET</span>Focus</a>
         <a href="#snapshot"        class="nav-link"><span class="nav-method method-GET">GET</span>Snapshot</a>
@@ -3548,6 +3549,40 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Makerble Support, who can only look" },
             { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation, or the Contract, colleague or Billing Role isn't one of its own" },
             { code: "422", cls: "response-4xx", desc: "A billing_role_id on a Flat Pricing Contract" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Two-step Verification -->
+      <section class="section" id="two-step-verification">
+        <div class="section-eyebrow">Colleagues</div>
+        <h2 class="section-title">Two-step Verification</h2>
+        <div class="section-desc">
+          <p>When a colleague loses their phone or can't get into their email, they can't get past two-step verification. If your Organisation has <strong>Organisation-controlled User Accounts</strong> turned on, its Organisation Admins can reset two-step verification for the colleagues whose accounts it controls, as <strong>Control Panel › Colleagues › Reset two-step verification</strong> does.</p>
+          <p>A reset removes every method the colleague has (authenticator app, text message, email) and their recovery codes, and signs them out everywhere. They then sign in with just their password, and set it up again straight away if the Organisation requires two-step verification. The colleague and the Organisation's other admins are emailed.</p>
+          <p>The same rules as the page apply: you must have two-step verification on for your own account, you can't reset yourself, you confirm with your own password, and you can make up to 10 resets in 24 hours. A colleague whose account your Organisation doesn't control answers <code>404</code>. Not available to connected (OAuth) apps.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> Call <code>GET …/two_step_verification</code> first. <code>can_reset</code> says whether a reset will work now and <code>reason</code> says why not, in the words shown on screen.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/organisations/{organisation_id}/colleagues/{user_id}/two_step_verification", "Get a colleague's two-step verification", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague's User ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "user_id, name, methods: [{method, name, detail}] (masked), has_recovery_codes, can_reset and reason" },
+            { code: "404", cls: "response-4xx", desc: "Not an Organisation Admin, or the Organisation doesn't control this colleague's account" }
+          ])}
+          ${endpointCard("POST", "/organisations/{organisation_id}/colleagues/{user_id}/two_step_verification/reset", "Reset a colleague's two-step verification", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague's User ID" },
+            { name: "password", in: "body", type: "string", required: true, desc: "Your own Makerble password, to confirm it is you" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "message and reset: {id, user_id, methods_removed, created_at}" },
+            { code: "404", cls: "response-4xx", desc: "Not an Organisation Admin, or the Organisation doesn't control this colleague's account" },
+            { code: "422", cls: "response-4xx", desc: "Wrong password, nothing to reset, your own account has no two-step verification, or the colleague controls their own account" },
+            { code: "429", cls: "response-4xx", desc: "10 resets in 24 hours, or 5 wrong passwords in 15 minutes" }
           ])}
         </div>
       </section>

@@ -11022,6 +11022,113 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /organisations/{organisation_id}/colleagues/{user_id}/two_step_verification:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+      - $ref: '#/components/parameters/ColleagueUserId'
+    get:
+      tags: [Users]
+      summary: Get a colleague's two-step verification
+      description: |
+        What an Organisation Admin sees on an organisation-controlled colleague's Two-step
+        verification tab: which second-step methods they have on (authenticator app, text message,
+        email), shown masked, whether they have recovery codes, and whether you can reset them now.
+
+        Only for Organisation Admins (Charity Editors) of an Organisation with Organisation-controlled
+        User Accounts turned on, and only for colleagues whose account that Organisation controls.
+        Anyone else gets 404. When `can_reset` is false, `reason` says why, in the words shown on
+        screen (for example, your own account has no two-step verification).
+      operationId: getColleagueTwoStepVerification
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The colleague's two-step verification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColleagueTwoStepVerification'
+              example:
+                user_id: 4182
+                name: Priya Shah
+                methods:
+                  - method: sms
+                    name: Text message
+                    detail: "+44•••••••3456"
+                has_recovery_codes: true
+                can_reset: true
+                reason: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /organisations/{organisation_id}/colleagues/{user_id}/two_step_verification/reset:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+      - $ref: '#/components/parameters/ColleagueUserId'
+    post:
+      tags: [Users]
+      summary: Reset a colleague's two-step verification
+      description: |
+        Reset two-step verification for an organisation-controlled colleague who is locked out, as
+        Control Panel › Colleagues › Reset two-step verification does. It removes every method they
+        have (authenticator app, text message, email) and their recovery codes, and signs them out
+        everywhere, including the Makerble app and connected apps. They then sign in with just their
+        password; if their Organisation requires two-step verification they are asked to set it up
+        again straight away. The colleague and the Organisation's other admins are emailed, and the
+        reset is recorded.
+
+        Send your own Makerble `password` to confirm. The same rules as the page apply: you must be an
+        Organisation Admin with two-step verification on for your own account, you can't reset
+        yourself, and you can make up to 10 resets in 24 hours (then 429). Five wrong passwords lock
+        the check for 15 minutes (429). A colleague you may not reset gets 404, or 422 with the reason
+        when they are your colleague but you can't reset them (for example, they control their own
+        account). Not available to connected (OAuth) apps.
+      operationId: resetColleagueTwoStepVerification
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  format: password
+                  description: Your own Makerble password, to confirm it is you
+            example:
+              password: your-own-password
+      responses:
+        "200":
+          description: The colleague's two-step verification was reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoStepVerificationResetResult'
+              example:
+                message: Two-step verification reset for Priya Shah.
+                reset:
+                  id: 37
+                  user_id: 4182
+                  methods_removed: [sms, recovery_codes]
+                  created_at: "2026-10-30T10:14:00Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+        "429":
+          description: Too many resets in 24 hours, or too many wrong passwords
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: You've reset several colleagues today. Contact Makerble support if you need to reset more.
+
   /albums/{album_id}/age_bands:
     parameters:
       - name: album_id
@@ -12140,6 +12247,13 @@ components:
         type: string
         format: date
       description: The deadline the window ends on. Defaults to the next Target Deadline, or today when there is none.
+    ColleagueUserId:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: The colleague's User ID
     OrganisationId:
       name: organisation_id
       in: path
@@ -12366,6 +12480,62 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    ColleagueTwoStepVerification:
+      type: object
+      required: [user_id, name, methods, has_recovery_codes, can_reset, reason]
+      properties:
+        user_id:
+          type: integer
+        name:
+          type: string
+        methods:
+          type: array
+          description: The second-step methods the colleague has on, in the order used at sign-in
+          items:
+            type: object
+            required: [method, name, detail]
+            properties:
+              method:
+                type: string
+                enum: [app, sms, email]
+              name:
+                type: string
+                description: The name shown on screen, e.g. "Text message"
+              detail:
+                type: string
+                nullable: true
+                description: The masked phone number or email address, or when the app was added
+        has_recovery_codes:
+          type: boolean
+        can_reset:
+          type: boolean
+          description: Whether you can reset the colleague's two-step verification now
+        reason:
+          type: string
+          nullable: true
+          description: Why you can't reset it now, as shown on screen; null when you can
+    TwoStepVerificationResetResult:
+      type: object
+      required: [message, reset]
+      properties:
+        message:
+          type: string
+        reset:
+          type: object
+          required: [id, user_id, methods_removed, created_at]
+          properties:
+            id:
+              type: integer
+            user_id:
+              type: integer
+            methods_removed:
+              type: array
+              items:
+                type: string
+                enum: [app, sms, email, recovery_codes]
+            created_at:
+              type: string
+              format: date-time
     BulkProjectMove:
       type: object
       description: A move of many Contacts through Projects, and how far it has got
