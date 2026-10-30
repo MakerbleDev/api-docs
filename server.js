@@ -1898,6 +1898,17 @@ function buildDocsPage() {
             { name: "per_page", type: "integer", required: false, desc: "Records per page" },
             { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [{ code: "200", cls: "response-2xx", desc: "Paginated list of Changes with stage (activity/participation)" }])}
+          ${endpointCard("POST", "/engagement_trackers", "Create an Engagement Tracker", true, [
+            { name: "name", in: "body", type: "string", required: true, desc: "e.g. <code>Attended the weekly session</code>" },
+            { name: "owner_id", in: "body", type: "integer", required: false, desc: "The organisation (Charity) that will own it; one you belong to. Leave out to own it yourself" },
+            { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create it even though a near-identical one exists (see 409)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created: the new tracker (<code>id</code>, <code>name</code>, <code>icon</code>, <code>stage_id</code>, <code>participation: true</code>, <code>owner_type</code>, <code>owner_id</code>)" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "<code>owner_id</code> is not one of your organisations" },
+            { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists trackers you can reuse with the same or a near-identical name. Resend with <code>force: true</code> to create anyway" },
+            { code: "422", cls: "response-4xx", desc: "Invalid input, e.g. a missing name; nothing is created" }
+          ], "Hidden from other organisations and editable only by the owning organisation's Organisation Editors. Use its <code>id</code> as a Survey question's <code>activity_tracker_id</code>.")}
         </div>
       </section>
 

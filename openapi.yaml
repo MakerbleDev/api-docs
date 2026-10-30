@@ -3079,6 +3079,90 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /engagement_trackers:
+    post:
+      tags: [Changes, Library]
+      summary: Create an Engagement Tracker
+      operationId: createEngagementTracker
+      description: |
+        Creates an Engagement Tracker (a participation Change, also called an Attendance tracker):
+        a yes/no record of whether a Contact took part, e.g. "Attended the weekly session". It is
+        made as on the Create Metric page and the Engagement Tracker tab of the Create/Edit Survey
+        page: hidden from other organisations, and editable only by the owning organisation's
+        Organisation Editors. Leave out `owner_id` to own it yourself. Near-identical names get
+        `409`, as for **Create a List**. To put it in a Survey, use its `id` as a question's
+        `activity_tracker_id`.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                owner_id:
+                  type: integer
+                  description: The organisation (Charity) that will own it; one you belong to
+                force:
+                  $ref: '#/components/schemas/ForceCreate'
+            example:
+              name: "Attended the weekly session"
+              owner_id: 913
+      responses:
+        "201":
+          description: The new Engagement Tracker
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+                  icon:
+                    type: string
+                    nullable: true
+                  stage_id:
+                    type: integer
+                  activity:
+                    type: boolean
+                  participation:
+                    type: boolean
+                  owner_type:
+                    type: string
+                    enum: [Charity, User]
+                  owner_id:
+                    type: integer
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+              example:
+                id: 2841
+                name: "Attended the weekly session"
+                icon: "/system/changes/icons/2841/original/icon.png"
+                stage_id: 2
+                activity: false
+                participation: true
+                owner_type: Charity
+                owner_id: 913
+                created_at: "2026-10-29T10:00:00Z"
+                updated_at: "2026-10-29T10:00:00Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "409":
+          $ref: '#/components/responses/LibraryDuplicates'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /indicators:
     get:
       tags: [Indicators]
