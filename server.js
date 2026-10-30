@@ -1565,6 +1565,13 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found, or started by someone else" }
           ], "Only the user who started the move can see it.")}
+          ${endpointCard("GET", "/beneficiaries/bulk_actions/{id}", "Get the progress of a bulk action on Contacts", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The <code>id</code> returned by a bulk change, e.g. <code>POST /events/{id}/guests</code> with <code>filter_data</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>action_name</code> (e.g. add_to_event, move_through_projects), <code>status</code> (pending, running, completed, failed or undone), <code>processed_count</code> of <code>total_count</code>, <code>changed_count</code>, <code>skip_counts</code>, and <code>summary</code> once finished" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or started by someone else" }
+          ], "Works for any change to many Contacts at once. Only the user who started it can see it.")}
         </div>
       </section>
 
@@ -3351,14 +3358,19 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "You may not see this event" }
           ])}
           ${endpointCard("POST", "/events/{id}/guests", "Add guests to an event", true, [
-            { name: "contact_ids", type: "array", required: true, desc: "Contacts in the event's project" },
+            { name: "contact_ids", type: "array", required: false, desc: "Contacts in the event's project. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", type: "object", required: false, desc: "Instead of <code>contact_ids</code>: everyone matching the Manage Contacts filters, e.g. <code>{\"beneficiary_state_ids\": [\"1\"]}</code>" },
+            { name: "excluded_ids", type: "integer[]", required: false, desc: "With <code>filter_data</code>: Contacts matching the filters to leave out" },
+            { name: "project_id", type: "integer", required: false, desc: "With <code>filter_data</code>: shortcut for the Contacts in this Project" },
             { name: "guest_status_id", type: "integer", required: false, desc: "One of the Event Format's Guest Statuses; its requirements are checked" },
-            { name: "event_role_id", type: "integer", required: false, desc: "One of the Event Format's Event Roles for guests" },
-            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or this_and_upcoming_events" }
+            { name: "event_role_id", type: "integer", required: false, desc: "One of the Event Format's Event Roles for guests (<code>contact_ids</code> only)" },
+            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or this_and_upcoming_events (<code>contact_ids</code> only)" }
           ], [
-            { code: "201", cls: "response-2xx", desc: "event_id and guests_count" },
-            { code: "422", cls: "response-4xx", desc: "Every problem: Contacts outside the project, an unmet requirement, a full event..." }
-          ])}
+            { code: "200", cls: "response-2xx", desc: "<code>filter_data</code>, up to 50 Contacts added straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code>, <code>summary</code>, <code>event_id</code> and <code>guests_count</code>" },
+            { code: "201", cls: "response-2xx", desc: "<code>contact_ids</code>: event_id and guests_count" },
+            { code: "202", cls: "response-2xx", desc: "<code>filter_data</code>, more than 50 Contacts: added in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "422", cls: "response-4xx", desc: "Every problem: Contacts outside the project, an unmet requirement, a full event... (<code>contact_ids</code>), or a Guest Status not on the Event Format" }
+          ], "With <code>contact_ids</code> all the Contacts are added or none are. With <code>filter_data</code> (<strong>Add to › An event</strong> for the Contacts selected on Manage Contacts) each Contact is added in turn, and those that can't be are skipped and counted in <code>skip_counts</code>: <code>headline_only</code>, <code>not_in_project</code>, <code>event_full</code>, <code>requirements_not_met</code>. Contacts already on the event keep their Guest Status.")}
           ${endpointCard("PATCH", "/events/{id}/guests/{contact_id}", "Change a guest's Guest Status or Event Role", true, [
             { name: "guest_status_id", type: "integer", required: false, desc: "New Guest Status; its requirements are checked" },
             { name: "event_role_id", type: "integer | null", required: false, desc: "New Event Role, or null to clear it" }
