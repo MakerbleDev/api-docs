@@ -1678,6 +1678,97 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+  /beneficiaries/bulk_checklists:
+    post:
+      tags: [Beneficiaries]
+      summary: Start a Checklist for many Contacts at once
+      description: |
+        Starts a Checklist for many Contacts (Beneficiaries) in one request. This is **Add to › A
+        Checklist** for the Contacts selected on the Manage Contacts page. Each Contact is started
+        the same way as Add a Checklist on their profile, and actions their records already prove
+        done are marked done straight away.
+
+        **Which Checklist.** `checklist_id` and `project_id`: a Checklist the project lets colleagues
+        add by hand, through that project. Organisation Editors and Reporters may use any open
+        project; other users only projects they are an Editor or Reporter of. Anything else is
+        refused with `422`.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`. With `filter_data`,
+        `project_id` also narrows the filters to Contacts in that project, since anyone outside it
+        would be skipped anyway.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` (the user only has
+        Headline Only Access to them), `not_in_project` (they aren't in the project), `not_allowed`
+        (the Checklist can't be started for them). A Contact who already has the Checklist keeps
+        their progress and isn't counted as changed.
+
+        Up to 50 Contacts are started straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: startChecklistForBeneficiaries
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checklist_id, project_id]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to start it for
+                checklist_id:
+                  type: integer
+                  description: The Checklist to start
+                project_id:
+                  type: integer
+                  description: The project it is started through (one that lets colleagues add it by hand)
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              checklist_id: 31
+              project_id: 572
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Checklist was started straight away (50 Contacts or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiaryBulkAction' }
+              example:
+                id: 61
+                status: completed
+                total_count: 10
+                processed_count: 10
+                changed_count: 7
+                skip_counts: { not_in_project: 3 }
+                background: false
+                summary: "7 contacts changed. 3 skipped: 3 because they aren't in Youth Mentoring."
+        "202":
+          description: More than 50 Contacts, so it runs in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiaryBulkAction' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /beneficiaries/bulk_actions/{id}:
     get:
       tags: [Beneficiaries]
