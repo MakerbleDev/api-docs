@@ -1615,6 +1615,28 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
             { code: "422", cls: "response-4xx", desc: "A title is missing, or the pair already exists in any case: <code>existing_id</code> is the one already there, to reuse" }
           ], "<strong>New Relationship Type</strong> on the organisation's Relationship Types page, e.g. Parent &amp; Child or Client &amp; Emergency Contact. A fixed Signup Page needs one to connect the people it signs up. List them first and reuse one that fits.")}
+          ${endpointCard("GET", "/audiences", "List the organisation's audiences", true, [
+            { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only audiences changed since then" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each audience's <code>id</code>, <code>name</code>, <code>color</code> and <code>contact_types</code>, by name, in the paginated envelope" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
+          ], "Audiences (Contact Roles), e.g. Participant or Parent, as on the organisation's Audiences page. A flexible Signup Page signs people up as audiences. Any member of the organisation can list them.")}
+          ${endpointCard("POST", "/audiences", "Create an audience", true, [
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "name", in: "body", type: "string", required: true, desc: "e.g. Participant" },
+            { name: "color", in: "body", type: "string", required: false, desc: "One of the approved colours; <code>#f96d67</code> if left out" },
+            { name: "contact_type_id", in: "body", type: "integer", required: false, desc: "The Contact Type (<code>GET /beneficiary_types</code>); Person if left out" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The audience made" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an organisation editor (Organisation Admin)" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "No name, a colour that isn't approved, or an unknown Contact Type" }
+          ], "<strong>New Audience</strong> on the Audiences page. Names aren't unique: list them first and reuse one that fits.")}
           ${endpointCard("GET", "/beneficiaries/bulk_actions/{id}", "Get the progress of a bulk action on Contacts", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The <code>id</code> returned by a bulk change, e.g. <code>POST /events/{id}/guests</code> with <code>filter_data</code>" }
           ], [

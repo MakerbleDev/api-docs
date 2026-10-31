@@ -1967,6 +1967,98 @@ paths:
               example:
                 errors: ["Already exists"]
                 existing_id: 34
+  /audiences:
+    get:
+      tags: [Beneficiaries]
+      summary: List the organisation's audiences
+      description: |
+        The organisation's audiences (Contact Roles; Beneficiary Roles), e.g. Participant or Parent,
+        as on its Audiences page, by name. Each lists the Contact Types (Person, Organisation, …) it
+        is for. A flexible Signup Page signs people up as audiences, and a permitted relationship
+        says which audiences may be on each side of a Relationship Category. Any member of the
+        organisation can list them. `charity_id` may be left out when the user belongs to one
+        organisation.
+      operationId: listAudiences
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of audiences, by name
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Audience' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+    post:
+      tags: [Beneficiaries]
+      summary: Create an audience
+      description: |
+        Adds an audience (Contact Role; Beneficiary Role), as the New Audience page does. `color` is
+        one of the approved colours (the first, `#f96d67`, if left out). `contact_type_id` links it to
+        a Contact Type (`GET /beneficiary_types`); it is linked to Person if left out. Only
+        organisation editors (Organisation Admins) may create audiences (`403` otherwise). Names
+        aren't unique, so list them first with `GET /audiences` and reuse one that fits.
+      operationId: createAudience
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation to add it to
+                name:
+                  type: string
+                  description: e.g. Participant
+                color:
+                  type: string
+                  description: |
+                    One of #f96d67, #f31208, #bc1204, #f92915, #f26f21, #ff6800, #e59200, #ffa300,
+                    #62a837, #71c240, #2b800e, #36ac9a, #2e9283, #226c61, #225f85, #2e85bc, #3596d6,
+                    #063262, #ac3898, #6c235f, #620a4d, #8c1b6d, #d07db7, #a81e6a, #e82a92, #8e0132
+                contact_type_id:
+                  type: integer
+                  description: The Contact Type (Beneficiary Type) it is for; Person if left out
+            example:
+              charity_id: 12
+              name: Parent
+              color: '#ac3898'
+      responses:
+        "201":
+          description: The audience made
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Audience' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /beneficiaries/bulk_actions/{id}:
     get:
       tags: [Beneficiaries]
@@ -14025,6 +14117,26 @@ components:
         child_title:
           type: string
           description: The second side, e.g. Pupil
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Audience:
+      type: object
+      description: An audience (Contact Role; Beneficiary Role), e.g. Participant or Parent
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        color:
+          type: string
+          description: Its colour on the Audiences page, e.g. '#f96d67'
+        contact_types:
+          type: array
+          description: The Contact Types (Beneficiary Types) it is for
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
