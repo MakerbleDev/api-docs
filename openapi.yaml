@@ -159,6 +159,8 @@ tags:
     description: Organisations — the top-level entity that owns Projects
   - name: Projects
     description: The primary organisational unit — every Story and Case belongs to a Project
+  - name: Announcements
+    description: '"What''s new in Makerble" popups, written and scheduled by Makerble staff in Site Overview'
   - name: Albums
     description: Albums (Bundles; being renamed Portfolios on screen) group Projects so their results can be seen together
   - name: Age Bands
@@ -570,6 +572,133 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /announcements:
+    get:
+      tags: [Announcements]
+      summary: List Announcements
+      description: |
+        Lists the "What's new in Makerble" popups written in Site Overview › Announcements, newest
+        first, with how many people have seen each one and how many clicked its "Learn more" link.
+        Each signed-in user in an announcement's audience sees it once, between its start and end
+        dates. System Access users only (Makerble staff); anyone else gets 403.
+      operationId: listAnnouncements
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Announcements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAnnouncements'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      tags: [Announcements]
+      summary: Create an Announcement
+      description: |
+        Creates a "What's new in Makerble" popup. It is saved as a draft (seen by nobody) unless
+        `status` is `scheduled`, when it shows from `starts_on` to `ends_on` to its audience.
+        Write the headline in sentence case, saying plainly what changed, and a message that says
+        what the person needs to do, which is often nothing. System Access users only.
+      operationId: createAnnouncement
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementInput'
+            example:
+              title: Projects are now Workspaces, and Albums are now Portfolios
+              body: Nothing has moved. Only the names have changed.
+              visual_type: name_change
+              name_changes:
+                - old_name: Projects
+                  new_name: Workspaces
+                - old_name: Albums
+                  new_name: Portfolios
+              learn_more_url: https://makerble.atlassian.net/wiki/spaces/MCPD/pages/123/Workspaces
+              audience: everyone
+              starts_on: "2026-12-01"
+              ends_on: "2026-12-31"
+              status: scheduled
+      responses:
+        "201":
+          description: The created Announcement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Announcement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /announcements/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Announcements]
+      summary: Get an Announcement
+      description: One "What's new in Makerble" popup, with its seen and "Learn more" click counts. System Access users only.
+      operationId: getAnnouncement
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Announcement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Announcement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Announcements]
+      summary: Update an Announcement
+      description: |
+        Changes only the fields sent. Without `status`, a draft stays a draft and a scheduled
+        announcement stays scheduled. Editing a live announcement doesn't show it again to people
+        who have already seen it. To end one early, set `ends_on` to today. System Access users only.
+      operationId: updateAnnouncement
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementInput'
+            example:
+              ends_on: "2026-12-15"
+      responses:
+        "200":
+          description: The updated Announcement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Announcement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /albums:
     get:
       tags: [Albums]
@@ -13013,6 +13142,139 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    AnnouncementNameChange:
+      type: object
+      required: [old_name, new_name]
+      properties:
+        old_name:
+          type: string
+          maxLength: 40
+          example: Projects
+        new_name:
+          type: string
+          maxLength: 40
+          example: Workspaces
+    AnnouncementInput:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 90
+          description: The headline, in sentence case. Required.
+        body:
+          type: string
+          maxLength: 280
+          description: The message. Required.
+        visual_type:
+          type: string
+          enum: [name_change, vimeo, none]
+          description: The name-change animation, a Vimeo video, or nothing.
+        name_changes:
+          type: array
+          minItems: 1
+          maxItems: 3
+          description: For `name_change`, 1 to 3 old and new names, played in this order. Ignored for the other visuals.
+          items:
+            $ref: '#/components/schemas/AnnouncementNameChange'
+        vimeo_url:
+          type: string
+          description: For `vimeo`, https://vimeo.com/<id>, https://vimeo.com/<id>/<hash> or https://player.vimeo.com/video/<id>?h=<hash>. Ignored for the other visuals.
+        learn_more_url:
+          type: string
+          nullable: true
+          description: Optional. A page in the Makerble User Guide (https://makerble.atlassian.net/wiki/spaces/MCPD/...).
+        button_label:
+          type: string
+          maxLength: 24
+          description: Defaults to "Got it".
+        audience:
+          type: string
+          enum: [everyone, colleagues, administrators]
+          description: |
+            `everyone`: every signed-in user. `colleagues`: everyone except Contacts with a login
+            (active participants). `administrators`: Organisation Admins of at least one organisation.
+        starts_on:
+          type: string
+          format: date
+          description: Required to schedule.
+        ends_on:
+          type: string
+          format: date
+          description: Required to schedule; not before `starts_on`.
+        status:
+          type: string
+          enum: [draft, scheduled]
+          description: On create, defaults to `draft`. On update, defaults to the current status.
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        body:
+          type: string
+        visual_type:
+          type: string
+          enum: [name_change, vimeo, none]
+        name_changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnnouncementNameChange'
+        vimeo_url:
+          type: string
+          nullable: true
+        learn_more_url:
+          type: string
+          nullable: true
+        button_label:
+          type: string
+        audience:
+          type: string
+          enum: [everyone, colleagues, administrators]
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [draft, scheduled]
+          description: What is stored. See `current_status` for whether it is showing.
+        current_status:
+          type: string
+          enum: [draft, scheduled, live, ended]
+          description: "`live` while today is within the dates of a scheduled announcement, `ended` after them."
+        seen_count:
+          type: integer
+          description: People who have closed it.
+        learn_more_click_count:
+          type: integer
+          description: People who clicked its "Learn more" link.
+        created_by_id:
+          type: integer
+          nullable: true
+        updated_by_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PaginatedAnnouncements:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Announcement'
     BulkProjectMove:
       type: object
       description: A move of many Contacts through Projects, and how far it has got
