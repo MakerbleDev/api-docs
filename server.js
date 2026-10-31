@@ -1637,6 +1637,32 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
             { code: "422", cls: "response-4xx", desc: "No name, a colour that isn't approved, or an unknown Contact Type" }
           ], "<strong>New Audience</strong> on the Audiences page. Names aren't unique: list them first and reuse one that fits.")}
+          ${endpointCard("GET", "/permitted_relationships", "List the organisation's permitted relationships", true, [
+            { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "relationship_category_id", in: "query", type: "integer", required: false, desc: "Only those for this Relationship Category" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only those changed since then" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each one's <code>relationship_category</code>, <code>parent_audience</code>, <code>child_audience</code> and the titles each may hold, in the paginated envelope" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an organisation editor (Organisation Admin)" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in, or another organisation's category" }
+          ], "Role-holder Relationships: which audience may be on each side of a Relationship Category. A flexible Signup Page can only sign people up as audiences that have one.")}
+          ${endpointCard("POST", "/permitted_relationships", "Create a permitted relationship", true, [
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "relationship_category_id", in: "body", type: "integer", required: true, desc: "One of the organisation's Relationship Categories" },
+            { name: "parent_audience_id", in: "body", type: "integer", required: true, desc: "The audience on the parent side (Audience A)" },
+            { name: "child_audience_id", in: "body", type: "integer", required: true, desc: "The audience on the child side (Audience B)" },
+            { name: "parent_audience_titles", in: "body", type: "array", required: false, desc: "Which of the category's titles the parent audience may hold; its <code>parent_title</code> if left out" },
+            { name: "child_audience_titles", in: "body", type: "array", required: false, desc: "Which of the category's titles the child audience may hold; its <code>child_title</code> if left out" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The permitted relationship made" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an organisation editor (Organisation Admin)" },
+            { code: "404", cls: "response-4xx", desc: "Another organisation's category or audience, or an organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "A title that isn't the category's, or a side with no title" }
+          ], "<strong>New Role-holder Relationship</strong>, e.g. Parent on the parent side of Parent &amp; Child and Participant on the child side.")}
           ${endpointCard("GET", "/beneficiaries/bulk_actions/{id}", "Get the progress of a bulk action on Contacts", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The <code>id</code> returned by a bulk change, e.g. <code>POST /events/{id}/guests</code> with <code>filter_data</code>" }
           ], [
