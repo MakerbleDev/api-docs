@@ -2137,6 +2137,116 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /permitted_relationships:
+    get:
+      tags: [Beneficiaries]
+      summary: List the organisation's permitted relationships
+      description: |
+        The organisation's permitted relationships (Role-holder Relationships), as on its
+        Role-holder Relationships page: for a Relationship Category, which audience (Contact Role)
+        may be on its parent side and which on its child side, and which of the category's titles
+        each may hold. A flexible Signup Page can only sign people up as audiences that have one.
+        Only organisation editors (Organisation Admins) can list them (`403` otherwise).
+        `relationship_category_id` narrows the list to one category. `charity_id` may be left out
+        when the user belongs to one organisation.
+      operationId: listPermittedRelationships
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: relationship_category_id
+          in: query
+          required: false
+          description: Only those for this Relationship Category
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of permitted relationships, oldest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/PermittedRelationship' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+    post:
+      tags: [Beneficiaries]
+      summary: Create a permitted relationship
+      description: |
+        Says which audience (Contact Role) may be on each side of a Relationship Category, as the New
+        Role-holder Relationship page does, e.g. Parent on the parent side of Parent & Child and
+        Participant on the child side. A flexible Signup Page needs one for the audiences it signs up.
+
+        By default the parent audience holds the category's `parent_title` and the child audience its
+        `child_title`; `parent_audience_titles` and `child_audience_titles` choose others from the
+        category's two titles. The category and both audiences must be the organisation's own
+        (`404` otherwise). Only organisation editors may create them (`403` otherwise). List them
+        first with `GET /permitted_relationships` and reuse one that fits.
+      operationId: createPermittedRelationship
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [relationship_category_id, parent_audience_id, child_audience_id]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation to add it to
+                relationship_category_id:
+                  type: integer
+                  description: One of the organisation's Relationship Categories
+                parent_audience_id:
+                  type: integer
+                  description: The audience on the category's parent side (Audience A)
+                child_audience_id:
+                  type: integer
+                  description: The audience on the category's child side (Audience B)
+                parent_audience_titles:
+                  type: array
+                  items: { type: string }
+                  description: Which of the category's titles the parent audience may hold; its parent_title if left out
+                child_audience_titles:
+                  type: array
+                  items: { type: string }
+                  description: Which of the category's titles the child audience may hold; its child_title if left out
+            example:
+              charity_id: 12
+              relationship_category_id: 34
+              parent_audience_id: 56
+              child_audience_id: 78
+      responses:
+        "201":
+          description: The permitted relationship made
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PermittedRelationship' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /beneficiary_types:
     get:
       tags: [Beneficiary Types]
@@ -15241,6 +15351,38 @@ components:
             properties:
               id: { type: integer }
               name: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PermittedRelationship:
+      type: object
+      description: Which audience may be on each side of a Relationship Category (a Role-holder Relationship)
+      properties:
+        id: { type: integer }
+        relationship_category:
+          type: object
+          properties:
+            id: { type: integer }
+            parent_title: { type: string }
+            child_title: { type: string }
+        parent_audience:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        child_audience:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        parent_audience_titles:
+          type: array
+          items: { type: string }
+          description: The category's titles the parent audience may hold
+        child_audience_titles:
+          type: array
+          items: { type: string }
+          description: The category's titles the child audience may hold
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
