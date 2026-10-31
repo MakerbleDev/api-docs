@@ -1604,6 +1604,17 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
           ], "The kinds of relationship Contacts can have with each other in the organisation. Any member of the organisation can list them.")}
+          ${endpointCard("POST", "/relationship_categories", "Create a Relationship Category", true, [
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "parent_title", in: "body", type: "string", required: true, desc: "The first side, e.g. Parent" },
+            { name: "child_title", in: "body", type: "string", required: true, desc: "The second side, e.g. Child" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The category made: <code>id</code>, <code>parent_title</code>, <code>child_title</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an organisation editor (Organisation Admin)" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "A title is missing, or the pair already exists in any case: <code>existing_id</code> is the one already there, to reuse" }
+          ], "<strong>New Relationship Type</strong> on the organisation's Relationship Types page, e.g. Parent &amp; Child or Client &amp; Emergency Contact. A fixed Signup Page needs one to connect the people it signs up. List them first and reuse one that fits.")}
           ${endpointCard("GET", "/beneficiaries/bulk_actions/{id}", "Get the progress of a bulk action on Contacts", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The <code>id</code> returned by a bulk change, e.g. <code>POST /events/{id}/guests</code> with <code>filter_data</code>" }
           ], [

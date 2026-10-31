@@ -1903,6 +1903,70 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+    post:
+      tags: [Beneficiaries]
+      summary: Create a Relationship Category
+      description: |
+        Adds a kind of relationship Contacts can have with each other, as the New Relationship Type
+        page does: its two sides, e.g. Parent & Child or Client & Emergency Contact. A fixed Signup
+        Page needs at least one to connect the people it signs up.
+
+        Only organisation editors (Organisation Admins) may create them (`403` otherwise). The same
+        pair of titles can't exist twice in an organisation, whatever their case: `422` then gives
+        `existing_id`, the one already there, to reuse. List them first with
+        `GET /relationship_categories`. `charity_id` may be left out when the user belongs to one
+        organisation.
+      operationId: createRelationshipCategory
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parent_title, child_title]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation to add it to
+                parent_title:
+                  type: string
+                  description: The first side, e.g. Parent
+                child_title:
+                  type: string
+                  description: The second side, e.g. Child
+            example:
+              charity_id: 12
+              parent_title: Parent
+              child_title: Child
+      responses:
+        "201":
+          description: The Relationship Category made
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RelationshipCategory' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: Validation failed, or the pair of titles already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items: { type: string }
+                  existing_id:
+                    type: integer
+                    description: The Relationship Category with these titles already, when that is why
+              example:
+                errors: ["Already exists"]
+                existing_id: 34
   /beneficiaries/bulk_actions/{id}:
     get:
       tags: [Beneficiaries]
