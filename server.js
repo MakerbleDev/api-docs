@@ -2175,6 +2175,16 @@ function buildDocsPage() {
             { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse instead of the new ones, each with its <code>question</code>" },
             { code: "422", cls: "response-4xx", desc: "Invalid input; nothing is created and the error names the field" }
           ], "A Contact Form (Beneficiary Category). Reuse Fields and Lists by id, and define only what's missing.")}
+          ${endpointCard("POST", "/contact_forms/{id}/projects", "Add a Contact Form to projects", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Contact Form's (Beneficiary Category's) id" },
+            { name: "project_ids", in: "body", type: "array", required: true, desc: "The projects to add it to: in the form's organisation, and ones whose Project Preferences you can change" },
+            { name: "use", in: "body", type: "string", required: false, desc: "<code>full</code> (default) to create and edit Contacts, <code>create</code> to create them only, or <code>edit</code> to edit them only" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code> has <code>contact_form_id</code>, <code>use</code>, <code>added_project_ids</code> and <code>existing_project_ids</code> (projects that already used it that way)" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "404", cls: "response-4xx", desc: "The form, or a project, isn't one you can use; the error names it. Nothing is changed" },
+            { code: "422", cls: "response-4xx", desc: "No <code>project_ids</code>, an unknown <code>use</code>, or an organisation that doesn't use Contact Forms. Nothing is changed" }
+          ], "The same as Add form to project on a Contact Form's page. Only the project's Contact Form settings change.")}
           ${endpointCard("POST", "/impact_frameworks", "Create an Impact Framework with its entries", true, [
             { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
             { name: "name", in: "body", type: "string", required: true, desc: "e.g. <code>Youth employment</code>" },

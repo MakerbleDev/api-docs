@@ -6348,7 +6348,7 @@ paths:
                   type: string
                 field_data_type:
                   type: string
-                  enum: [text, number, date, time, file, section_title, email_address, telephone]
+                  enum: [text, number, date, time, file, section_title, email_address, telephone, signature]
                 section_text:
                   type: string
                   description: For a section_title Field only
@@ -6815,6 +6815,96 @@ paths:
           $ref: '#/components/responses/NotFound'
         "409":
           $ref: '#/components/responses/LibraryDuplicates'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /contact_forms/{id}/projects:
+    post:
+      tags: [Library, Beneficiary Categories]
+      summary: Add a Contact Form to projects
+      operationId: addContactFormToProjects
+      description: |
+        Adds a Contact Form (Beneficiary Category) to projects, as **Add form to project** on a
+        Contact Form's page does, so staff in those projects use it when they add or edit Contacts.
+
+        `use` says how each project uses it: `full` (the default) to create new Contacts and edit
+        existing ones, `create` to create new Contacts only, or `edit` to edit existing Contacts
+        only. Organisation Admins and Project Managers may then edit what it holds. Only the
+        project's Contact Form settings change.
+
+        - Each project must belong to the form's organisation, and you must be able to change its
+          Project Preferences: an Organisation Admin, or the project's manager. Otherwise `404`,
+          naming the project.
+        - A form that doesn't exist is `404`; an organisation that doesn't use Contact Forms is `422`.
+
+        Every project is checked first, so if one is refused none is changed. A project that
+        already uses the form that way is left as it is and listed in `existing_project_ids`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: The Contact Form's (Beneficiary Category's) id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_ids]
+              properties:
+                project_ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: integer
+                  description: The projects to add it to
+                use:
+                  type: string
+                  enum: [full, create, edit]
+                  default: full
+                  description: How the projects use it
+            example:
+              project_ids: [4021, 4022]
+              use: create
+      responses:
+        "200":
+          description: The form is in every project given
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      contact_form_id:
+                        type: integer
+                      use:
+                        type: string
+                        enum: [full, create, edit]
+                      added_project_ids:
+                        type: array
+                        items:
+                          type: integer
+                        description: Projects the form was added to now
+                      existing_project_ids:
+                        type: array
+                        items:
+                          type: integer
+                        description: Projects that already used it that way
+              example:
+                data:
+                  contact_form_id: 2391
+                  use: create
+                  added_project_ids: [4021]
+                  existing_project_ids: [4022]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -13024,7 +13114,7 @@ components:
               type: string
             field_data_type:
               type: string
-              enum: [text, number, date, time, file, section_title, email_address, telephone]
+              enum: [text, number, date, time, file, section_title, email_address, telephone, signature]
             section_text:
               type: string
             private:
