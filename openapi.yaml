@@ -22,6 +22,15 @@ info:
 
     > **Multi-user integrations:** If activity must be attributed to specific users, authenticate separately per user. A single Organisation Admin token is acceptable when attribution to one admin is sufficient.
 
+    ### Organisation API keys
+    A custom integration that works for one Organisation should use an **API key** instead of a person's own token. An Organisation Admin creates one in Makerble under **Data In & Out → Integrations → API keys** (or with `POST /api_keys`). Send it on every request as:
+
+    ```
+    Authorization: Bearer mk_live_...
+    ```
+
+    A key belongs to one Organisation and acts as the colleague chosen when it was created: it can see and do only what they can, in that Organisation only. It can call the same endpoints as a connected app (OAuth), and gets `403` with `not_available_to_connected_apps` from any other. If the colleague leaves the Organisation, or the key is revoked, requests get `401`. Calls made with an Organisation's API keys count towards its monthly API usage.
+
     ## Creating Users via the API
     `POST /users` requires a separate API Key (`auth_code`). Request one at [api-key-request@makerble.com](mailto:api-key-request@makerble.com).
 
@@ -288,6 +297,10 @@ tags:
       Seats per Colleague: which seat each colleague holds on each of an Organisation's current
       Contracts, and changing one. A colleague's roles decide the lowest seat (Billing Role) they
       need on Role-based Pricing. Only the Organisation's admins can change seats.
+  - name: API keys
+    description: |
+      Keys an Organisation's admins create for the custom integrations they build. Each key belongs
+      to one Organisation and acts as one of its colleagues. See "Organisation API keys" above.
   - name: Webhooks
     description: |
       HTTPS endpoints an Organisation's admins register to receive signed events when
@@ -11771,6 +11784,121 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /api_keys:
+    get:
+      tags: [API keys]
+      summary: List an Organisation's API keys
+      description: |
+        The Organisation's (Charity's) API keys, including revoked ones, without their secrets. Each key
+        shows the start of its secret (`secret_hint`) so it can be recognised. Only the Organisation's
+        admins can manage API keys (otherwise `403`). These endpoints need a person's own token: an API
+        key or a connected app gets `403`, so a key can't create or revoke keys.
+      operationId: listApiKeys
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of API keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedApiKeys'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+
+    post:
+      tags: [API keys]
+      summary: Create an API key
+      description: |
+        Creates a key for a custom integration. It acts as `user_id`, who must be a colleague in the
+        Organisation (a User with a role in it; see `GET /users`), and can see and do only what they can.
+        The response includes the key itself in `secret`, which is shown only this once: store it
+        somewhere safe. Send it as `Authorization: Bearer <secret>`.
+      operationId: createApiKey
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiKeyRequest'
+            example:
+              charity_id: 913
+              api_key:
+                name: "Finance dashboard"
+                user_id: 4521
+      responses:
+        "201":
+          description: Key created, with its secret
+          headers:
+            Location:
+              description: Full address of the new key, e.g. `https://app.makerble.com/api/v2/api_keys/42`
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyWithSecret'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api_keys/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [API keys]
+      summary: Get an API key
+      description: The key, without its secret. Another Organisation's key answers `404`.
+      operationId: getApiKey
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The key, without its secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [API keys]
+      summary: Revoke an API key
+      description: |
+        Revokes the key straight away: requests made with it get `401` from then on. This can't be
+        undone. The key stays in the list, with `active: false` and `revoked_at` set.
+      operationId: revokeApiKey
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The revoked key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /webhook_endpoints:
     get:
       tags: [Webhooks]
@@ -12238,6 +12366,12 @@ components:
       description: |
         Long-lived token from `POST /users/sign_in`. Does not expire.
         Must be accompanied by `X-User-Email` header.
+    apiKeyAuth:
+      type: http
+      scheme: bearer
+      description: |
+        An Organisation API key (`mk_live_...`), sent as `Authorization: Bearer mk_live_...`. It acts
+        as the colleague chosen when it was created, in its Organisation only. See "Organisation API keys" above.
     submissionBearerAuth:
       type: http
       scheme: bearer
@@ -18808,6 +18942,83 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/SeatColleague'
+
+    ApiKey:
+      type: object
+      properties:
+        id:
+          type: integer
+        charity_id:
+          type: integer
+          description: The Organisation (Charity) the key belongs to
+        name:
+          type: string
+          example: "Finance dashboard"
+        secret_hint:
+          type: string
+          description: The start of the key, to recognise it by. The rest is never shown again.
+          example: "mk_live_Ab12"
+        user_id:
+          type: integer
+          description: The colleague the key acts as
+        created_by_id:
+          type: integer
+          nullable: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+          description: false once revoked
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ApiKeyWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/ApiKey'
+        - type: object
+          properties:
+            secret:
+              type: string
+              description: The key itself. Shown only in the response that created it.
+              example: "mk_live_Ab12Cd34Ef56Gh78Ij90Kl12Mn34Op56"
+
+    ApiKeyRequest:
+      type: object
+      required: [charity_id, api_key]
+      properties:
+        charity_id:
+          type: integer
+          description: The Organisation (Charity) ID
+        api_key:
+          type: object
+          required: [name, user_id]
+          properties:
+            name:
+              type: string
+              description: What the key is for
+            user_id:
+              type: integer
+              description: The colleague the key acts as
+
+    PaginatedApiKeys:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ApiKey'
 
     PaginatedWebhookEndpoints:
       allOf:

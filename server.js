@@ -966,6 +966,7 @@ function buildDocsPage() {
       <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
         <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST">POST</span>Webhooks</a>
+        <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
       </div>
       <div class="nav-section">
@@ -1033,6 +1034,11 @@ function buildDocsPage() {
         <div class="callout callout-info" style="margin-top:20px">
           <span class="callout-icon">ℹ</span>
           <span><strong>Multi-user integrations:</strong> If you need activity attributed to specific users, authenticate separately per user. A single Organisation Admin token is fine when attribution to a single admin is acceptable.</span>
+        </div>
+
+        <div class="callout callout-tip" style="margin-top:20px">
+          <span class="callout-icon">✓</span>
+          <span><strong>Organisation API keys:</strong> a custom integration that works for one Organisation should use an <a href="#api-keys">API key</a> instead of a person's token. Send it as <code>Authorization: Bearer mk_live_…</code> on every request, with no <code>X-User-Email</code> or <code>X-User-Token</code>.</span>
         </div>
 
         <div class="endpoint-list">
@@ -3451,6 +3457,49 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "Has events or is added to projects — error gives the reason and counts" }
+          ])}
+        </div>
+      </section>
+
+      <!-- API keys -->
+      <section class="section" id="api-keys">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">API keys</h2>
+        <div class="section-desc">
+          <p>An API key lets a custom integration call the API for one Organisation without using a person's own token. An Organisation Admin creates one in Makerble under <strong>Data In &amp; Out → Integrations → API keys</strong>, or with <code>POST /api_keys</code> below. The key itself (<code>mk_live_…</code>) is shown only once, when it is created.</p>
+          <p><strong>Using a key:</strong> send <code>Authorization: Bearer mk_live_…</code> on every request. The key acts as the colleague chosen when it was created: it can see and do only what they can, in its Organisation only. It can call the same endpoints as a connected app (OAuth); any other answers <code>403</code> with <code>not_available_to_connected_apps</code>. A revoked key, or one whose colleague has left the Organisation, gets <code>401</code>. Calls made with an Organisation's API keys count towards its monthly API usage.</p>
+          <p><strong>Managing keys:</strong> only the Organisation's admins can list, create and revoke its keys, and only with their own <code>X-User-Email</code> and <code>X-User-Token</code>: an API key or a connected app can't create or revoke keys.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/api_keys", "List an Organisation's API keys", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of keys, including revoked ones, without secrets" },
+            { code: "403", cls: "response-4xx", desc: "Not an admin of this Organisation, or called with an API key or connected app" }
+          ])}
+          ${endpointCard("POST", "/api_keys", "Create an API key", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "api_key[name]", in: "body", type: "string", required: true, desc: "What the key is for" },
+            { name: "api_key[user_id]", in: "body", type: "integer", required: true, desc: "The colleague the key acts as (a User in the Organisation)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created — includes the key in secret, shown only this once" },
+            { code: "403", cls: "response-4xx", desc: "Not an admin of this Organisation" },
+            { code: "422", cls: "response-4xx", desc: "No name, or the user isn't a colleague in the Organisation" }
+          ])}
+          ${endpointCard("GET", "/api_keys/{id}", "Get an API key", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "API key ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The key, without its secret" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not an admin of its Organisation" }
+          ])}
+          ${endpointCard("DELETE", "/api_keys/{id}", "Revoke an API key", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "API key ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The revoked key: it stops working at once, and this can't be undone" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not an admin of its Organisation" }
           ])}
         </div>
       </section>
