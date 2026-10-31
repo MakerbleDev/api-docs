@@ -1571,6 +1571,27 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found, or started by someone else" }
           ], "Only the user who started the move can see it.")}
+          ${endpointCard("GET", "/relationship_categories", "List the organisation's Relationship Categories", true, [
+            { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only categories changed since then" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each category's <code>id</code>, <code>parent_title</code> and <code>child_title</code> (e.g. School and Pupil), in the paginated envelope" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
+          ], "The kinds of relationship Contacts can have with each other in the organisation. Any member of the organisation can list them.")}
+          ${endpointCard("POST", "/relationship_categories", "Create a Relationship Category", true, [
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "parent_title", in: "body", type: "string", required: true, desc: "The first side, e.g. Parent" },
+            { name: "child_title", in: "body", type: "string", required: true, desc: "The second side, e.g. Child" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The category made: <code>id</code>, <code>parent_title</code>, <code>child_title</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an organisation editor (Organisation Admin)" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "A title is missing, or the pair already exists in any case: <code>existing_id</code> is the one already there, to reuse" }
+          ], "<strong>New Relationship Type</strong> on the organisation's Relationship Types page, e.g. Parent &amp; Child or Client &amp; Emergency Contact. A fixed Signup Page needs one to connect the people it signs up. List them first and reuse one that fits.")}
         </div>
       </section>
 
