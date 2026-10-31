@@ -968,6 +968,7 @@ function buildDocsPage() {
         <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST">POST</span>Webhooks</a>
         <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
+        <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
@@ -3689,6 +3690,50 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation, or the Contract, colleague or Billing Role isn't one of its own" },
             { code: "422", cls: "response-4xx", desc: "A billing_role_id on a Flat Pricing Contract" }
           ])}
+        </div>
+      </section>
+
+      <!-- Announcements -->
+      <section class="section" id="announcements">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Announcements</h2>
+        <div class="section-desc">
+          <p>An Announcement is the "What's new in Makerble" popup that each signed-in user in its audience sees once, between its start and end dates, for example "Projects are now Workspaces". Makerble staff write them in Site Overview › Announcements. These endpoints are for System Access users only; anyone else gets <code>403</code>.</p>
+          <p><code>visual_type</code> is <code>name_change</code> (an animation of 1 to 3 <code>name_changes</code>, old name → new name), <code>vimeo</code> (a Vimeo video at <code>vimeo_url</code>) or <code>none</code>. <code>audience</code> is <code>everyone</code>, <code>colleagues</code> (everyone except Contacts with a login) or <code>administrators</code> (Organisation Admins). <code>status</code> stores <code>draft</code> or <code>scheduled</code>; <code>current_status</code> also says whether a scheduled one is <code>live</code> or has <code>ended</code>.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Writing tip:</strong> Write the headline in sentence case, saying plainly what changed, and a message that says what the person needs to do, which is often nothing. Save as a draft first; send <code>status: scheduled</code> when it's ready. To end one early, set <code>ends_on</code> to today.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/announcements", "List Announcements", true, [
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Announcements, newest first, each with <code>seen_count</code> and <code>learn_more_click_count</code>" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
+          ])}
+          ${endpointCard("GET", "/announcements/{id}", "Get an Announcement", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Announcement, with its seen and Learn more click counts" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+          ${endpointCard("POST", "/announcements", "Create an Announcement", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Announcement created (a draft unless <code>status</code> is <code>scheduled</code>)" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no headline, a headline over 90 characters, or a Vimeo visual with a YouTube link" }
+          ], "Body: <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>learn_more_url</code> (a Makerble User Guide page), <code>button_label</code> (default \"Got it\"), <code>audience</code>, <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
+          ${endpointCard("PATCH", "/announcements/{id}", "Update an Announcement", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Announcement updated" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. 4 name changes" }
+          ], "Same body as create; only the fields sent change. Without <code>status</code>, a draft stays a draft and a scheduled announcement stays scheduled. Editing a live announcement doesn't show it again to people who have already seen it.")}
         </div>
       </section>
 
