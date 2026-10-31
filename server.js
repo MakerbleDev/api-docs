@@ -964,6 +964,10 @@ function buildDocsPage() {
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
       </div>
       <div class="nav-section">
+        <div class="nav-section-label">Site content</div>
+        <a href="#guidance-panels" class="nav-link"><span class="nav-method method-PATCH">PATCH</span>Guidance Panels</a>
+      </div>
+      <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
         <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST">POST</span>Webhooks</a>
         <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
@@ -3457,6 +3461,48 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "Has events or is added to projects — error gives the reason and counts" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Guidance Panels -->
+      <section class="section" id="guidance-panels">
+        <div class="section-eyebrow">Site content</div>
+        <h2 class="section-title">Guidance Panels</h2>
+        <div class="section-desc">
+          <p>A Guidance Panel is the Show/Hide Guidance introduction at the top of a Manage page, such as Manage Events or Manage Contact Groups: an eyebrow, a one-line headline, 2 to 5 points that each start with a short bold lead, the sentence shown to people who can't use the page's main button, a <strong>Learn more</strong> link to the page's article in the Makerble User Guide, and an optional Vimeo video. Panels are the same for every Organisation.</p>
+          <p><strong>Who can use these endpoints:</strong> only Makerble staff with System Access, with their own <code>X-User-Email</code> and <code>X-User-Token</code>. Anyone else, an API key and a connected app all get <code>403</code>. The same changes can be made in Site Overview › Guidance Panels, and every change, wherever it is made, is kept as a version that can be seen and restored.</p>
+          <p><strong>Rules:</strong> a headline of at most 80 characters; 2 to 5 points, each with a <code>lead</code> (up to 40 characters) and <code>text</code> (up to 200); a <code>user_guide_url</code> in the Makerble User Guide (<code>https://makerble.atlassian.net/wiki/spaces/MCPD/…</code>); and a <code>vimeo_url</code> that is empty or one of <code>https://vimeo.com/&lt;id&gt;</code>, <code>https://vimeo.com/&lt;id&gt;/&lt;hash&gt;</code> (unlisted) or <code>https://player.vimeo.com/video/&lt;id&gt;?h=&lt;hash&gt;</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/guidance_panels", "List the Guidance Panels", true, [
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of panels, by page name" },
+            { code: "403", cls: "response-4xx", desc: "No System Access, or called with an API key or connected app" }
+          ])}
+          ${endpointCard("GET", "/guidance_panels/{key}", "Get a Guidance Panel and its recent changes", true, [
+            { name: "key", in: "path", type: "string", required: true, desc: "The panel's key, e.g. <code>events</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The panel, with its last 10 versions: who, when, and what changed from what to what" },
+            { code: "403", cls: "response-4xx", desc: "No System Access" },
+            { code: "404", cls: "response-4xx", desc: "No panel with that key" }
+          ])}
+          ${endpointCard("PATCH", "/guidance_panels/{key}", "Change a Guidance Panel's wording or video", true, [
+            { name: "key", in: "path", type: "string", required: true, desc: "The panel's key, e.g. <code>events</code>" },
+            { name: "guidance_panel[eyebrow]", in: "body", type: "string", required: false, desc: "e.g. Makerble® Events" },
+            { name: "guidance_panel[headline]", in: "body", type: "string", required: false, desc: "One line, at most 80 characters" },
+            { name: "guidance_panel[points]", in: "body", type: "array", required: false, desc: "2 to 5 <code>{lead, text}</code>, in order; replaces the whole list" },
+            { name: "guidance_panel[staff_text]", in: "body", type: "string", required: false, desc: "Shown instead of the main action to people who can't use it" },
+            { name: "guidance_panel[user_guide_url]", in: "body", type: "string", required: false, desc: "A page in the Makerble User Guide" },
+            { name: "guidance_panel[vimeo_url]", in: "body", type: "string", required: false, desc: "A Vimeo link, or empty to show the page's own image or animation" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The changed panel and its last 10 versions; the page shows the change from its next load" },
+            { code: "403", cls: "response-4xx", desc: "No System Access" },
+            { code: "404", cls: "response-4xx", desc: "No panel with that key" },
+            { code: "422", cls: "response-4xx", desc: "A rule was broken: every message is in <code>errors</code>" }
           ])}
         </div>
       </section>

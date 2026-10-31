@@ -297,6 +297,10 @@ tags:
       Seats per Colleague: which seat each colleague holds on each of an Organisation's current
       Contracts, and changing one. A colleague's roles decide the lowest seat (Billing Role) they
       need on Role-based Pricing. Only the Organisation's admins can change seats.
+  - name: Guidance Panels
+    description: |
+      The Show/Hide Guidance introduction at the top of each Manage page. Makerble staff with System
+      Access change the wording and video; every change is kept as a version.
   - name: API keys
     description: |
       Keys an Organisation's admins create for the custom integrations they build. Each key belongs
@@ -11784,6 +11788,113 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /guidance_panels:
+    get:
+      tags: [Guidance Panels]
+      summary: List the Guidance Panels
+      description: |
+        Every Guidance Panel: the Show/Hide Guidance introduction at the top of a Manage page (such as
+        Manage Events or Manage Contact Groups), with its eyebrow, headline, 2 to 5 points, the text shown to
+        people who can't use the page's main action, the link to its article in the Makerble User Guide,
+        and its video. Panels are the same for every Organisation. Only Makerble staff with System Access
+        can read or change them (otherwise `403`), and only with their own token: an API key or a
+        connected app gets `403`.
+      operationId: listGuidancePanels
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Guidance Panels, by page name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGuidancePanels'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+
+  /guidance_panels/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The panel's key, e.g. `events` or `contact_groups` (see `GET /guidance_panels`)
+        example: events
+    get:
+      tags: [Guidance Panels]
+      summary: Get a Guidance Panel and its recent changes
+      description: |
+        One Guidance Panel, with its last 10 versions, newest first: who changed it, when, and what changed
+        from what to what. Changes made in Site Overview › Guidance Panels, through this API and through
+        the MCP all appear here.
+      operationId: getGuidancePanel
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Guidance Panel and its last 10 versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuidancePanelWithVersions'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Guidance Panels]
+      summary: Change a Guidance Panel's wording or video
+      description: |
+        Changes any of the panel's eyebrow, headline, points, staff text, user guide link and Vimeo link.
+        Fields you leave out stay as they are. `points` replaces the whole list, in the order given. The
+        page shows the change from its next load, and the change is kept as a version attributed to you.
+
+        The same rules apply as in Site Overview: a headline of at most 80 characters; 2 to 5 points, each
+        with a `lead` (up to 40 characters, shown in bold) and `text` (up to 200); a `user_guide_url` on a
+        page in the Makerble User Guide (`https://makerble.atlassian.net/wiki/spaces/MCPD/...`); and a
+        `vimeo_url` that is empty or one of `https://vimeo.com/<id>`, `https://vimeo.com/<id>/<hash>`
+        (unlisted videos) or `https://player.vimeo.com/video/<id>?h=<hash>`. An empty `vimeo_url` puts the
+        page back to its fallback visual. A broken rule answers `422` with every message in `errors`.
+      operationId: updateGuidancePanel
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuidancePanelRequest'
+            example:
+              guidance_panel:
+                headline: "Plan every session in one place"
+                points:
+                  - lead: "Plan events"
+                    text: "set rotas and track attendance for every session."
+                  - lead: "Count the time"
+                    text: "spent by contact, coworker, task, event or case."
+                vimeo_url: "https://vimeo.com/76979871"
+      responses:
+        "200":
+          description: The changed Guidance Panel and its last 10 versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuidancePanelWithVersions'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /api_keys:
     get:
       tags: [API keys]
@@ -19009,6 +19120,150 @@ components:
             user_id:
               type: integer
               description: The colleague the key acts as
+
+    GuidancePanelPoint:
+      type: object
+      description: One point on a Guidance Panel, shown as its bold `lead` followed by its `text`
+      properties:
+        lead:
+          type: string
+          example: "Plan events"
+        text:
+          type: string
+          example: "set rotas and track attendance for every session."
+
+    GuidancePanelUser:
+      type: object
+      nullable: true
+      description: The User who made the change, or null when it wasn't made by a User (e.g. the seed task)
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    GuidancePanel:
+      type: object
+      description: |
+        The Show/Hide Guidance introduction at the top of a Manage page. Its main action, and who may use it,
+        belong to the page, so they are not part of the panel.
+      properties:
+        key:
+          type: string
+          description: Identifies the panel, e.g. `events`
+          example: events
+        page_name:
+          type: string
+          description: The page's name on screen
+          example: Events
+        module:
+          type: string
+          enum: [spaces, crm, scheduling, surveys, impact, settings]
+          description: The sidebar section the page is in, which sets the panel's colour
+        eyebrow:
+          type: string
+          nullable: true
+          example: "Makerble® Events"
+        headline:
+          type: string
+          example: "For moments that have a lasting impact"
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuidancePanelPoint'
+        staff_text:
+          type: string
+          nullable: true
+          description: Shown instead of the page's main action to people who can't use it
+        user_guide_url:
+          type: string
+          description: The page's article in the Makerble User Guide, linked as "Learn more about <page> →"
+        vimeo_url:
+          type: string
+          nullable: true
+        fallback_visual:
+          type: string
+          nullable: true
+          description: The CSS animation, or the page's current image, shown when there is no Vimeo link
+        visual:
+          type: string
+          enum: [vimeo, animation, image, none]
+          description: What the panel shows beside its text now
+        updated_at:
+          type: string
+          format: date-time
+        updated_by:
+          $ref: '#/components/schemas/GuidancePanelUser'
+
+    GuidancePanelVersion:
+      type: object
+      description: One change to a Guidance Panel
+      properties:
+        id:
+          type: integer
+        event:
+          type: string
+          enum: [create, update]
+        created_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/GuidancePanelUser'
+        changed:
+          type: array
+          description: The parts that changed, in words, e.g. `["Headline", "Points"]`
+          items:
+            type: string
+        changes:
+          type: object
+          additionalProperties: true
+          description: 'Each changed field with its value before and after, e.g. `{"headline": ["Old", "New"]}`'
+
+    GuidancePanelWithVersions:
+      allOf:
+        - $ref: '#/components/schemas/GuidancePanel'
+        - type: object
+          properties:
+            versions:
+              type: array
+              description: The last 10 versions, newest first
+              items:
+                $ref: '#/components/schemas/GuidancePanelVersion'
+
+    GuidancePanelRequest:
+      type: object
+      properties:
+        guidance_panel:
+          type: object
+          properties:
+            eyebrow:
+              type: string
+            headline:
+              type: string
+              maxLength: 80
+            points:
+              type: array
+              minItems: 2
+              maxItems: 5
+              items:
+                $ref: '#/components/schemas/GuidancePanelPoint'
+            staff_text:
+              type: string
+              maxLength: 300
+            user_guide_url:
+              type: string
+            vimeo_url:
+              type: string
+
+    PaginatedGuidancePanels:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/GuidancePanel'
 
     PaginatedApiKeys:
       allOf:
