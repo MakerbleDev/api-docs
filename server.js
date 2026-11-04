@@ -925,6 +925,7 @@ function buildDocsPage() {
         <a href="#albums"          class="nav-link"><span class="nav-method method-GET">GET</span>Albums (Portfolios)</a>
         <a href="#signup-pages"    class="nav-link"><span class="nav-method method-POST">POST</span>Signup Pages</a>
         <a href="#users"           class="nav-link"><span class="nav-method method-POST">POST</span>Users</a>
+        <a href="#teams"           class="nav-link"><span class="nav-method method-PATCH">PATCH</span>Teams</a>
         <a href="#contacts"        class="nav-link"><span class="nav-method method-POST">POST</span>Contacts</a>
         <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET">GET</span>Contact Bio Forms</a>
         <a href="#cases"           class="nav-link"><span class="nav-method method-POST">POST</span>Cases</a>
@@ -1476,6 +1477,48 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "User created — returns id and email" },
             { code: "422", cls: "response-4xx", desc: "Validation failed (check password requirements)" }
           ], "Requires an <code>auth_code</code> API Key. Password must be 8+ chars with at least one number, special character, and capital letter.")}
+        </div>
+      </section>
+
+      <!-- Teams -->
+      <section class="section" id="teams">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Teams</h2>
+        <div class="section-desc">
+          <p>A Team groups colleagues across an Organisation's Projects. Its people are <strong>Managers</strong> (<code>manager_ids</code>; leaders in older screens) and <strong>Members</strong> (<code>member_ids</code>). A Team can add the people who join it to Projects automatically: when <code>auto_add_to_projects</code> is true, someone joining is added, at that moment, to the Projects in <code>auto_add_project_ids</code> and to every open Project that one of the saved Projects page filters in <code>auto_add_filter_ids</code> matches. A new Manager gets <code>auto_add_manager_role</code> and a new Member <code>auto_add_member_role</code>: <code>editor</code> (Project Manager), <code>reporter</code> (Changemaker) or <code>observer</code> (Analyst). People who already have a role on a Project keep it, and someone removed from one of those Projects later isn't added back.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/teams", "List an Organisation's Teams", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation. One you aren't in reads as not found" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — return only Teams updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Teams" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An Organisation you aren't in" }
+          ], "The Teams the Organisation's Teams page shows. Anyone in the Organisation can list them.")}
+          ${endpointCard("GET", "/teams/{id}", "Get a Team", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Team ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Team, with <code>manager_ids</code>, <code>member_ids</code> and its project auto-add settings" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Team of an Organisation you aren't in" }
+          ])}
+          ${endpointCard("PATCH", "/teams/{id}", "Set which Projects a Team adds people to", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Team ID" },
+            { name: "auto_add_to_projects", type: "boolean", required: false, desc: "Turn adding people to Projects on or off" },
+            { name: "auto_add_project_ids", type: "integer[]", required: false, desc: "Open Projects of the Team's Organisation (replaces the list)" },
+            { name: "auto_add_filter_ids", type: "integer[]", required: false, desc: "Saved Projects page filters you can use: <code>saved_filters</code> from <code>GET /project_automations/options</code> (replaces the list)" },
+            { name: "auto_add_manager_role", type: "string", required: false, desc: "<code>editor</code>, <code>reporter</code> or <code>observer</code> for a new Manager (default <code>editor</code>)" },
+            { name: "auto_add_member_role", type: "string", required: false, desc: "<code>editor</code>, <code>reporter</code> or <code>observer</code> for a new Member (default <code>reporter</code>)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The updated Team" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Admin of the Team's Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Team of an Organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: {field: [...]}}</code>, e.g. another Organisation's Project or an unknown role" }
+          ], "Changes the <b>Automatically add managers and members to projects</b> settings, as the Create/Edit Team popup does. Send only the fields to change. It doesn't add the Team's current people to anything; people are added only as they join.")}
         </div>
       </section>
 
