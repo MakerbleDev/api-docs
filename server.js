@@ -925,6 +925,7 @@ function buildDocsPage() {
         <a href="#albums"          class="nav-link"><span class="nav-method method-GET">GET</span>Albums (Portfolios)</a>
         <a href="#signup-pages"    class="nav-link"><span class="nav-method method-POST">POST</span>Signup Pages</a>
         <a href="#users"           class="nav-link"><span class="nav-method method-POST">POST</span>Users</a>
+        <a href="#teams"           class="nav-link"><span class="nav-method method-PATCH">PATCH</span>Teams</a>
         <a href="#contacts"        class="nav-link"><span class="nav-method method-POST">POST</span>Contacts</a>
         <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET">GET</span>Contact Bio Forms</a>
         <a href="#cases"           class="nav-link"><span class="nav-method method-POST">POST</span>Cases</a>
@@ -1171,10 +1172,20 @@ function buildDocsPage() {
           ${endpointCard("GET", "/charities/{id}", "Get a single Organisation", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Organisation ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Charity record with id, name, timestamps" },
+            { code: "200", cls: "response-2xx", desc: "Charity record with id, name, timestamps and <code>default_project_story_privacy</code>: the Story Privacy Level each new project in the Organisation starts with" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
+          ${endpointCard("PATCH", "/charities/{id}", "Change an Organisation's settings", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "default_project_story_privacy", in: "body", type: "string", required: false, desc: "<strong>Default story level privacy setting on each project</strong>: the Story Privacy Level each new project starts with. One of <code>only_project_colleagues</code> (Project colleagues only), <code>only_charity_colleagues</code> (Organisation colleagues only), <code>charity_plus_network</code> (Network &amp; organisation colleagues only) or <code>everyone</code>. Existing projects keep their own level." }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Organisation, with the setting changed" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of this Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one of your Organisations" },
+            { code: "422", cls: "response-4xx", desc: "<code>default_project_story_privacy</code> isn't one of the four levels" }
+          ], "Only an Organisation Admin can change these settings, the same people who can use Charity Preferences. Only the settings sent are changed.")}
         </div>
       </section>
 
@@ -1477,6 +1488,59 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "User created — returns id and email" },
             { code: "422", cls: "response-4xx", desc: "Validation failed (check password requirements)" }
           ], "Requires an <code>auth_code</code> API Key. Password must be 8+ chars with at least one number, special character, and capital letter.")}
+        </div>
+      </section>
+
+      <!-- Teams -->
+      <section class="section" id="teams">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Teams</h2>
+        <div class="section-desc">
+          <p>A Team groups colleagues across an Organisation's Projects. Its people are <strong>Managers</strong> (<code>manager_ids</code>; leaders in older screens) and <strong>Members</strong> (<code>member_ids</code>). A Team can add the people who join it to Projects automatically: when <code>auto_add_to_projects</code> is true, someone joining is added, at that moment, to the Projects in <code>auto_add_project_ids</code> and to every open Project that one of the saved Projects page filters in <code>auto_add_filter_ids</code> matches. A new Manager gets <code>auto_add_manager_role</code> and a new Member <code>auto_add_member_role</code>: <code>editor</code> (Project Manager), <code>reporter</code> (Changemaker) or <code>observer</code> (Analyst). People who already have a role on a Project keep it, and someone removed from one of those Projects later isn't added back.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/teams", "List an Organisation's Teams", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation. One you aren't in reads as not found" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — return only Teams updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Teams" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An Organisation you aren't in" }
+          ], "The Teams the Organisation's Teams page shows. Anyone in the Organisation can list them.")}
+          ${endpointCard("GET", "/teams/{id}", "Get a Team", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Team ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Team, with <code>manager_ids</code>, <code>member_ids</code> and its project auto-add settings" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Team of an Organisation you aren't in" }
+          ])}
+          ${endpointCard("PATCH", "/teams/{id}", "Set which Projects a Team adds people to", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Team ID" },
+            { name: "auto_add_to_projects", type: "boolean", required: false, desc: "Turn adding people to Projects on or off" },
+            { name: "auto_add_project_ids", type: "integer[]", required: false, desc: "Open Projects of the Team's Organisation (replaces the list)" },
+            { name: "auto_add_filter_ids", type: "integer[]", required: false, desc: "Saved Projects page filters you can use: <code>saved_filters</code> from <code>GET /project_automations/options</code> (replaces the list)" },
+            { name: "auto_add_manager_role", type: "string", required: false, desc: "<code>editor</code>, <code>reporter</code> or <code>observer</code> for a new Manager (default <code>editor</code>)" },
+            { name: "auto_add_member_role", type: "string", required: false, desc: "<code>editor</code>, <code>reporter</code> or <code>observer</code> for a new Member (default <code>reporter</code>)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The updated Team" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Admin of the Team's Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Team of an Organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: {field: [...]}}</code>, e.g. another Organisation's Project or an unknown role" }
+          ], "Changes the <b>Automatically add managers and members to projects</b> settings, as the Create/Edit Team popup does. Send only the fields to change. It doesn't add the Team's current people to anything; people are added only as they join.")}
+          ${endpointCard("POST", "/teams/{id}/members", "Add colleagues to a Team", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Team ID" },
+            { name: "user_ids", type: "integer[]", required: true, desc: "Colleagues (users) already in the Team's Organisation" },
+            { name: "role", type: "string", required: true, desc: "<code>member</code> or <code>manager</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Team, with the people added" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Admin of the Team's Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Team of an Organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: {field: [...]}}</code>, e.g. someone who isn't a colleague, or an unknown role" }
+          ], "Adds people as the Create/Edit Team popup and the Teams tab of <b>Invite a colleague</b> do, leaving the Team's other people as they are. When the Team adds people to Projects, the ones who join are added to them too.")}
         </div>
       </section>
 
@@ -2594,20 +2658,20 @@ function buildDocsPage() {
           ${endpointCard("GET", "/checklists/{id}", "Get a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>stages</code> (<code>id, name, icon, position, colour</code>), <code>actions</code> (each with <code>stage_id</code>, <code>due_within_days</code>, its owner fields and <code>owner_description</code>; <code>action_name</code> is \"Not set yet\" while no type is chosen), <code>projects</code> and <code>contacts_count</code>" },
+            { code: "200", cls: "response-2xx", desc: "The Checklist with <code>stages</code> (<code>id, name, icon, position, colour</code>), <code>actions</code> (each with <code>stage_id</code>, <code>due_within_days</code>, <code>video_url</code>, its owner fields and <code>owner_description</code>; <code>action_name</code> is \"Not set yet\" while no type is chosen), <code>projects</code> and <code>contacts_count</code>" },
             { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
           ])}
           ${endpointCard("POST", "/checklists", "Create a Checklist", true, [], [
             { code: "201", cls: "response-2xx", desc: "The new Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "e.g. an action with every option unticked" }
-          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, stages: [{key, name, icon}], actions: [{action_type, title, description, stage_key, criteria, only_this_project, due_within_days, allow_manual_completion, if_earlier_steps_not_done, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. <code>stages</code> are the optional Participant Journey stages, in order: each action joins one by naming its <code>key</code> in <code>stage_key</code>, and each stage's actions are kept together. <code>icon</code> is one of <code>GET /checklists/stage_icons</code> (<code>clipboard</code> by default). An action without an <code>action_type</code> is saved as \"Not set yet\" and can't be done until a type is chosen. <code>criteria</code> holds specific values under the type's <code>criteria_keys</code>, or <code>{any: true}</code> for any record of the kind; an action with neither is saved as \"Not set yet\" and can't be done until it is set. The owner fields are optional. <code>allow_manual_completion: true</code> (\"Allow colleagues to tick this off by hand with a note\") lets colleagues mark the action done by hand. <code>if_earlier_steps_not_done</code> (\"If earlier steps aren't done\") is <code>remind</code> (the default: a reminder colleagues can dismiss) or <code>ask_reason</code> (they must give a reason to skip the earlier steps). <code>only_this_project: true</code> (\"Only count records in this project\") counts only records made in the Project the Checklist was added to the Contact through. <code>due_within_days</code> (\"Due within N days of the checklist being added\", 0 to 3650) gives the action a deadline; leave it out for none.")}
+          ], "Body: <code>charity_id</code>, <code>checklist: {name, description, stages: [{key, name, icon}], actions: [{action_type, title, description, video_url, stage_key, criteria, only_this_project, due_within_days, allow_manual_completion, if_earlier_steps_not_done, owner_kind, owner_user_id, owner_team_id, owner_relationship_side}]}</code>. <code>stages</code> are the optional Participant Journey stages, in order: each action joins one by naming its <code>key</code> in <code>stage_key</code>, and each stage's actions are kept together. <code>icon</code> is one of <code>GET /checklists/stage_icons</code> (<code>clipboard</code> by default). An action without an <code>action_type</code> is saved as \"Not set yet\" and can't be done until a type is chosen. <code>criteria</code> holds specific values under the type's <code>criteria_keys</code>, or <code>{any: true}</code> for any record of the kind; an action with neither is saved as \"Not set yet\" and can't be done until it is set. The owner fields are optional. <code>allow_manual_completion: true</code> (\"Allow colleagues to tick this off by hand with a note\") lets colleagues mark the action done by hand. <code>if_earlier_steps_not_done</code> (\"If earlier steps aren't done\") is <code>remind</code> (the default: a reminder colleagues can dismiss) or <code>ask_reason</code> (they must give a reason to skip the earlier steps). <code>only_this_project: true</code> (\"Only count records in this project\") counts only records made in the Project the Checklist was added to the Contact through. <code>due_within_days</code> (\"Due within N days of the checklist being added\", 0 to 3650) gives the action a deadline; leave it out for none. <code>video_url</code> (\"Video (optional)\") is a web link to a video about the step, shown in Watch the journey on the Checklist's page: YouTube, Vimeo, Loom and Google Drive videos play in place, other links open in a new tab.")}
           ${endpointCard("PATCH", "/checklists/{id}", "Update a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The updated Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" }
-          ], "Actions with an <code>id</code> change; <code>{id, _destroy: true}</code> removes one; actions without an <code>id</code> are added. <code>due_within_days: null</code> removes an action's deadline. <code>stages</code> work the same way (<code>{id, name, icon, position}</code>, <code>{id, _destroy: true}</code>, or a new one with a <code>key</code>); an action's <code>stage_key</code> is a new stage's key or an existing stage's id, empty for no stage. A stage left without actions is removed.")}
+          ], "Actions with an <code>id</code> change; <code>{id, _destroy: true}</code> removes one; actions without an <code>id</code> are added. <code>due_within_days: null</code> removes an action's deadline. An empty <code>video_url</code> removes an action's video. <code>stages</code> work the same way (<code>{id, name, icon, position}</code>, <code>{id, _destroy: true}</code>, or a new one with a <code>key</code>); an action's <code>stage_key</code> is a new stage's key or an existing stage's id, empty for no stage. A stage left without actions is removed.")}
           ${endpointCard("GET", "/checklists/stage_icons", "List the icons a Checklist stage can have", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>{data: [{icon, name}]}</code>: clipboard, calendar, people, chart, flag, message, home, heart, school, book" }
           ])}
@@ -2642,6 +2706,19 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, another Organisation's, or a Project the Checklist isn't added to" },
             { code: "422", cls: "response-4xx", desc: "An unknown <code>responsible</code> value" }
           ], "The Progress section of the Checklist's profile page, Table and Board. <code>completed</code>: Contacts who have done the action. <code>furthest</code>: Contacts for whom it is the furthest action done. <code>waiting</code>: Contacts for whom it is the first action not done, so someone who did steps 1 and 3 is waiting on step 2. Only Contacts the user can see are counted.")}
+          ${endpointCard("GET", "/checklists/{id}/progress/contacts", "List every Contact behind a progress count", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "list", type: "string", required: true, desc: "<code>completed</code>, <code>furthest</code> or <code>waiting</code> (the Table's lists for <code>action_id</code>), <code>board</code> (the Board column for <code>action_id</code>) or <code>complete</code> (Fully complete)" },
+            { name: "action_id", type: "integer", required: false, desc: "The action whose list it is; required for every list but <code>complete</code>" },
+            { name: "project_id", type: "integer", required: false, desc: "Only Contacts in this Project, one the Checklist is added to" },
+            { name: "responsible", type: "string", required: false, desc: "Only Contacts whose waiting action this person or Team is responsible for: <code>me</code>, <code>user:&lt;id&gt;</code> or <code>team:&lt;id&gt;</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated <code>{page, page_size, page_count, total_count, data}</code>: each Contact as <code>{beneficiary_id, name, actions_done}</code>, plus <code>days_waiting</code>, <code>overdue</code>, <code>skipped_a_step</code> and <code>responsible</code> in the <code>waiting</code> and <code>board</code> lists" },
+            { code: "404", cls: "response-4xx", desc: "Not found, another Organisation's, or a Project the Checklist isn't added to" },
+            { code: "422", cls: "response-4xx", desc: "An unknown <code>list</code>, a missing or unknown <code>action_id</code>, or an unknown <code>responsible</code> value" }
+          ], "The rest of each list after the first 30 that <code>GET /checklists/{id}/progress</code> gives, as the Show N more buttons on the Checklist's page do. Only Contacts the user can see are counted.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [

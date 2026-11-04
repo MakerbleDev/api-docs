@@ -155,6 +155,8 @@ tags:
     description: Obtain and manage authentication tokens
   - name: Users
     description: Platform users with login credentials
+  - name: Teams
+    description: Teams of colleagues in an Organisation, and the Projects a Team adds the people who join it to
   - name: Charities
     description: Organisations — the top-level entity that owns Projects
   - name: Projects
@@ -580,6 +582,44 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Charities]
+      summary: Change an Organisation's settings
+      description: |
+        Changes the Organisation's settings that Charity Preferences offers over the API. For now that is
+        **Default story level privacy setting on each project**: the Story Privacy Level each new project
+        in the Organisation starts with. Existing projects keep their own level, and each project's level
+        can still be changed on its Preferences page. Only settings sent are changed. Only an
+        Organisation Admin may do this; other colleagues get 403. Returns the Organisation.
+      operationId: updateCharity
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                default_project_story_privacy:
+                  $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+            example:
+              default_project_story_privacy: only_project_colleagues
+      responses:
+        "200":
+          description: The Organisation, with the setting changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charity'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /announcements:
     get:
@@ -708,6 +748,166 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /teams:
+    get:
+      tags: [Teams]
+      summary: List an Organisation's Teams
+      description: |
+        The Teams of an Organisation (Charity) the user belongs to, as the Teams page lists them. A
+        Team groups colleagues across Projects; its managers are shown as "Managers" (leaders in
+        older screens) and everyone else as "Members". When `auto_add_to_projects` is true, someone
+        who joins the Team is added, at that moment, to the Projects in `auto_add_project_ids` and to
+        every open Project that one of the saved project filters in `auto_add_filter_ids` matches,
+        with the project role in `auto_add_manager_role` or `auto_add_member_role`.
+      operationId: listTeams
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          description: The Organisation whose Teams to list. Another Organisation reads as not found.
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Teams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamList'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /teams/{id}:
+    get:
+      tags: [Teams]
+      summary: Get a Team
+      description: A Team of one of the user's Organisations, with its managers, members and the Projects it adds people to.
+      operationId: getTeam
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The Team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Teams]
+      summary: Set which Projects a Team adds people to
+      description: |
+        Changes the "Automatically add managers and members to projects" settings of a Team, as the
+        Create/Edit Team popup does. Only an Organisation Admin of the Team's Organisation can do
+        this. Send only the fields to change.
+
+        People are added only at the moment they join the Team. Changing these settings doesn't add
+        the Team's current managers and members to anything, and someone removed from one of these
+        Projects later isn't added back. People who already have a role on a Project keep it.
+
+        `auto_add_project_ids` must be open Projects of the Team's Organisation. `auto_add_filter_ids`
+        must be saved Projects page filters the user can use: their own, or ones colleagues have
+        shared (the same list as `saved_filters` in `GET /project_automations/options?charity_id=`).
+        Projects and filters already on the Team are kept even if this user couldn't choose them.
+        Roles are `editor` (Project Manager), `reporter` (Changemaker) or `observer` (Analyst).
+      operationId: updateTeam
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamUpdateRequest'
+            example:
+              auto_add_to_projects: true
+              auto_add_project_ids: [619, 620]
+              auto_add_filter_ids: [88]
+              auto_add_manager_role: editor
+              auto_add_member_role: reporter
+      responses:
+        "200":
+          description: The updated Team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /teams/{id}/members:
+    post:
+      tags: [Teams]
+      summary: Add colleagues to a Team
+      description: |
+        Adds colleagues to a Team as Members or Managers, as the Create/Edit Team popup and the Teams
+        tab of Invite a colleague do. The Team's other people are left as they are, and someone already
+        in the Team in that role is skipped. Only an Organisation Admin of the Team's Organisation can
+        do this, and everyone added must already be a colleague in the Organisation (use
+        `GET /users` to find them).
+
+        When the Team has `auto_add_to_projects` on, the people who join are added, in the background,
+        to its Projects and to the open Projects its saved filters match, with the Team's project role
+        for a Manager or a Member. People who already have a role on a Project keep it.
+      operationId: addTeamMembers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamAddMembersRequest'
+            example:
+              user_ids: [4012, 4013]
+              role: member
+      responses:
+        "200":
+          description: The Team, with the people added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /albums:
     get:
       tags: [Albums]
@@ -8075,6 +8275,13 @@ paths:
         ("Warn and ask for a reason to skip") makes them give a reason, which is logged. On an update,
         an action that doesn't mention it keeps its setting.
 
+        "Video (optional)": set `video_url` to a web link (`https://` or `http://`, up to 2048
+        characters) to a video about the step, for self-paced training. On the Checklist's page,
+        **Watch the journey** shows each step as a card with its video: a YouTube, Vimeo, Loom or
+        Google Drive link plays in the card, and any other link (SharePoint, Slack, an intranet)
+        opens in a new tab. Send an empty `video_url` to remove it; on an update, an action that
+        doesn't mention it keeps its video.
+
         Participant Journey stages: send `stages`, in order, each with a `key` of your choosing, a
         `name` and an `icon` (see `GET /checklists/stage_icons`; `clipboard` if left out), and give
         each action the `stage_key` of its stage. The Journey view on the Checklist's profile page
@@ -8127,6 +8334,7 @@ paths:
                     owner_team_id: 18
                     allow_manual_completion: true
                     if_earlier_steps_not_done: "ask_reason"
+                    video_url: "https://www.loom.com/share/22af2a7d40a54d0ba6d720140230b565"
       responses:
         "201":
           description: The Checklist, with its actions, projects and contacts_count
@@ -8279,7 +8487,8 @@ paths:
         Each action includes who is responsible for it: `owner_kind`, `owner_user_id`, `owner_team_id`,
         `owner_relationship_side` and a readable `owner_description`, and its settings
         `due_within_days`, `only_this_project`, `allow_manual_completion` and
-        `if_earlier_steps_not_done` (`remind` or `ask_reason`), and its `stage_id`. `stages` lists the
+        `if_earlier_steps_not_done` (`remind` or `ask_reason`), its `video_url` (null for none) and its
+        `stage_id`. `stages` lists the
         Participant Journey stages in order, each with `id`, `name`, `icon`, `position` and `colour`.
         An action whose type isn't chosen yet has a null `action_type` and `action_name` "Not set yet".
       operationId: getChecklist
@@ -8489,6 +8698,77 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /checklists/{id}/progress/contacts:
+    get:
+      tags: [Checklists]
+      summary: List every Contact behind one of a Checklist's progress counts
+      description: |
+        Every Contact behind one count of the Checklist's Progress section, a page at a time, as the
+        **Show N more** buttons on the Checklist's page do. `GET /checklists/{id}/progress` lists only the
+        first `list_limit` (30) of each list; use this to get the rest. Choose the list with `list`:
+
+        - `completed`, `furthest` or `waiting`: the Table's lists for the action `action_id`: who has
+          done it, for whom it is the furthest action done, and who is waiting on it
+        - `board`: the Board's column for the action `action_id` (those waiting on it, longest waiting first)
+        - `complete`: the Board's Fully complete column (no `action_id`)
+
+        Each Contact is `{beneficiary_id, name, actions_done}`. In the `waiting` and `board` lists each
+        also has `days_waiting`, `overdue`, `skipped_a_step` and `responsible`. The same `project_id` and
+        `responsible` filters as `GET /checklists/{id}/progress` apply. Only Contacts the user can see are
+        counted. `per_page` is at most 200.
+      operationId: listChecklistProgressContacts
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: list
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [completed, furthest, waiting, board, complete]
+        - name: action_id
+          in: query
+          required: false
+          description: The action whose list it is. Required for every list but `complete`
+          schema:
+            type: integer
+        - name: project_id
+          in: query
+          required: false
+          description: Count only the Contacts in this Project, which must be one the Checklist is added to
+          schema:
+            type: integer
+        - name: responsible
+          in: query
+          required: false
+          description: "Count only the Contacts whose waiting action this person or Team is responsible for: `me`, `user:<id>` or `team:<id>`"
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: One page of the list, in the usual envelope
+          content:
+            application/json:
+              example:
+                page: 2
+                page_size: 1
+                page_count: 2
+                total_count: 31
+                data:
+                  - {beneficiary_id: 903, name: "Mpho Sithole", actions_done: 0, days_waiting: 9, overdue: true, skipped_a_step: false, responsible: "Anyone in Youth Workers"}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -14921,6 +15201,18 @@ components:
             name:
               type: string
               example: "Greenfield Community Trust"
+            default_project_story_privacy:
+              $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+
+    DefaultProjectStoryPrivacy:
+      type: string
+      description: |
+        The Story Privacy Level each new project in the Organisation starts with: Project colleagues
+        only, Organisation colleagues only, Network & organisation colleagues only, or Everyone.
+        Organisations created from November 2026 start with `only_project_colleagues`; older ones
+        with `only_charity_colleagues`.
+      enum: [only_project_colleagues, only_charity_colleagues, charity_plus_network, everyone]
+      example: only_project_colleagues
 
     ProjectDetail:
       description: A Project as returned by `GET /projects/{id}`.
@@ -15010,6 +15302,106 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    Team:
+      type: object
+      properties:
+        id:
+          type: integer
+        charity_id:
+          type: integer
+          description: The Organisation the Team belongs to
+        name:
+          type: string
+        colour:
+          type: string
+          description: The Team's chip colour, e.g. "#3595d5"
+        manager_ids:
+          type: array
+          description: User IDs of the Team's managers (leaders)
+          items:
+            type: integer
+        member_ids:
+          type: array
+          description: User IDs of the Team's other members
+          items:
+            type: integer
+        auto_add_to_projects:
+          type: boolean
+          description: Whether people who join the Team are added to its Projects
+        auto_add_project_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_filter_ids:
+          type: array
+          description: Saved project filters (FilterHistory) whose matching open Projects people are added to
+          items:
+            type: integer
+        auto_add_manager_role:
+          type: string
+          enum: [editor, reporter, observer]
+          description: The project role a new manager gets
+        auto_add_member_role:
+          type: string
+          enum: [editor, reporter, observer]
+          description: The project role a new member gets
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TeamAddMembersRequest:
+      type: object
+      required: [user_ids, role]
+      properties:
+        user_ids:
+          type: array
+          description: Colleagues (user IDs) in the Team's Organisation
+          items:
+            type: integer
+        role:
+          type: string
+          enum: [member, manager]
+          description: Add them as Members, or as Managers (leaders)
+
+    TeamList:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+
+    TeamUpdateRequest:
+      type: object
+      properties:
+        auto_add_to_projects:
+          type: boolean
+        auto_add_project_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_filter_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_manager_role:
+          type: string
+          enum: [editor, reporter, observer]
+        auto_add_member_role:
+          type: string
+          enum: [editor, reporter, observer]
 
     AlbumList:
       type: object
