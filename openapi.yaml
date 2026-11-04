@@ -15993,7 +15993,7 @@ components:
           example: "Employed"
         restricted:
           type: boolean
-          description: Present and true when Field Visibility hides this field from you; `value` is then null, whether or not it has an answer
+          description: True when Field Visibility hides this field from you; `value` is then null, whether or not it has an answer
           example: true
 
     Story:
