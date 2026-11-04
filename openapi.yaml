@@ -155,6 +155,8 @@ tags:
     description: Obtain and manage authentication tokens
   - name: Users
     description: Platform users with login credentials
+  - name: Teams
+    description: Teams of colleagues in an Organisation, and the Projects a Team adds the people who join it to
   - name: Charities
     description: Organisations — the top-level entity that owns Projects
   - name: Projects
@@ -741,6 +743,166 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /teams:
+    get:
+      tags: [Teams]
+      summary: List an Organisation's Teams
+      description: |
+        The Teams of an Organisation (Charity) the user belongs to, as the Teams page lists them. A
+        Team groups colleagues across Projects; its managers are shown as "Managers" (leaders in
+        older screens) and everyone else as "Members". When `auto_add_to_projects` is true, someone
+        who joins the Team is added, at that moment, to the Projects in `auto_add_project_ids` and to
+        every open Project that one of the saved project filters in `auto_add_filter_ids` matches,
+        with the project role in `auto_add_manager_role` or `auto_add_member_role`.
+      operationId: listTeams
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          description: The Organisation whose Teams to list. Another Organisation reads as not found.
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Teams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamList'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /teams/{id}:
+    get:
+      tags: [Teams]
+      summary: Get a Team
+      description: A Team of one of the user's Organisations, with its managers, members and the Projects it adds people to.
+      operationId: getTeam
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The Team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Teams]
+      summary: Set which Projects a Team adds people to
+      description: |
+        Changes the "Automatically add managers and members to projects" settings of a Team, as the
+        Create/Edit Team popup does. Only an Organisation Admin of the Team's Organisation can do
+        this. Send only the fields to change.
+
+        People are added only at the moment they join the Team. Changing these settings doesn't add
+        the Team's current managers and members to anything, and someone removed from one of these
+        Projects later isn't added back. People who already have a role on a Project keep it.
+
+        `auto_add_project_ids` must be open Projects of the Team's Organisation. `auto_add_filter_ids`
+        must be saved Projects page filters the user can use: their own, or ones colleagues have
+        shared (the same list as `saved_filters` in `GET /project_automations/options?charity_id=`).
+        Projects and filters already on the Team are kept even if this user couldn't choose them.
+        Roles are `editor` (Project Manager), `reporter` (Changemaker) or `observer` (Analyst).
+      operationId: updateTeam
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamUpdateRequest'
+            example:
+              auto_add_to_projects: true
+              auto_add_project_ids: [619, 620]
+              auto_add_filter_ids: [88]
+              auto_add_manager_role: editor
+              auto_add_member_role: reporter
+      responses:
+        "200":
+          description: The updated Team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /teams/{id}/members:
+    post:
+      tags: [Teams]
+      summary: Add colleagues to a Team
+      description: |
+        Adds colleagues to a Team as Members or Managers, as the Create/Edit Team popup and the Teams
+        tab of Invite a colleague do. The Team's other people are left as they are, and someone already
+        in the Team in that role is skipped. Only an Organisation Admin of the Team's Organisation can
+        do this, and everyone added must already be a colleague in the Organisation (use
+        `GET /users` to find them).
+
+        When the Team has `auto_add_to_projects` on, the people who join are added, in the background,
+        to its Projects and to the open Projects its saved filters match, with the Team's project role
+        for a Manager or a Member. People who already have a role on a Project keep it.
+      operationId: addTeamMembers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamAddMembersRequest'
+            example:
+              user_ids: [4012, 4013]
+              role: member
+      responses:
+        "200":
+          description: The Team, with the people added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /albums:
     get:
       tags: [Albums]
@@ -14993,6 +15155,106 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    Team:
+      type: object
+      properties:
+        id:
+          type: integer
+        charity_id:
+          type: integer
+          description: The Organisation the Team belongs to
+        name:
+          type: string
+        colour:
+          type: string
+          description: The Team's chip colour, e.g. "#3595d5"
+        manager_ids:
+          type: array
+          description: User IDs of the Team's managers (leaders)
+          items:
+            type: integer
+        member_ids:
+          type: array
+          description: User IDs of the Team's other members
+          items:
+            type: integer
+        auto_add_to_projects:
+          type: boolean
+          description: Whether people who join the Team are added to its Projects
+        auto_add_project_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_filter_ids:
+          type: array
+          description: Saved project filters (FilterHistory) whose matching open Projects people are added to
+          items:
+            type: integer
+        auto_add_manager_role:
+          type: string
+          enum: [editor, reporter, observer]
+          description: The project role a new manager gets
+        auto_add_member_role:
+          type: string
+          enum: [editor, reporter, observer]
+          description: The project role a new member gets
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TeamAddMembersRequest:
+      type: object
+      required: [user_ids, role]
+      properties:
+        user_ids:
+          type: array
+          description: Colleagues (user IDs) in the Team's Organisation
+          items:
+            type: integer
+        role:
+          type: string
+          enum: [member, manager]
+          description: Add them as Members, or as Managers (leaders)
+
+    TeamList:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+
+    TeamUpdateRequest:
+      type: object
+      properties:
+        auto_add_to_projects:
+          type: boolean
+        auto_add_project_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_filter_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_manager_role:
+          type: string
+          enum: [editor, reporter, observer]
+        auto_add_member_role:
+          type: string
+          enum: [editor, reporter, observer]
 
     AlbumList:
       type: object
