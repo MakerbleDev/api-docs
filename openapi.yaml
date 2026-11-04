@@ -818,6 +818,53 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /teams/{id}/members:
+    post:
+      tags: [Teams]
+      summary: Add colleagues to a Team
+      description: |
+        Adds colleagues to a Team as Members or Managers, as the Create/Edit Team popup and the Teams
+        tab of Invite a colleague do. The Team's other people are left as they are, and someone already
+        in the Team in that role is skipped. Only an Organisation Admin of the Team's Organisation can
+        do this, and everyone added must already be a colleague in the Organisation (use
+        `GET /users` to find them).
+
+        When the Team has `auto_add_to_projects` on, the people who join are added, in the background,
+        to its Projects and to the open Projects its saved filters match, with the Team's project role
+        for a Manager or a Member. People who already have a role on a Project keep it.
+      operationId: addTeamMembers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamAddMembersRequest'
+            example:
+              user_ids: [4012, 4013]
+              role: member
+      responses:
+        "200":
+          description: The Team, with the people added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /albums:
     get:
       tags: [Albums]
@@ -15037,6 +15084,20 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    TeamAddMembersRequest:
+      type: object
+      required: [user_ids, role]
+      properties:
+        user_ids:
+          type: array
+          description: Colleagues (user IDs) in the Team's Organisation
+          items:
+            type: integer
+        role:
+          type: string
+          enum: [member, manager]
+          description: Add them as Members, or as Managers (leaders)
 
     TeamList:
       type: object

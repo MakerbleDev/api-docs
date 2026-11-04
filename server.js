@@ -1519,6 +1519,17 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or a Team of an Organisation you aren't in" },
             { code: "422", cls: "response-4xx", desc: "<code>{errors: {field: [...]}}</code>, e.g. another Organisation's Project or an unknown role" }
           ], "Changes the <b>Automatically add managers and members to projects</b> settings, as the Create/Edit Team popup does. Send only the fields to change. It doesn't add the Team's current people to anything; people are added only as they join.")}
+          ${endpointCard("POST", "/teams/{id}/members", "Add colleagues to a Team", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Team ID" },
+            { name: "user_ids", type: "integer[]", required: true, desc: "Colleagues (users) already in the Team's Organisation" },
+            { name: "role", type: "string", required: true, desc: "<code>member</code> or <code>manager</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Team, with the people added" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Admin of the Team's Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Team of an Organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: {field: [...]}}</code>, e.g. someone who isn't a colleague, or an unknown role" }
+          ], "Adds people as the Create/Edit Team popup and the Teams tab of <b>Invite a colleague</b> do, leaving the Team's other people as they are. When the Team adds people to Projects, the ones who join are added to them too.")}
         </div>
       </section>
 
