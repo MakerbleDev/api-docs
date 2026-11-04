@@ -155,6 +155,8 @@ tags:
     description: Obtain and manage authentication tokens
   - name: Users
     description: Platform users with login credentials
+  - name: Teams
+    description: Teams of colleagues in an Organisation, and the Projects a Team adds the people who join it to
   - name: Charities
     description: Organisations — the top-level entity that owns Projects
   - name: Projects
@@ -316,6 +318,11 @@ tags:
     description: |
       HTTPS endpoints an Organisation's admins register to receive signed events when
       Contacts, Stories and Projects change and when imports finish. See Webhooks above.
+  - name: Eventbrite
+    description: |
+      An Organisation's connection to Eventbrite, which brings Eventbrite events, ticket holders and
+      check-ins into Makerble as Events, Contacts and attendance Stories. Only the Organisation's admins
+      can see or change it.
 
 paths:
 
@@ -580,6 +587,44 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Charities]
+      summary: Change an Organisation's settings
+      description: |
+        Changes the Organisation's settings that Charity Preferences offers over the API. For now that is
+        **Default story level privacy setting on each project**: the Story Privacy Level each new project
+        in the Organisation starts with. Existing projects keep their own level, and each project's level
+        can still be changed on its Preferences page. Only settings sent are changed. Only an
+        Organisation Admin may do this; other colleagues get 403. Returns the Organisation.
+      operationId: updateCharity
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                default_project_story_privacy:
+                  $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+            example:
+              default_project_story_privacy: only_project_colleagues
+      responses:
+        "200":
+          description: The Organisation, with the setting changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charity'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /announcements:
     get:
@@ -708,6 +753,166 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /teams:
+    get:
+      tags: [Teams]
+      summary: List an Organisation's Teams
+      description: |
+        The Teams of an Organisation (Charity) the user belongs to, as the Teams page lists them. A
+        Team groups colleagues across Projects; its managers are shown as "Managers" (leaders in
+        older screens) and everyone else as "Members". When `auto_add_to_projects` is true, someone
+        who joins the Team is added, at that moment, to the Projects in `auto_add_project_ids` and to
+        every open Project that one of the saved project filters in `auto_add_filter_ids` matches,
+        with the project role in `auto_add_manager_role` or `auto_add_member_role`.
+      operationId: listTeams
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          description: The Organisation whose Teams to list. Another Organisation reads as not found.
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Teams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamList'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /teams/{id}:
+    get:
+      tags: [Teams]
+      summary: Get a Team
+      description: A Team of one of the user's Organisations, with its managers, members and the Projects it adds people to.
+      operationId: getTeam
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The Team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Teams]
+      summary: Set which Projects a Team adds people to
+      description: |
+        Changes the "Automatically add managers and members to projects" settings of a Team, as the
+        Create/Edit Team popup does. Only an Organisation Admin of the Team's Organisation can do
+        this. Send only the fields to change.
+
+        People are added only at the moment they join the Team. Changing these settings doesn't add
+        the Team's current managers and members to anything, and someone removed from one of these
+        Projects later isn't added back. People who already have a role on a Project keep it.
+
+        `auto_add_project_ids` must be open Projects of the Team's Organisation. `auto_add_filter_ids`
+        must be saved Projects page filters the user can use: their own, or ones colleagues have
+        shared (the same list as `saved_filters` in `GET /project_automations/options?charity_id=`).
+        Projects and filters already on the Team are kept even if this user couldn't choose them.
+        Roles are `editor` (Project Manager), `reporter` (Changemaker) or `observer` (Analyst).
+      operationId: updateTeam
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamUpdateRequest'
+            example:
+              auto_add_to_projects: true
+              auto_add_project_ids: [619, 620]
+              auto_add_filter_ids: [88]
+              auto_add_manager_role: editor
+              auto_add_member_role: reporter
+      responses:
+        "200":
+          description: The updated Team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /teams/{id}/members:
+    post:
+      tags: [Teams]
+      summary: Add colleagues to a Team
+      description: |
+        Adds colleagues to a Team as Members or Managers, as the Create/Edit Team popup and the Teams
+        tab of Invite a colleague do. The Team's other people are left as they are, and someone already
+        in the Team in that role is skipped. Only an Organisation Admin of the Team's Organisation can
+        do this, and everyone added must already be a colleague in the Organisation (use
+        `GET /users` to find them).
+
+        When the Team has `auto_add_to_projects` on, the people who join are added, in the background,
+        to its Projects and to the open Projects its saved filters match, with the Team's project role
+        for a Manager or a Member. People who already have a role on a Project keep it.
+      operationId: addTeamMembers
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamAddMembersRequest'
+            example:
+              user_ids: [4012, 4013]
+              role: member
+      responses:
+        "200":
+          description: The Team, with the people added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /albums:
     get:
       tags: [Albums]
@@ -8268,6 +8473,13 @@ paths:
         ("Warn and ask for a reason to skip") makes them give a reason, which is logged. On an update,
         an action that doesn't mention it keeps its setting.
 
+        "Video (optional)": set `video_url` to a web link (`https://` or `http://`, up to 2048
+        characters) to a video about the step, for self-paced training. On the Checklist's page,
+        **Watch the journey** shows each step as a card with its video: a YouTube, Vimeo, Loom or
+        Google Drive link plays in the card, and any other link (SharePoint, Slack, an intranet)
+        opens in a new tab. Send an empty `video_url` to remove it; on an update, an action that
+        doesn't mention it keeps its video.
+
         Participant Journey stages: send `stages`, in order, each with a `key` of your choosing, a
         `name` and an `icon` (see `GET /checklists/stage_icons`; `clipboard` if left out), and give
         each action the `stage_key` of its stage. The Journey view on the Checklist's profile page
@@ -8320,6 +8532,7 @@ paths:
                     owner_team_id: 18
                     allow_manual_completion: true
                     if_earlier_steps_not_done: "ask_reason"
+                    video_url: "https://www.loom.com/share/22af2a7d40a54d0ba6d720140230b565"
       responses:
         "201":
           description: The Checklist, with its actions, projects and contacts_count
@@ -8472,7 +8685,8 @@ paths:
         Each action includes who is responsible for it: `owner_kind`, `owner_user_id`, `owner_team_id`,
         `owner_relationship_side` and a readable `owner_description`, and its settings
         `due_within_days`, `only_this_project`, `allow_manual_completion` and
-        `if_earlier_steps_not_done` (`remind` or `ask_reason`), and its `stage_id`. `stages` lists the
+        `if_earlier_steps_not_done` (`remind` or `ask_reason`), its `video_url` (null for none) and its
+        `stage_id`. `stages` lists the
         Participant Journey stages in order, each with `id`, `name`, `icon`, `position` and `colour`.
         An action whose type isn't chosen yet has a null `action_type` and `action_name` "Not set yet".
       operationId: getChecklist
@@ -8682,6 +8896,77 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /checklists/{id}/progress/contacts:
+    get:
+      tags: [Checklists]
+      summary: List every Contact behind one of a Checklist's progress counts
+      description: |
+        Every Contact behind one count of the Checklist's Progress section, a page at a time, as the
+        **Show N more** buttons on the Checklist's page do. `GET /checklists/{id}/progress` lists only the
+        first `list_limit` (30) of each list; use this to get the rest. Choose the list with `list`:
+
+        - `completed`, `furthest` or `waiting`: the Table's lists for the action `action_id`: who has
+          done it, for whom it is the furthest action done, and who is waiting on it
+        - `board`: the Board's column for the action `action_id` (those waiting on it, longest waiting first)
+        - `complete`: the Board's Fully complete column (no `action_id`)
+
+        Each Contact is `{beneficiary_id, name, actions_done}`. In the `waiting` and `board` lists each
+        also has `days_waiting`, `overdue`, `skipped_a_step` and `responsible`. The same `project_id` and
+        `responsible` filters as `GET /checklists/{id}/progress` apply. Only Contacts the user can see are
+        counted. `per_page` is at most 200.
+      operationId: listChecklistProgressContacts
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: list
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [completed, furthest, waiting, board, complete]
+        - name: action_id
+          in: query
+          required: false
+          description: The action whose list it is. Required for every list but `complete`
+          schema:
+            type: integer
+        - name: project_id
+          in: query
+          required: false
+          description: Count only the Contacts in this Project, which must be one the Checklist is added to
+          schema:
+            type: integer
+        - name: responsible
+          in: query
+          required: false
+          description: "Count only the Contacts whose waiting action this person or Team is responsible for: `me`, `user:<id>` or `team:<id>`"
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: One page of the list, in the usual envelope
+          content:
+            application/json:
+              example:
+                page: 2
+                page_size: 1
+                page_count: 2
+                total_count: 31
+                data:
+                  - {beneficiary_id: 903, name: "Mpho Sithole", actions_done: 0, days_waiting: 9, overdue: true, skipped_a_step: false, responsible: "Anyone in Youth Workers"}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -12642,6 +12927,446 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /eventbrite_connection:
+    get:
+      tags: [Eventbrite]
+      summary: Get the Organisation's Eventbrite connection
+      description: |
+        Whether the Organisation (Charity) is connected to Eventbrite. `status` is `not_connected`,
+        `choosing_organisation` (signed in, but the Eventbrite sign-in belongs to several Eventbrite
+        organisations; choose one with `PATCH /eventbrite_connection`), `active`, or `reconnect_required`
+        (Eventbrite no longer accepts the sign-in, and the Organisation's admins have been emailed).
+        Signing in to Eventbrite needs a browser, so connecting and reconnecting happen on the
+        Connect > Eventbrite page in Makerble, given as `page_url`. The Eventbrite token is never returned.
+      operationId: getEventbriteConnection
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The connection, or `status` `not_connected`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Eventbrite]
+      summary: Choose the Eventbrite organisation
+      description: |
+        While `status` is `choosing_organisation`, chooses which of `available_organizations` the
+        connection uses. The connection becomes `active`.
+      operationId: chooseEventbriteOrganization
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, eventbrite_connection]
+              properties:
+                charity_id:
+                  type: integer
+                eventbrite_connection:
+                  type: object
+                  required: [eventbrite_organization_id]
+                  properties:
+                    eventbrite_organization_id:
+                      type: string
+            example:
+              charity_id: 913
+              eventbrite_connection:
+                eventbrite_organization_id: "2"
+      responses:
+        "200":
+          description: The connection, now active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Eventbrite]
+      summary: Disconnect Eventbrite
+      description: |
+        Makerble stops bringing in changes from Eventbrite. Events, Contacts and Stories already brought
+        in stay, with their links to Eventbrite. Succeeds again when already disconnected.
+      operationId: disconnectEventbrite
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "204":
+          description: Disconnected
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/test:
+    post:
+      tags: [Eventbrite]
+      summary: Test the Eventbrite connection
+      description: |
+        Checks with Eventbrite that the sign-in still works. `test_succeeded` says whether it did. A
+        revoked sign-in moves `status` to `reconnect_required`.
+      operationId: testEventbriteConnection
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The connection, with `test_succeeded`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/sync:
+    post:
+      tags: [Eventbrite]
+      summary: Sync with Eventbrite now
+      description: |
+        Queues a full catch-up with the Organisation's Eventbrite account, instead of waiting for the one
+        every 3 hours (changes normally arrive within seconds by webhook). `syncing` is true until it has run;
+        see `GET /eventbrite_connection/sync_log` for what came in.
+      operationId: syncEventbriteNow
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/sync_log:
+    get:
+      tags: [Eventbrite]
+      summary: List the Eventbrite sync log
+      description: |
+        What Makerble brought in from Eventbrite, updated, skipped or removed, and why, newest first, kept for
+        90 days. `needs_review` means a ticket holder's email matched existing Contacts unclearly: a new Contact
+        was made and the possible duplicates are on the Suggested Merges list (source `eventbrite`).
+      operationId: listEventbriteSyncLog
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated sync log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventbriteSyncLog'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/settings:
+    patch:
+      tags: [Eventbrite]
+      summary: Choose what to bring in from Eventbrite
+      description: |
+        The Workspace (`project_id`) and Event format (`event_category_id`, one of the Workspace's) new Events go
+        into; `import_mode` `all_upcoming` (every upcoming Eventbrite event, new ones included) or `selected`
+        (only picked events, drafts included); the Workspace (`contact_project_id`, or each Event's Workspace when
+        blank) and Contact Bio Form (`beneficiary_category_id`, one the Workspace uses for creating Contacts) new
+        Contacts get; and the engagement tracker (`change_id`) and Event attendance survey (`story_category_id`, a
+        survey running on the Workspace for new Events) check-ins are recorded with. Send only the settings to
+        change. Saving starts a sync. Nothing comes in until `project_id` and `event_category_id` are set.
+      operationId: updateEventbriteSettings
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, eventbrite_connection]
+              properties:
+                charity_id:
+                  type: integer
+                eventbrite_connection:
+                  $ref: '#/components/schemas/EventbriteSettings'
+            example:
+              charity_id: 913
+              eventbrite_connection:
+                project_id: 120
+                event_category_id: 44
+                import_mode: all_upcoming
+                change_id: 3021
+                story_category_id: 812
+      responses:
+        "200":
+          description: The connection with its new settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /eventbrite_connection/events:
+    get:
+      tags: [Eventbrite]
+      summary: List the Eventbrite events to pick from
+      description: |
+        The upcoming events in the connected Eventbrite organisation, with whether each is (or would be)
+        brought in, and the Makerble Event it came in as. Drafts and cancelled events are listed but not
+        selected unless picked.
+      operationId: listEventbriteEvents
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The Eventbrite events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventbriteEventChoice'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "502":
+          description: Eventbrite couldn't list the events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Eventbrite]
+      summary: Pick the Eventbrite events to bring in
+      description: Switches `import_mode` to `selected` and brings in only these Eventbrite events.
+      operationId: chooseEventbriteEvents
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, eventbrite_event_ids]
+              properties:
+                charity_id:
+                  type: integer
+                eventbrite_event_ids:
+                  type: array
+                  items:
+                    type: string
+            example:
+              charity_id: 913
+              eventbrite_event_ids: ["750011223344"]
+      responses:
+        "200":
+          description: The connection, with the picked events in settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/mappings/{object_type}:
+    parameters:
+      - name: object_type
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [event, attendee]
+        description: "`event` for Eventbrite events onto Makerble Events; `attendee` for ticket holders onto Contacts"
+    get:
+      tags: [Eventbrite]
+      summary: Get an Eventbrite field mapping
+      description: |
+        Which Makerble field each Eventbrite field is copied into. Defaults are filled in on first use. For
+        `attendee`, order form questions appear as `answer:<question>` fields once Eventbrite has been read
+        (see `POST /eventbrite_connection/refresh_questions`).
+      operationId: getEventbriteFieldMapping
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The mapping, with the fields each Eventbrite field can go into
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteFieldMapping'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Eventbrite]
+      summary: Replace an Eventbrite field mapping
+      description: |
+        Only compatible types can be paired, each field can be in only one pair, and a pair can be paused.
+        Eventbrite fields left out are not copied. Event fields replace the Makerble value; Contact fields
+        only fill in blanks.
+      operationId: setEventbriteFieldMapping
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, mappings]
+              properties:
+                charity_id:
+                  type: integer
+                mappings:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/EventbriteFieldPair'
+            example:
+              charity_id: 913
+              mappings:
+                - eventbrite_field: name
+                  makerble_field: name
+                - eventbrite_field: venue
+                  makerble_field: location
+                  paused: true
+      responses:
+        "200":
+          description: The mapping, with the fields each Eventbrite field can go into
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteFieldMapping'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /eventbrite_connection/refresh_questions:
+    post:
+      tags: [Eventbrite]
+      summary: Re-read the order form questions from Eventbrite
+      description: Reads the questions on the order forms of recent events brought in, and returns the ticket holder mapping.
+      operationId: refreshEventbriteQuestions
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The mapping, with the fields each Eventbrite field can go into
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteFieldMapping'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /webhook_endpoints:
     get:
       tags: [Webhooks]
@@ -14981,6 +15706,18 @@ components:
             name:
               type: string
               example: "Greenfield Community Trust"
+            default_project_story_privacy:
+              $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+
+    DefaultProjectStoryPrivacy:
+      type: string
+      description: |
+        The Story Privacy Level each new project in the Organisation starts with: Project colleagues
+        only, Organisation colleagues only, Network & organisation colleagues only, or Everyone.
+        Organisations created from November 2026 start with `only_project_colleagues`; older ones
+        with `only_charity_colleagues`.
+      enum: [only_project_colleagues, only_charity_colleagues, charity_plus_network, everyone]
+      example: only_project_colleagues
 
     ProjectDetail:
       description: A Project as returned by `GET /projects/{id}`.
@@ -15070,6 +15807,106 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    Team:
+      type: object
+      properties:
+        id:
+          type: integer
+        charity_id:
+          type: integer
+          description: The Organisation the Team belongs to
+        name:
+          type: string
+        colour:
+          type: string
+          description: The Team's chip colour, e.g. "#3595d5"
+        manager_ids:
+          type: array
+          description: User IDs of the Team's managers (leaders)
+          items:
+            type: integer
+        member_ids:
+          type: array
+          description: User IDs of the Team's other members
+          items:
+            type: integer
+        auto_add_to_projects:
+          type: boolean
+          description: Whether people who join the Team are added to its Projects
+        auto_add_project_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_filter_ids:
+          type: array
+          description: Saved project filters (FilterHistory) whose matching open Projects people are added to
+          items:
+            type: integer
+        auto_add_manager_role:
+          type: string
+          enum: [editor, reporter, observer]
+          description: The project role a new manager gets
+        auto_add_member_role:
+          type: string
+          enum: [editor, reporter, observer]
+          description: The project role a new member gets
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TeamAddMembersRequest:
+      type: object
+      required: [user_ids, role]
+      properties:
+        user_ids:
+          type: array
+          description: Colleagues (user IDs) in the Team's Organisation
+          items:
+            type: integer
+        role:
+          type: string
+          enum: [member, manager]
+          description: Add them as Members, or as Managers (leaders)
+
+    TeamList:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+
+    TeamUpdateRequest:
+      type: object
+      properties:
+        auto_add_to_projects:
+          type: boolean
+        auto_add_project_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_filter_ids:
+          type: array
+          items:
+            type: integer
+        auto_add_manager_role:
+          type: string
+          enum: [editor, reporter, observer]
+        auto_add_member_role:
+          type: string
+          enum: [editor, reporter, observer]
 
     AlbumList:
       type: object
@@ -19351,6 +20188,237 @@ components:
               type: boolean
               description: false pauses the endpoint; true resumes it
 
+    EventbriteSettings:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          nullable: true
+        event_category_id:
+          type: integer
+          nullable: true
+        import_mode:
+          type: string
+          enum: [all_upcoming, selected]
+        selected_event_ids:
+          type: array
+          readOnly: true
+          items:
+            type: string
+        contact_project_id:
+          type: integer
+          nullable: true
+        beneficiary_category_id:
+          type: integer
+          nullable: true
+        change_id:
+          type: integer
+          nullable: true
+        story_category_id:
+          type: integer
+          nullable: true
+    EventbriteEventChoice:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        start:
+          type: string
+          description: Local start time on Eventbrite
+        status:
+          type: string
+          enum: [live, started, ended, canceled, draft]
+        url:
+          type: string
+        selected:
+          type: boolean
+        makerble_event_id:
+          type: integer
+          nullable: true
+    EventbriteFieldPair:
+      type: object
+      required: [eventbrite_field, makerble_field]
+      properties:
+        eventbrite_field:
+          type: string
+        makerble_field:
+          type: string
+          description: A built-in field, `custom_field:<id>` or (Contacts) `dropdown:<ratio set id>`
+        paused:
+          type: boolean
+    EventbriteFieldMapping:
+      type: object
+      properties:
+        object_type:
+          type: string
+        mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventbriteFieldPair'
+        eventbrite_fields:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              label:
+                type: string
+              type:
+                type: string
+              compatible_makerble_fields:
+                type: array
+                items:
+                  type: string
+        makerble_fields:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              label:
+                type: string
+              type:
+                type: string
+    PaginatedEventbriteSyncLog:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              outcome:
+                type: string
+                enum: [imported, updated, skipped, removed, needs_review, error]
+              object_type:
+                type: string
+                enum: [connection, event, attendee, order, check_in]
+              message:
+                type: string
+              eventbrite_id:
+                type: string
+                nullable: true
+              eventbrite_url:
+                type: string
+                nullable: true
+              record:
+                type: object
+                nullable: true
+                properties:
+                  type:
+                    type: string
+                    enum: [Contact, Event, Story]
+                  id:
+                    type: integer
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+    EventbriteConnection:
+      type: object
+      properties:
+        charity_id:
+          type: integer
+        status:
+          type: string
+          enum: [not_connected, choosing_organisation, active, reconnect_required]
+        connected:
+          type: boolean
+          description: True when `status` is `active`
+        available:
+          type: boolean
+          description: False when the Eventbrite integration isn't set up on this Makerble site
+        page_url:
+          type: string
+          format: uri
+          description: The Connect > Eventbrite page, where an admin signs in to Eventbrite
+        test_succeeded:
+          type: boolean
+          description: Only on `POST /eventbrite_connection/test`
+        eventbrite_organization:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        available_organizations:
+          type: array
+          description: Only while `status` is `choosing_organisation`
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        connected_by:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        syncing:
+          type: boolean
+          description: A sync is queued or running
+        last_error:
+          type: string
+          nullable: true
+        settings:
+          $ref: '#/components/schemas/EventbriteSettings'
+        check_in_problem:
+          type: string
+          nullable: true
+          description: Why check-ins can't be recorded yet; they wait until it is put right
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      example:
+        charity_id: 913
+        status: active
+        connected: true
+        available: true
+        page_url: "https://app.makerble.com/charities/hope-trust/eventbrite"
+        eventbrite_organization:
+          id: "555"
+          name: "Hope Trust Events"
+        connected_by:
+          id: 42
+          name: "Sam Patel"
+        last_checked_at: "2026-11-04T09:15:00Z"
+        last_error: null
+        created_at: "2026-11-04T09:10:00Z"
+        updated_at: "2026-11-04T09:15:00Z"
     WebhookEndpoint:
       type: object
       properties:
