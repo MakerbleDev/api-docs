@@ -12934,10 +12934,11 @@ paths:
       description: |
         The Workspace (`project_id`) and Event format (`event_category_id`, one of the Workspace's) new Events go
         into; `import_mode` `all_upcoming` (every upcoming Eventbrite event, new ones included) or `selected`
-        (only picked events); the Workspace (`contact_project_id`, or each Event's Workspace when blank) and
-        Contact type (`beneficiary_category_id`) new Contacts get; and the engagement tracker (`change_id`) and
-        Story Category (`story_category_id`) check-ins are recorded with. Send only the settings to change.
-        Saving starts a sync.
+        (only picked events, drafts included); the Workspace (`contact_project_id`, or each Event's Workspace when
+        blank) and Contact Bio Form (`beneficiary_category_id`, one the Workspace uses for creating Contacts) new
+        Contacts get; and the engagement tracker (`change_id`) and Event attendance survey (`story_category_id`, a
+        survey running on the Workspace for new Events) check-ins are recorded with. Send only the settings to
+        change. Saving starts a sync. Nothing comes in until `project_id` and `event_category_id` are set.
       operationId: updateEventbriteSettings
       security: [{tokenAuth: []}]
       requestBody:

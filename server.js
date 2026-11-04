@@ -3829,8 +3829,8 @@ function buildDocsPage() {
             { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
             { name: "eventbrite_connection[project_id] / [event_category_id]", in: "body", type: "integer", required: false, desc: "Workspace and Event format for new Events" },
             { name: "eventbrite_connection[import_mode]", in: "body", type: "string", required: false, desc: "all_upcoming or selected" },
-            { name: "eventbrite_connection[contact_project_id] / [beneficiary_category_id]", in: "body", type: "integer", required: false, desc: "Workspace and Contact type for new Contacts" },
-            { name: "eventbrite_connection[change_id] / [story_category_id]", in: "body", type: "integer", required: false, desc: "Engagement tracker and Story Category for check-ins" }
+            { name: "eventbrite_connection[contact_project_id] / [beneficiary_category_id]", in: "body", type: "integer", required: false, desc: "Workspace and Contact Bio Form (one the Workspace creates Contacts with) for new Contacts" },
+            { name: "eventbrite_connection[change_id] / [story_category_id]", in: "body", type: "integer", required: false, desc: "Engagement tracker and Event attendance survey (running on the Workspace) for check-ins" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The connection with its settings; a sync starts" },
             { code: "422", cls: "response-4xx", desc: "E.g. the Event format isn't one of the Workspace's" }
