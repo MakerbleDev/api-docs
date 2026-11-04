@@ -12862,6 +12862,312 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /eventbrite_connection/sync:
+    post:
+      tags: [Eventbrite]
+      summary: Sync with Eventbrite now
+      description: |
+        Queues a full catch-up with the Organisation's Eventbrite account, instead of waiting for the one
+        every 3 hours (changes normally arrive within seconds by webhook). `syncing` is true until it has run;
+        see `GET /eventbrite_connection/sync_log` for what came in.
+      operationId: syncEventbriteNow
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/sync_log:
+    get:
+      tags: [Eventbrite]
+      summary: List the Eventbrite sync log
+      description: |
+        What Makerble brought in from Eventbrite, updated, skipped or removed, and why, newest first, kept for
+        90 days. `needs_review` means a ticket holder's email matched existing Contacts unclearly: a new Contact
+        was made and the possible duplicates are on the Suggested Merges list (source `eventbrite`).
+      operationId: listEventbriteSyncLog
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated sync log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventbriteSyncLog'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/settings:
+    patch:
+      tags: [Eventbrite]
+      summary: Choose what to bring in from Eventbrite
+      description: |
+        The Workspace (`project_id`) and Event format (`event_category_id`, one of the Workspace's) new Events go
+        into; `import_mode` `all_upcoming` (every upcoming Eventbrite event, new ones included) or `selected`
+        (only picked events); the Workspace (`contact_project_id`, or each Event's Workspace when blank) and
+        Contact type (`beneficiary_category_id`) new Contacts get; and the engagement tracker (`change_id`) and
+        Story Category (`story_category_id`) check-ins are recorded with. Send only the settings to change.
+        Saving starts a sync.
+      operationId: updateEventbriteSettings
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, eventbrite_connection]
+              properties:
+                charity_id:
+                  type: integer
+                eventbrite_connection:
+                  $ref: '#/components/schemas/EventbriteSettings'
+            example:
+              charity_id: 913
+              eventbrite_connection:
+                project_id: 120
+                event_category_id: 44
+                import_mode: all_upcoming
+                change_id: 3021
+                story_category_id: 812
+      responses:
+        "200":
+          description: The connection with its new settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /eventbrite_connection/events:
+    get:
+      tags: [Eventbrite]
+      summary: List the Eventbrite events to pick from
+      description: |
+        The upcoming events in the connected Eventbrite organisation, with whether each is (or would be)
+        brought in, and the Makerble Event it came in as. Drafts and cancelled events are listed but not
+        selected unless picked.
+      operationId: listEventbriteEvents
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The Eventbrite events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventbriteEventChoice'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "502":
+          description: Eventbrite couldn't list the events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Eventbrite]
+      summary: Pick the Eventbrite events to bring in
+      description: Switches `import_mode` to `selected` and brings in only these Eventbrite events.
+      operationId: chooseEventbriteEvents
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, eventbrite_event_ids]
+              properties:
+                charity_id:
+                  type: integer
+                eventbrite_event_ids:
+                  type: array
+                  items:
+                    type: string
+            example:
+              charity_id: 913
+              eventbrite_event_ids: ["750011223344"]
+      responses:
+        "200":
+          description: The connection, with the picked events in settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/mappings/{object_type}:
+    parameters:
+      - name: object_type
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [event, attendee]
+        description: "`event` for Eventbrite events onto Makerble Events; `attendee` for ticket holders onto Contacts"
+    get:
+      tags: [Eventbrite]
+      summary: Get an Eventbrite field mapping
+      description: |
+        Which Makerble field each Eventbrite field is copied into. Defaults are filled in on first use. For
+        `attendee`, order form questions appear as `answer:<question>` fields once Eventbrite has been read
+        (see `POST /eventbrite_connection/refresh_questions`).
+      operationId: getEventbriteFieldMapping
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The mapping, with the fields each Eventbrite field can go into
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteFieldMapping'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Eventbrite]
+      summary: Replace an Eventbrite field mapping
+      description: |
+        Only compatible types can be paired, each field can be in only one pair, and a pair can be paused.
+        Eventbrite fields left out are not copied. Event fields replace the Makerble value; Contact fields
+        only fill in blanks.
+      operationId: setEventbriteFieldMapping
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, mappings]
+              properties:
+                charity_id:
+                  type: integer
+                mappings:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/EventbriteFieldPair'
+            example:
+              charity_id: 913
+              mappings:
+                - eventbrite_field: name
+                  makerble_field: name
+                - eventbrite_field: venue
+                  makerble_field: location
+                  paused: true
+      responses:
+        "200":
+          description: The mapping, with the fields each Eventbrite field can go into
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteFieldMapping'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /eventbrite_connection/refresh_questions:
+    post:
+      tags: [Eventbrite]
+      summary: Re-read the order form questions from Eventbrite
+      description: Reads the questions on the order forms of recent events brought in, and returns the ticket holder mapping.
+      operationId: refreshEventbriteQuestions
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The mapping, with the fields each Eventbrite field can go into
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteFieldMapping'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /webhook_endpoints:
     get:
       tags: [Webhooks]
@@ -19667,6 +19973,148 @@ components:
               type: boolean
               description: false pauses the endpoint; true resumes it
 
+    EventbriteSettings:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          nullable: true
+        event_category_id:
+          type: integer
+          nullable: true
+        import_mode:
+          type: string
+          enum: [all_upcoming, selected]
+        selected_event_ids:
+          type: array
+          readOnly: true
+          items:
+            type: string
+        contact_project_id:
+          type: integer
+          nullable: true
+        beneficiary_category_id:
+          type: integer
+          nullable: true
+        change_id:
+          type: integer
+          nullable: true
+        story_category_id:
+          type: integer
+          nullable: true
+    EventbriteEventChoice:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        start:
+          type: string
+          description: Local start time on Eventbrite
+        status:
+          type: string
+          enum: [live, started, ended, canceled, draft]
+        url:
+          type: string
+        selected:
+          type: boolean
+        makerble_event_id:
+          type: integer
+          nullable: true
+    EventbriteFieldPair:
+      type: object
+      required: [eventbrite_field, makerble_field]
+      properties:
+        eventbrite_field:
+          type: string
+        makerble_field:
+          type: string
+          description: A built-in field, `custom_field:<id>` or (Contacts) `dropdown:<ratio set id>`
+        paused:
+          type: boolean
+    EventbriteFieldMapping:
+      type: object
+      properties:
+        object_type:
+          type: string
+        mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventbriteFieldPair'
+        eventbrite_fields:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              label:
+                type: string
+              type:
+                type: string
+              compatible_makerble_fields:
+                type: array
+                items:
+                  type: string
+        makerble_fields:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              label:
+                type: string
+              type:
+                type: string
+    PaginatedEventbriteSyncLog:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              outcome:
+                type: string
+                enum: [imported, updated, skipped, removed, needs_review, error]
+              object_type:
+                type: string
+                enum: [connection, event, attendee, order, check_in]
+              message:
+                type: string
+              eventbrite_id:
+                type: string
+                nullable: true
+              eventbrite_url:
+                type: string
+                nullable: true
+              record:
+                type: object
+                nullable: true
+                properties:
+                  type:
+                    type: string
+                    enum: [Contact, Event, Story]
+                  id:
+                    type: integer
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
     EventbriteConnection:
       type: object
       properties:
@@ -19718,9 +20166,22 @@ components:
           type: string
           format: date-time
           nullable: true
+        last_synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        syncing:
+          type: boolean
+          description: A sync is queued or running
         last_error:
           type: string
           nullable: true
+        settings:
+          $ref: '#/components/schemas/EventbriteSettings'
+        check_in_problem:
+          type: string
+          nullable: true
+          description: Why check-ins can't be recorded yet; they wait until it is put right
         created_at:
           type: string
           format: date-time
