@@ -970,6 +970,7 @@ function buildDocsPage() {
       <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
         <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST">POST</span>Webhooks</a>
+        <a href="#eventbrite"      class="nav-link"><span class="nav-method method-GET">GET</span>Eventbrite</a>
         <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
@@ -3698,6 +3699,44 @@ function buildDocsPage() {
           ], [
             { code: "202", cls: "response-2xx", desc: "Queued again, with the same event id" },
             { code: "404", cls: "response-4xx", desc: "No such delivery for this endpoint" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Eventbrite -->
+      <section class="section" id="eventbrite">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Eventbrite</h2>
+        <div class="section-desc">
+          <p>An Organisation can connect Makerble to its Eventbrite account to bring Eventbrite events, ticket holders and check-ins into Makerble as Events, Contacts and attendance Stories. Only the Organisation's admins can see or change the connection; anyone else gets <code>403</code>, and someone outside the Organisation <code>404</code>.</p>
+          <p>Signing in to Eventbrite needs a browser, so an admin connects (and reconnects) on the <strong>Connect &gt; Eventbrite</strong> page in Makerble, returned as <code>page_url</code>. The API reports the connection's <code>status</code>: <code>not_connected</code>, <code>choosing_organisation</code> (the sign-in belongs to several Eventbrite organisations; choose one from <code>available_organizations</code>), <code>active</code>, or <code>reconnect_required</code> (Eventbrite no longer accepts the sign-in; the admins are emailed). The Eventbrite token is never returned.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/eventbrite_connection", "Get the Organisation's Eventbrite connection", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The connection, or status not_connected, with page_url" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" },
+            { code: "404", cls: "response-4xx", desc: "Not in this Organisation" }
+          ])}
+          ${endpointCard("PATCH", "/eventbrite_connection", "Choose the Eventbrite organisation", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "eventbrite_connection[eventbrite_organization_id]", in: "body", type: "string", required: true, desc: "An id from available_organizations" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The connection, now active" },
+            { code: "404", cls: "response-4xx", desc: "Eventbrite isn't connected for this Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Not one of available_organizations" }
+          ])}
+          ${endpointCard("POST", "/eventbrite_connection/test", "Test the Eventbrite connection", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The connection with test_succeeded; a revoked sign-in becomes reconnect_required" },
+            { code: "404", cls: "response-4xx", desc: "Eventbrite isn't connected for this Organisation" }
+          ])}
+          ${endpointCard("DELETE", "/eventbrite_connection", "Disconnect Eventbrite", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Disconnected; records already brought in from Eventbrite stay" }
           ])}
         </div>
       </section>

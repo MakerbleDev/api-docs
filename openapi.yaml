@@ -311,6 +311,11 @@ tags:
     description: |
       HTTPS endpoints an Organisation's admins register to receive signed events when
       Contacts, Stories and Projects change and when imports finish. See Webhooks above.
+  - name: Eventbrite
+    description: |
+      An Organisation's connection to Eventbrite, which brings Eventbrite events, ticket holders and
+      check-ins into Makerble as Events, Contacts and attendance Stories. Only the Organisation's admins
+      can see or change it.
 
 paths:
 
@@ -12444,6 +12449,139 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /eventbrite_connection:
+    get:
+      tags: [Eventbrite]
+      summary: Get the Organisation's Eventbrite connection
+      description: |
+        Whether the Organisation (Charity) is connected to Eventbrite. `status` is `not_connected`,
+        `choosing_organisation` (signed in, but the Eventbrite sign-in belongs to several Eventbrite
+        organisations; choose one with `PATCH /eventbrite_connection`), `active`, or `reconnect_required`
+        (Eventbrite no longer accepts the sign-in, and the Organisation's admins have been emailed).
+        Signing in to Eventbrite needs a browser, so connecting and reconnecting happen on the
+        Connect > Eventbrite page in Makerble, given as `page_url`. The Eventbrite token is never returned.
+      operationId: getEventbriteConnection
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The connection, or `status` `not_connected`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Eventbrite]
+      summary: Choose the Eventbrite organisation
+      description: |
+        While `status` is `choosing_organisation`, chooses which of `available_organizations` the
+        connection uses. The connection becomes `active`.
+      operationId: chooseEventbriteOrganization
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, eventbrite_connection]
+              properties:
+                charity_id:
+                  type: integer
+                eventbrite_connection:
+                  type: object
+                  required: [eventbrite_organization_id]
+                  properties:
+                    eventbrite_organization_id:
+                      type: string
+            example:
+              charity_id: 913
+              eventbrite_connection:
+                eventbrite_organization_id: "2"
+      responses:
+        "200":
+          description: The connection, now active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Eventbrite]
+      summary: Disconnect Eventbrite
+      description: |
+        Makerble stops bringing in changes from Eventbrite. Events, Contacts and Stories already brought
+        in stay, with their links to Eventbrite. Succeeds again when already disconnected.
+      operationId: disconnectEventbrite
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "204":
+          description: Disconnected
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /eventbrite_connection/test:
+    post:
+      tags: [Eventbrite]
+      summary: Test the Eventbrite connection
+      description: |
+        Checks with Eventbrite that the sign-in still works. `test_succeeded` says whether it did. A
+        revoked sign-in moves `status` to `reconnect_required`.
+      operationId: testEventbriteConnection
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+      responses:
+        "200":
+          description: The connection, with `test_succeeded`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventbriteConnection'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /webhook_endpoints:
     get:
       tags: [Webhooks]
@@ -19137,6 +19275,82 @@ components:
               type: boolean
               description: false pauses the endpoint; true resumes it
 
+    EventbriteConnection:
+      type: object
+      properties:
+        charity_id:
+          type: integer
+        status:
+          type: string
+          enum: [not_connected, choosing_organisation, active, reconnect_required]
+        connected:
+          type: boolean
+          description: True when `status` is `active`
+        available:
+          type: boolean
+          description: False when the Eventbrite integration isn't set up on this Makerble site
+        page_url:
+          type: string
+          format: uri
+          description: The Connect > Eventbrite page, where an admin signs in to Eventbrite
+        test_succeeded:
+          type: boolean
+          description: Only on `POST /eventbrite_connection/test`
+        eventbrite_organization:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        available_organizations:
+          type: array
+          description: Only while `status` is `choosing_organisation`
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        connected_by:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      example:
+        charity_id: 913
+        status: active
+        connected: true
+        available: true
+        page_url: "https://app.makerble.com/charities/hope-trust/eventbrite"
+        eventbrite_organization:
+          id: "555"
+          name: "Hope Trust Events"
+        connected_by:
+          id: 42
+          name: "Sam Patel"
+        last_checked_at: "2026-11-04T09:15:00Z"
+        last_error: null
+        created_at: "2026-11-04T09:10:00Z"
+        updated_at: "2026-11-04T09:15:00Z"
     WebhookEndpoint:
       type: object
       properties:
