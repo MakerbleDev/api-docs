@@ -254,6 +254,11 @@ tags:
     description: |
       An Organisation's custom rules for finding duplicate Contacts: which fields must be
       identical, and whether matches are merged automatically or suggested for review.
+  - name: Field Visibility
+    description: |
+      Who can see each Contact field (Settings > Field Visibility). A field is either visible to
+      everyone who can view the Contact (default) or Restricted to users in chosen Teams or on
+      chosen Projects. Also sets whether external guest users see the field.
   - name: Checklists
     description: |
       An Organisation's lists of actions it expects to be done for each Contact (Beneficiary),
@@ -7934,6 +7939,187 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "403":
           description: The user isn't an Admin or Creator of the Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /field_visibility_rules:
+    get:
+      tags: [Field Visibility]
+      summary: List who can see each Contact field
+      description: |
+        The Field Visibility settings page. Every Contact field comes back once, whichever Contact
+        forms it is on. `field_class_name` and `field_key` identify it: `CustomField` or `RatioSet`
+        with its id for a form field or dropdown, `BeneficiaryColumn` with the column name for a
+        built-in field such as `date_of_birth`, `CustomFieldDefinition` with its id for a Custom
+        Forms field. `visibility` is `default` (everyone who can view the Contact) or `restricted`:
+        only users in one of its `teams`, or colleagues in any role on one of its `projects`, see the
+        value; Organisation Admins get no exception. A restriction never gives anyone access to a
+        Contact they can't already view. `visible_to_guests` says whether external guest users added
+        through a Contact's Override see the field. Requires an Organisation Admin (editor).
+        `last_synced_datetime` isn't supported: a field returned to default has no record to sync.
+      operationId: listFieldVisibilityRules
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity) ID
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Part of the field name
+        - name: form
+          in: query
+          schema:
+            type: string
+          description: Only fields on this Contact form (its name)
+        - name: visibility
+          in: query
+          schema:
+            type: string
+            enum: [default, restricted]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of Contact fields
+          content:
+            application/json:
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - field_class_name: CustomField
+                    field_key: "481"
+                    name: NHS number
+                    forms: [Person being referred]
+                    visibility: restricted
+                    teams: [{ id: 9, name: Beacons }]
+                    projects: [{ id: 33, name: WAY Beacons CYP }]
+                    visible_to_guests: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't an Organisation Admin
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Field Visibility]
+      summary: Change who can see Contact fields
+      description: |
+        Change the settings of one or more Contact fields, all together or not at all. For each
+        field, `visibility: restricted` needs at least one of `team_ids` or `project_ids` (Teams and
+        Projects of the same Organisation); `visibility: default` removes the restriction.
+        `visible_to_guests` shows or hides the field from external guest users. Leave a key out to
+        keep that setting. Errors name the field, e.g. "NHS number: Choose at least one Team or
+        project for a restricted field". Requires an Organisation Admin (editor).
+      operationId: updateFieldVisibilityRules
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, rules]
+              properties:
+                charity_id: { type: integer }
+                rules:
+                  type: array
+                  items:
+                    type: object
+                    required: [field_class_name, field_key]
+                    properties:
+                      field_class_name: { type: string, enum: [CustomField, RatioSet, BeneficiaryColumn, CustomFieldDefinition] }
+                      field_key: { type: string, description: The field id, or the column name for a BeneficiaryColumn }
+                      visibility: { type: string, enum: [default, restricted] }
+                      team_ids: { type: array, items: { type: integer } }
+                      project_ids: { type: array, items: { type: integer } }
+                      visible_to_guests: { type: boolean }
+            example:
+              charity_id: 12
+              rules:
+                - { field_class_name: CustomField, field_key: "481", visibility: restricted, team_ids: [9], project_ids: [33], visible_to_guests: false }
+      responses:
+        "200":
+          description: The changed fields
+          content:
+            application/json:
+              example:
+                data:
+                  - field_class_name: CustomField
+                    field_key: "481"
+                    name: NHS number
+                    forms: [Person being referred]
+                    visibility: restricted
+                    teams: [{ id: 9, name: Beacons }]
+                    projects: [{ id: 33, name: WAY Beacons CYP }]
+                    visible_to_guests: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't an Organisation Admin
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+    put:
+      tags: [Field Visibility]
+      summary: Change who can see Contact fields (same as PATCH)
+      description: The same as PATCH /field_visibility_rules.
+      operationId: replaceFieldVisibilityRules
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, rules]
+              properties:
+                charity_id: { type: integer }
+                rules:
+                  type: array
+                  items:
+                    type: object
+                    required: [field_class_name, field_key]
+                    properties:
+                      field_class_name: { type: string, enum: [CustomField, RatioSet, BeneficiaryColumn, CustomFieldDefinition] }
+                      field_key: { type: string, description: The field id, or the column name for a BeneficiaryColumn }
+                      visibility: { type: string, enum: [default, restricted] }
+                      team_ids: { type: array, items: { type: integer } }
+                      project_ids: { type: array, items: { type: integer } }
+                      visible_to_guests: { type: boolean }
+            example:
+              charity_id: 12
+              rules:
+                - { field_class_name: CustomField, field_key: "481", visibility: restricted, team_ids: [9], project_ids: [33], visible_to_guests: false }
+      responses:
+        "200":
+          description: The changed fields
+          content:
+            application/json:
+              example:
+                data:
+                  - field_class_name: CustomField
+                    field_key: "481"
+                    name: NHS number
+                    forms: [Person being referred]
+                    visibility: restricted
+                    teams: [{ id: 9, name: Beacons }]
+                    projects: [{ id: 33, name: WAY Beacons CYP }]
+                    visible_to_guests: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user isn't an Organisation Admin
         "404":
           $ref: '#/components/responses/NotFound'
         "422":
