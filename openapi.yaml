@@ -575,6 +575,44 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Charities]
+      summary: Change an Organisation's settings
+      description: |
+        Changes the Organisation's settings that Charity Preferences offers over the API. For now that is
+        **Default story level privacy setting on each project**: the Story Privacy Level each new project
+        in the Organisation starts with. Existing projects keep their own level, and each project's level
+        can still be changed on its Preferences page. Only settings sent are changed. Only an
+        Organisation Admin may do this; other colleagues get 403. Returns the Organisation.
+      operationId: updateCharity
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                default_project_story_privacy:
+                  $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+            example:
+              default_project_story_privacy: only_project_colleagues
+      responses:
+        "200":
+          description: The Organisation, with the setting changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charity'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /announcements:
     get:
@@ -14854,6 +14892,18 @@ components:
             name:
               type: string
               example: "Greenfield Community Trust"
+            default_project_story_privacy:
+              $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+
+    DefaultProjectStoryPrivacy:
+      type: string
+      description: |
+        The Story Privacy Level each new project in the Organisation starts with: Project colleagues
+        only, Organisation colleagues only, Network & organisation colleagues only, or Everyone.
+        Organisations created from November 2026 start with `only_project_colleagues`; older ones
+        with `only_charity_colleagues`.
+      enum: [only_project_colleagues, only_charity_colleagues, charity_plus_network, everyone]
+      example: only_project_colleagues
 
     ProjectDetail:
       description: A Project as returned by `GET /projects/{id}`.
