@@ -1501,17 +1501,17 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list of Contacts including custom fields" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" }
-          ])}
+          ], "Fields hidden from you by <strong>Field Visibility</strong> come back with <code>restricted: true</code> and a null value (custom fields), or null and named in <code>restricted_fields</code> (<code>dob</code>, <code>mobile</code>, <code>email</code>, <code>address</code>).")}
           ${endpointCard("GET", "/beneficiaries/{id}", "Get a single Contact", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Full Contact profile with all custom fields" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
-          ], "Opening a Contact this way is recorded in its <strong>Access Log</strong>, the audit trail of who has viewed it, under your name and marked as via the API (or via MCP when the Makerble MCP server sends <code>X-Makerble-Client: makerble-mcp</code>). Views less than 30 minutes apart are counted together. Use <code>GET /beneficiaries</code> when you only need to find or scan Contacts.")}
+          ], "Opening a Contact this way is recorded in its <strong>Access Log</strong>, the audit trail of who has viewed it, under your name and marked as via the API (or via MCP when the Makerble MCP server sends <code>X-Makerble-Client: makerble-mcp</code>). Views less than 30 minutes apart are counted together. Use <code>GET /beneficiaries</code> when you only need to find or scan Contacts. Fields hidden from you by <strong>Field Visibility</strong> come back with <code>restricted: true</code> and a null value (custom fields), or null and named in <code>restricted_fields</code> (<code>dob</code>, <code>mobile</code>, <code>email</code>, <code>address</code>).")}
           ${endpointCard("POST", "/beneficiaries", "Create a Contact", true, [], [
             { code: "200", cls: "response-2xx", desc: "Contact created" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required)" }
-          ], "Required fields: <code>beneficiary.name</code>, <code>beneficiary.owner_id</code> (User ID of the record owner). Submit custom field values as <code>custom_fields: {\"field_id\": \"value\"}</code>.")}
+            { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required), or a field hidden from you by Field Visibility was sent" }
+          ], "Required fields: <code>beneficiary.name</code>, <code>beneficiary.owner_id</code> (User ID of the record owner). Submit custom field values as <code>custom_fields: {\"field_id\": \"value\"}</code>. Setting a field hidden from you by Field Visibility is refused with 422 and an <code>errors</code> list naming it.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/summary", "Get the AI summary of a Contact (SummaryMaker)", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
@@ -1912,7 +1912,7 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "The Version, including full_object — every field as saved at that moment" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
-          ])}
+          ], "For a Contact, fields hidden from you by <strong>Field Visibility</strong> are null in <code>full_object</code> and named in <code>restricted_fields</code>.")}
         </div>
       </section>
 

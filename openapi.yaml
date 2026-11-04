@@ -1428,6 +1428,10 @@ paths:
       description: |
         Returns all Contacts visible to the authenticated user. Filter by `charity_id` or `project_id`.
         Response includes `custom_fields` defined by the Beneficiary Category.
+
+        Fields the Organisation's **Field Visibility** settings hide from you are not returned: a hidden custom field
+        comes back with `restricted: true` and `value: null`, and a hidden built-in field (`dob`, `mobile`, `email`,
+        `address`) is `null` and named in `restricted_fields`.
       operationId: listBeneficiaries
       security: [{tokenAuth: []}]
       parameters:
@@ -1461,6 +1465,10 @@ paths:
         Creates a new Contact. Required: `name`, `owner_id`.
 
         Call `GET /beneficiary_types` for `beneficiary_type_id` values and `GET /custom_fields` for available custom field IDs.
+
+        Setting a field the Organisation's Field Visibility settings hide from you (a custom field, a dropdown answer
+        in `sub_ratio_ids`, `date_of_birth` or `address`) is refused with `422` and an `errors` list naming each field;
+        no Contact is created.
       operationId: createBeneficiary
       security: [{tokenAuth: []}]
       requestBody:
@@ -1630,7 +1638,9 @@ paths:
     get:
       tags: [Beneficiaries]
       summary: Get advanced custom fields for all Beneficiaries
-      description: Returns the per-record custom field values for all Beneficiaries.
+      description: |
+        Returns the per-record custom field values (Custom Forms answers) for all Beneficiaries.
+        An answer the Organisation's Field Visibility settings hide from you comes back with `restricted: true` and `value: null`.
       operationId: listBeneficiaryAdvancedCustomFields
       security: [{tokenAuth: []}]
       parameters:
@@ -3335,6 +3345,8 @@ paths:
         moment, not just the fields that changed. Compare two Versions' `full_object` to see what changed.
         For a Story, `full_object` is `{schema_version, story, privacy_settings, contact_ids, outcome_ids, label_ids,
         media, answers}`, where each answer carries the survey question's label as it was then.
+        For a Contact, fields the Organisation's Field Visibility settings hide from you are `null` in `full_object`
+        and named in `restricted_fields`.
         Same permissions as `GET /versions`.
       operationId: getVersion
       security: [{tokenAuth: []}]
@@ -15828,6 +15840,12 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/CustomFieldValue'
+            restricted_fields:
+              type: array
+              items:
+                type: string
+              description: Built-in fields (`dob`, `mobile`, `email`, `address`) hidden from you by Field Visibility; each is returned as null
+              example: ["mobile"]
 
     BeneficiaryCreateRequest:
       type: object
@@ -15971,8 +15989,12 @@ components:
           example: "text"
           description: "Field type: text, date, time, file, etc."
         value:
-          description: Field value (string for most types; object for file attachments)
+          description: Field value (string for most types; object for file attachments). Null when `restricted` is true.
           example: "Employed"
+        restricted:
+          type: boolean
+          description: Present and true when Field Visibility hides this field from you; `value` is then null, whether or not it has an answer
+          example: true
 
     Story:
       allOf:
@@ -16796,6 +16818,12 @@ components:
               type: object
               additionalProperties: true
               description: Snapshot of every field of the record as saved in this Version
+            restricted_fields:
+              type: array
+              items:
+                type: string
+              description: Fields of a Contact hidden from you by Field Visibility, nulled in `full_object` (column names, or custom field names)
+              example: ["date_of_birth", "NHS number"]
 
     PaginatedVersions:
       allOf:
