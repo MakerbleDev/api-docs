@@ -575,6 +575,44 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Charities]
+      summary: Change an Organisation's settings
+      description: |
+        Changes the Organisation's settings that Charity Preferences offers over the API. For now that is
+        **Default story level privacy setting on each project**: the Story Privacy Level each new project
+        in the Organisation starts with. Existing projects keep their own level, and each project's level
+        can still be changed on its Preferences page. Only settings sent are changed. Only an
+        Organisation Admin may do this; other colleagues get 403. Returns the Organisation.
+      operationId: updateCharity
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                default_project_story_privacy:
+                  $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+            example:
+              default_project_story_privacy: only_project_colleagues
+      responses:
+        "200":
+          description: The Organisation, with the setting changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charity'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /announcements:
     get:
@@ -8496,6 +8534,77 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /checklists/{id}/progress/contacts:
+    get:
+      tags: [Checklists]
+      summary: List every Contact behind one of a Checklist's progress counts
+      description: |
+        Every Contact behind one count of the Checklist's Progress section, a page at a time, as the
+        **Show N more** buttons on the Checklist's page do. `GET /checklists/{id}/progress` lists only the
+        first `list_limit` (30) of each list; use this to get the rest. Choose the list with `list`:
+
+        - `completed`, `furthest` or `waiting`: the Table's lists for the action `action_id`: who has
+          done it, for whom it is the furthest action done, and who is waiting on it
+        - `board`: the Board's column for the action `action_id` (those waiting on it, longest waiting first)
+        - `complete`: the Board's Fully complete column (no `action_id`)
+
+        Each Contact is `{beneficiary_id, name, actions_done}`. In the `waiting` and `board` lists each
+        also has `days_waiting`, `overdue`, `skipped_a_step` and `responsible`. The same `project_id` and
+        `responsible` filters as `GET /checklists/{id}/progress` apply. Only Contacts the user can see are
+        counted. `per_page` is at most 200.
+      operationId: listChecklistProgressContacts
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: list
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [completed, furthest, waiting, board, complete]
+        - name: action_id
+          in: query
+          required: false
+          description: The action whose list it is. Required for every list but `complete`
+          schema:
+            type: integer
+        - name: project_id
+          in: query
+          required: false
+          description: Count only the Contacts in this Project, which must be one the Checklist is added to
+          schema:
+            type: integer
+        - name: responsible
+          in: query
+          required: false
+          description: "Count only the Contacts whose waiting action this person or Team is responsible for: `me`, `user:<id>` or `team:<id>`"
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: One page of the list, in the usual envelope
+          content:
+            application/json:
+              example:
+                page: 2
+                page_size: 1
+                page_count: 2
+                total_count: 31
+                data:
+                  - {beneficiary_id: 903, name: "Mpho Sithole", actions_done: 0, days_waiting: 9, overdue: true, skipped_a_step: false, responsible: "Anyone in Youth Workers"}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /checklists/{id}/journey:
     get:
       tags: [Checklists]
@@ -14792,6 +14901,18 @@ components:
             name:
               type: string
               example: "Greenfield Community Trust"
+            default_project_story_privacy:
+              $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+
+    DefaultProjectStoryPrivacy:
+      type: string
+      description: |
+        The Story Privacy Level each new project in the Organisation starts with: Project colleagues
+        only, Organisation colleagues only, Network & organisation colleagues only, or Everyone.
+        Organisations created from November 2026 start with `only_project_colleagues`; older ones
+        with `only_charity_colleagues`.
+      enum: [only_project_colleagues, only_charity_colleagues, charity_plus_network, everyone]
+      example: only_project_colleagues
 
     ProjectDetail:
       description: A Project as returned by `GET /projects/{id}`.
