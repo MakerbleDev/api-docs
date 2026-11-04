@@ -951,6 +951,7 @@ function buildDocsPage() {
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST">POST</span>Framework Sets</a>
         <a href="#suggested-merges" class="nav-link"><span class="nav-method method-POST">POST</span>Suggested Merges</a>
         <a href="#duplicate-contacts" class="nav-link"><span class="nav-method method-GET">GET</span>Duplicate Contacts</a>
+        <a href="#field-visibility" class="nav-link"><span class="nav-method method-GET">GET</span>Field Visibility</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST">POST</span>Checklists</a>
         <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST">POST</span>Add Metric To</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST">POST</span>Cohort Trackers</a>
@@ -1565,17 +1566,17 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list of Contacts including custom fields" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" }
-          ])}
+          ], "Fields hidden from you by <strong>Field Visibility</strong> come back with <code>restricted: true</code> and a null value (custom fields), or null and named in <code>restricted_fields</code> (<code>dob</code>, <code>mobile</code>, <code>email</code>, <code>address</code>).")}
           ${endpointCard("GET", "/beneficiaries/{id}", "Get a single Contact", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Full Contact profile with all custom fields" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
-          ], "Opening a Contact this way is recorded in its <strong>Access Log</strong>, the audit trail of who has viewed it, under your name and marked as via the API (or via MCP when the Makerble MCP server sends <code>X-Makerble-Client: makerble-mcp</code>). Views less than 30 minutes apart are counted together. Use <code>GET /beneficiaries</code> when you only need to find or scan Contacts.")}
+          ], "Opening a Contact this way is recorded in its <strong>Access Log</strong>, the audit trail of who has viewed it, under your name and marked as via the API (or via MCP when the Makerble MCP server sends <code>X-Makerble-Client: makerble-mcp</code>). Views less than 30 minutes apart are counted together. Use <code>GET /beneficiaries</code> when you only need to find or scan Contacts. Fields hidden from you by <strong>Field Visibility</strong> come back with <code>restricted: true</code> and a null value (custom fields), or null and named in <code>restricted_fields</code> (<code>dob</code>, <code>mobile</code>, <code>email</code>, <code>address</code>).")}
           ${endpointCard("POST", "/beneficiaries", "Create a Contact", true, [], [
             { code: "200", cls: "response-2xx", desc: "Contact created" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required)" }
-          ], "Required fields: <code>beneficiary.name</code>, <code>beneficiary.owner_id</code> (User ID of the record owner). Submit custom field values as <code>custom_fields: {\"field_id\": \"value\"}</code>.")}
+            { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required), or a field hidden from you by Field Visibility was sent" }
+          ], "Required fields: <code>beneficiary.name</code>, <code>beneficiary.owner_id</code> (User ID of the record owner). Submit custom field values as <code>custom_fields: {\"field_id\": \"value\"}</code>. Setting a field hidden from you by Field Visibility is refused with 422 and an <code>errors</code> list naming it.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/summary", "Get the AI summary of a Contact (SummaryMaker)", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
@@ -1976,7 +1977,7 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "The Version, including full_object — every field as saved at that moment" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
-          ])}
+          ], "For a Contact, fields hidden from you by <strong>Field Visibility</strong> are null in <code>full_object</code> and named in <code>restricted_fields</code>.")}
         </div>
       </section>
 
@@ -2558,6 +2559,33 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not a rule of an Organisation you manage" },
             { code: "422", cls: "response-4xx", desc: "<code>{errors}</code>" }
           ], "Body: any of <code>name</code>, <code>conditions</code>, <code>match_type</code>, <code>merge_mode</code>, <code>status</code> (<code>Active</code> or <code>Inactive</code>). Anything not sent is kept.")}
+        </div>
+      </section>
+
+      <!-- Field Visibility -->
+      <section class="section" id="field-visibility">
+        <div class="section-eyebrow">Contacts</div>
+        <h2 class="section-title">Field Visibility</h2>
+        <div class="section-desc">
+          <p>Who can see each Contact field, as the Field Visibility settings page shows it. A field is <code>default</code> (everyone who can view the Contact) or <code>restricted</code>: only users in one of its Teams, or colleagues in any role on one of its Projects, see the value. Organisation Admins get no exception, and a restriction never gives anyone access to a Contact they can't already view. <code>visible_to_guests</code> says whether external guest users added through a Contact's Override see the field. Only Organisation Admins can read or change these settings.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/field_visibility_rules", "List who can see each Contact field", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "search", type: "string", required: false, desc: "Part of the field name" },
+            { name: "form", type: "string", required: false, desc: "Only fields on this Contact form (its name)" },
+            { name: "visibility", type: "string", required: false, desc: "<code>default</code> or <code>restricted</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (at most 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list: <code>field_class_name, field_key, name, forms, visibility, teams [{id, name}], projects [{id, name}], visible_to_guests</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" }
+          ])}
+          ${endpointCard("PATCH", "/field_visibility_rules", "Change who can see Contact fields", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: the changed fields" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors}</code>: a Restricted field with no Team or Project, a Team or Project from another Organisation, or an unknown field. Nothing is saved" }
+          ], "Body: <code>charity_id</code> and <code>rules</code>, a list of fields, each with <code>field_class_name</code> and <code>field_key</code> (from the list) and any of <code>visibility</code>, <code>team_ids</code>, <code>project_ids</code>, <code>visible_to_guests</code>. A Restricted field needs at least one Team or Project. Anything not sent is kept. PUT does the same.")}
         </div>
       </section>
 
