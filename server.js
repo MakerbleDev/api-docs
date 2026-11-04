@@ -971,6 +971,7 @@ function buildDocsPage() {
       <div class="nav-section">
         <div class="nav-section-label">Integrations</div>
         <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST">POST</span>Webhooks</a>
+        <a href="#eventbrite"      class="nav-link"><span class="nav-method method-GET">GET</span>Eventbrite</a>
         <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
@@ -3775,6 +3776,100 @@ function buildDocsPage() {
           ], [
             { code: "202", cls: "response-2xx", desc: "Queued again, with the same event id" },
             { code: "404", cls: "response-4xx", desc: "No such delivery for this endpoint" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Eventbrite -->
+      <section class="section" id="eventbrite">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Eventbrite</h2>
+        <div class="section-desc">
+          <p>An Organisation can connect Makerble to its Eventbrite account to bring Eventbrite events, ticket holders and check-ins into Makerble as Events, Contacts and attendance Stories. Only the Organisation's admins can see or change the connection; anyone else gets <code>403</code>, and someone outside the Organisation <code>404</code>.</p>
+          <p>Once connected, Eventbrite events come in as Events (Eventbrite wins for mapped fields; a cancelled event is flagged, never deleted), ticket holders as Contacts and guests (matched by email, only blank fields filled in; unclear matches go on the Suggested Merges list), and check-ins as one attendance Story per ticket holder. Changes arrive by webhook within seconds, with a catch-up every 3 hours. See the sync log for what came in and why.</p>
+          <p>Signing in to Eventbrite needs a browser, so an admin connects (and reconnects) on the <strong>Connect &gt; Eventbrite</strong> page in Makerble, returned as <code>page_url</code>. The API reports the connection's <code>status</code>: <code>not_connected</code>, <code>choosing_organisation</code> (the sign-in belongs to several Eventbrite organisations; choose one from <code>available_organizations</code>), <code>active</code>, or <code>reconnect_required</code> (Eventbrite no longer accepts the sign-in; the admins are emailed). The Eventbrite token is never returned.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/eventbrite_connection", "Get the Organisation's Eventbrite connection", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The connection, or status not_connected, with page_url" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" },
+            { code: "404", cls: "response-4xx", desc: "Not in this Organisation" }
+          ])}
+          ${endpointCard("PATCH", "/eventbrite_connection", "Choose the Eventbrite organisation", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "eventbrite_connection[eventbrite_organization_id]", in: "body", type: "string", required: true, desc: "An id from available_organizations" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The connection, now active" },
+            { code: "404", cls: "response-4xx", desc: "Eventbrite isn't connected for this Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Not one of available_organizations" }
+          ])}
+          ${endpointCard("POST", "/eventbrite_connection/test", "Test the Eventbrite connection", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The connection with test_succeeded; a revoked sign-in becomes reconnect_required" },
+            { code: "404", cls: "response-4xx", desc: "Eventbrite isn't connected for this Organisation" }
+          ])}
+          ${endpointCard("POST", "/eventbrite_connection/sync", "Sync with Eventbrite now", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "Queued; syncing is true until it has run" },
+            { code: "404", cls: "response-4xx", desc: "Eventbrite isn't connected for this Organisation" }
+          ])}
+          ${endpointCard("GET", "/eventbrite_connection/sync_log", "List the Eventbrite sync log", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated: what came in, was skipped or removed, and why, newest first" }
+          ])}
+          ${endpointCard("PATCH", "/eventbrite_connection/settings", "Choose what to bring in from Eventbrite", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "eventbrite_connection[project_id] / [event_category_id]", in: "body", type: "integer", required: false, desc: "Workspace and Event format for new Events" },
+            { name: "eventbrite_connection[import_mode]", in: "body", type: "string", required: false, desc: "all_upcoming or selected" },
+            { name: "eventbrite_connection[contact_project_id] / [beneficiary_category_id]", in: "body", type: "integer", required: false, desc: "Workspace and Contact Bio Form (one the Workspace creates Contacts with) for new Contacts" },
+            { name: "eventbrite_connection[change_id] / [story_category_id]", in: "body", type: "integer", required: false, desc: "Engagement tracker and Event attendance survey (running on the Workspace) for check-ins" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The connection with its settings; a sync starts" },
+            { code: "422", cls: "response-4xx", desc: "E.g. the Event format isn't one of the Workspace's" }
+          ])}
+          ${endpointCard("GET", "/eventbrite_connection/events", "List the Eventbrite events to pick from", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Upcoming Eventbrite events, with selected and makerble_event_id" },
+            { code: "502", cls: "response-4xx", desc: "Eventbrite couldn't list them" }
+          ])}
+          ${endpointCard("PUT", "/eventbrite_connection/events", "Pick the Eventbrite events to bring in", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "eventbrite_event_ids", in: "body", type: "array", required: true, desc: "Eventbrite event IDs" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "import_mode becomes selected" }
+          ])}
+          ${endpointCard("GET", "/eventbrite_connection/mappings/{object_type}", "Get an Eventbrite field mapping", true, [
+            { name: "object_type", in: "path", type: "string", required: true, desc: "event or attendee" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Pairs, plus the fields each Eventbrite field can go into" }
+          ])}
+          ${endpointCard("PUT", "/eventbrite_connection/mappings/{object_type}", "Replace an Eventbrite field mapping", true, [
+            { name: "object_type", in: "path", type: "string", required: true, desc: "event or attendee" },
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "mappings", in: "body", type: "array", required: true, desc: "[{ eventbrite_field, makerble_field, paused }]" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The saved mapping" },
+            { code: "422", cls: "response-4xx", desc: "Incompatible types, or a field in two pairs" }
+          ])}
+          ${endpointCard("POST", "/eventbrite_connection/refresh_questions", "Re-read the order form questions", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The ticket holder mapping, with the questions as answer:<question> fields" }
+          ])}
+          ${endpointCard("DELETE", "/eventbrite_connection", "Disconnect Eventbrite", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Disconnected; records already brought in from Eventbrite stay" }
           ])}
         </div>
       </section>
