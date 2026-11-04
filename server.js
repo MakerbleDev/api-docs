@@ -2651,6 +2651,19 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, another Organisation's, or a Project the Checklist isn't added to" },
             { code: "422", cls: "response-4xx", desc: "An unknown <code>responsible</code> value" }
           ], "The Progress section of the Checklist's profile page, Table and Board. <code>completed</code>: Contacts who have done the action. <code>furthest</code>: Contacts for whom it is the furthest action done. <code>waiting</code>: Contacts for whom it is the first action not done, so someone who did steps 1 and 3 is waiting on step 2. Only Contacts the user can see are counted.")}
+          ${endpointCard("GET", "/checklists/{id}/progress/contacts", "List every Contact behind a progress count", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "list", type: "string", required: true, desc: "<code>completed</code>, <code>furthest</code> or <code>waiting</code> (the Table's lists for <code>action_id</code>), <code>board</code> (the Board column for <code>action_id</code>) or <code>complete</code> (Fully complete)" },
+            { name: "action_id", type: "integer", required: false, desc: "The action whose list it is; required for every list but <code>complete</code>" },
+            { name: "project_id", type: "integer", required: false, desc: "Only Contacts in this Project, one the Checklist is added to" },
+            { name: "responsible", type: "string", required: false, desc: "Only Contacts whose waiting action this person or Team is responsible for: <code>me</code>, <code>user:&lt;id&gt;</code> or <code>team:&lt;id&gt;</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Contacts per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated <code>{page, page_size, page_count, total_count, data}</code>: each Contact as <code>{beneficiary_id, name, actions_done}</code>, plus <code>days_waiting</code>, <code>overdue</code>, <code>skipped_a_step</code> and <code>responsible</code> in the <code>waiting</code> and <code>board</code> lists" },
+            { code: "404", cls: "response-4xx", desc: "Not found, another Organisation's, or a Project the Checklist isn't added to" },
+            { code: "422", cls: "response-4xx", desc: "An unknown <code>list</code>, a missing or unknown <code>action_id</code>, or an unknown <code>responsible</code> value" }
+          ], "The rest of each list after the first 30 that <code>GET /checklists/{id}/progress</code> gives, as the Show N more buttons on the Checklist's page do. Only Contacts the user can see are counted.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/checklists", "Get a Contact's Checklists", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
