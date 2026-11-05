@@ -1626,6 +1626,98 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /projects/bulk_status_change:
+    post:
+      tags: [Projects]
+      summary: Close or reopen many Projects at once
+      description: |
+        Closes or reopens several Projects in one request. This is **Close projects** and **Reopen
+        projects** for the projects ticked in the Rows view of the My Projects page. Each Project is
+        closed or reopened the same way as from its own settings menu, so its team is told.
+
+        A closed Project can't get new updates (Stories) or Contacts, and its existing updates can't
+        be edited, until it is reopened. Closed Projects are listed on the organisation's Closed
+        Projects page.
+
+        **Who may do it.** An Organisation Admin of the Project's organisation, or a Project Manager
+        (Project Editor) of the Project. If any listed Project is one the user may not change, nothing
+        is changed and the reply is `403` naming those Projects.
+
+        **Already closed or open.** `close` changes only the listed Projects that are open, and
+        `reopen` only those that are closed. The others are left as they are.
+
+        **Signup Pages.** Closing a Project that an active Signup Page uses would break that Signup
+        Page, so `close` needs `signup_pages`:
+        - `deactivate`: deactivate those Signup Pages, then close the Project. A Project whose Signup
+          Page the user may not deactivate is left open.
+        - `skip`: leave those Projects open and close the rest.
+
+        **In the background.** The reply is `202` straight away. The user is emailed when it has
+        finished: how many Projects were closed, with a link to the Closed Projects page, or which
+        Projects were reopened. Check the result with `GET /projects/{id}` (`is_closed`).
+      operationId: bulkChangeProjectStatus
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status_action, project_ids]
+              properties:
+                status_action:
+                  type: string
+                  enum: [close, reopen]
+                  description: Whether to close or reopen the Projects
+                project_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: integer }
+                  description: The Projects to change, at most 200
+                signup_pages:
+                  type: string
+                  enum: [deactivate, skip]
+                  description: Required with `close`. What to do with Projects that an active Signup Page uses.
+            example:
+              status_action: close
+              project_ids: [619, 620]
+              signup_pages: skip
+      responses:
+        "202":
+          description: The Projects are being closed or reopened in the background
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status_action:
+                    type: string
+                    enum: [close, reopen]
+                  project_ids:
+                    type: array
+                    items: { type: integer }
+                  message:
+                    type: string
+              example:
+                status_action: close
+                project_ids: [619, 620]
+                message: The projects are being changed in the background. You will be emailed when this is done.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not close or reopen one of the listed Projects. Nothing is changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "You don't have permission to close or reopen project 619."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /beneficiaries:
     get:
       tags: [Beneficiaries]
