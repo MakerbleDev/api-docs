@@ -9106,7 +9106,9 @@ paths:
         It is added through a Project, the one whose records count for actions set to "Only count
         records in this project": the only Project that allows it, or `project_id` when more than one
         does (required then). Adding one that was removed from the Contact earlier restores the
-        actions they had done.
+        actions they had done. An Organisation Admin may also add back a Checklist that was removed
+        from the Contact while one of their Projects adds it automatically; it is added through that
+        Project.
       operationId: addContactChecklist
       security: [{tokenAuth: []}]
       parameters:
