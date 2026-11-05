@@ -8799,6 +8799,13 @@ paths:
         by hand. `automatic`: every Contact now in the Project gets it (in the background), and so does
         every Contact who later joins or is created in it. `none`: stop offering it; Contacts who
         already have it keep it. Requires an Organisation editor, or a Project Manager of the Project.
+
+        For an `automatic` Checklist, `on_leave` says what happens when a Contact leaves the Project,
+        moves to a closed status in it (Alumni or Declined) or is archived: `keep` (the default) or
+        `remove_if_incomplete`, which takes it off them unless every action is done. A Checklist
+        removed that way keeps the Contact's progress, and comes back when they rejoin. Send `mode`,
+        `on_leave` or both; `on_leave` on its own changes only that, and needs the Checklist to be
+        `automatic` in the Project.
       operationId: setChecklistProject
       security: [{tokenAuth: []}]
       parameters:
@@ -8816,11 +8823,23 @@ paths:
         required: true
         content:
           application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [none, manual, automatic]
+                on_leave:
+                  type: string
+                  enum: [keep, remove_if_incomplete]
             example:
               mode: "automatic"
+              on_leave: "remove_if_incomplete"
       responses:
         "200":
-          description: "`{project_id, assignment_mode}`"
+          description: "`{project_id, assignment_mode, on_leave}`"
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -9086,7 +9105,8 @@ paths:
         lets the user add by hand is allowed; see `GET /beneficiaries/{beneficiary_id}/checklists/available`.
         It is added through a Project, the one whose records count for actions set to "Only count
         records in this project": the only Project that allows it, or `project_id` when more than one
-        does (required then).
+        does (required then). Adding one that was removed from the Contact earlier restores the
+        actions they had done.
       operationId: addContactChecklist
       security: [{tokenAuth: []}]
       parameters:
@@ -9111,6 +9131,48 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+
+  /beneficiaries/{beneficiary_id}/checklists/{checklist_id}:
+    delete:
+      tags: [Checklists]
+      summary: Remove a Checklist from a Contact
+      description: |
+        "Remove from this contact" in the ⋯ menu of a Checklist on the Contact's profile, for one added
+        by mistake or no longer relevant. It no longer shows on the Contact, in the Checklist's progress
+        or on Focus, and the removal is recorded on the Contact's History. The Contact's progress is
+        kept: adding the Checklist again (`POST /beneficiaries/{beneficiary_id}/checklists`) restores the
+        actions they had done, and a Project that adds the Checklist automatically won't add it back.
+        Allowed for Organisation Admins, and for colleagues who could add the Checklist to the Contact by
+        hand.
+      operationId: removeContactChecklist
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: checklist_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "`{checklist_id, beneficiary_id, removed_at, removed_by_user_id}`"
+          content:
+            application/json:
+              example:
+                checklist_id: 42
+                beneficiary_id: 1001
+                removed_at: "2026-11-05T10:00:00Z"
+                removed_by_user_id: 7
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: "`{errors}`: the user is neither an Organisation Admin nor able to add this Checklist to the Contact"
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /beneficiaries/{beneficiary_id}/checklists/{checklist_id}/actions/{action_id}/owner:
     patch:
