@@ -1309,6 +1309,15 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "One of the listed Projects doesn't exist" },
             { code: "422", cls: "response-4xx", desc: "Unknown <code>status_action</code>, missing <code>signup_pages</code> for <code>close</code>, or no Projects (or more than 200)" }
           ], "What <b>Close projects</b> and <b>Reopen projects</b> do for the projects ticked in the Rows view of My Projects. Organisation Admins and Project Managers (Project Editors) can use it. <code>close</code> changes only the open Projects listed and <code>reopen</code> only the closed ones; each is closed or reopened as from its own settings menu, so its team is told. Check the result with <code>GET /projects/{id}</code> (<code>is_closed</code>).")}
+          ${endpointCard("POST", "/projects/bulk_deletion", "Delete many closed Projects at once", true, [
+            { name: "project_ids", type: "integer[]", required: true, desc: "The Projects to delete, at most 200. Only the closed ones are deleted" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "Queued: <code>project_ids</code> (closed, to be deleted), <code>kept_project_ids</code> (open, kept) and <code>message</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You may not delete one of the listed Projects; nothing is deleted" },
+            { code: "404", cls: "response-4xx", desc: "One of the listed Projects doesn't exist" },
+            { code: "422", cls: "response-4xx", desc: "None of the Projects is closed, or no Projects (or more than 200)" }
+          ], "What <b>Delete projects</b> does for the projects ticked in the Rows view of My Projects. <b>Deletion is permanent.</b> Only closed Projects are deleted; close others first with <code>POST /projects/bulk_status_change</code>. Organisation Admins and Project Managers (Project Editors) can use it. Each Project is deleted as with the Delete project button on the Closed Projects page, so its team is emailed and it is listed under Deleted Projects. Runs in the background; <code>GET /projects/{id}</code> returns 404 once a Project has gone.")}
           ${endpointCard("GET", "/project_results", "Get Results Canvas figures for Projects", true, [
             { name: "project_ids", type: "integer[]", required: false, desc: "Projects to include, as <code>project_ids[]=619</code> or a JSON array string. Defaults to every Project you can view" },
             { name: "start_date", type: "string", required: false, desc: "First Story date to include, YYYY-MM-DD. Omit both dates for all time" },
