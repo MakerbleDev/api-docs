@@ -3148,6 +3148,7 @@ function buildDocsPage() {
         <div class="endpoint-list">
           ${endpointCard("GET", "/contact_automations", "List Contact Automations", true, [
             { name: "project_id", type: "integer", required: false, desc: "Only this Project's" },
+            { name: "flag_id", type: "integer", required: false, desc: "Only those whose actions add this Flag to Contacts" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }

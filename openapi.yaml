@@ -10579,6 +10579,15 @@ paths:
           schema:
             type: integer
           description: Only the Contact Automations on this Project
+        - name: flag_id
+          in: query
+          schema:
+            type: integer
+          description: |
+            Only the Contact Automations whose actions add this Flag to Contacts, as the "Automations that
+            add this flag automatically" column on Manage Flags counts them. A Flag of another Organisation
+            finds nothing.
+          example: 12
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
