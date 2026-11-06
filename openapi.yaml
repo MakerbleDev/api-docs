@@ -161,6 +161,8 @@ tags:
     description: Organisations — the top-level entity that owns Projects
   - name: Projects
     description: The primary organisational unit — every Story and Case belongs to a Project
+  - name: Welcome Tours
+    description: Guided tours of Makerble's own pages for new colleagues, written by Makerble staff; Organisation Admins choose how strict they are
   - name: Announcements
     description: '"What''s new in Makerble" popups, written and scheduled by Makerble staff in Site Overview'
   - name: Albums
@@ -745,6 +747,210 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Announcement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /tours:
+    get:
+      tags: [Welcome Tours]
+      summary: List Welcome Tours
+      description: |
+        Lists Welcome Tours: the guided tours of Makerble's own pages that a new colleague is offered after the
+        photo step of their welcome journey. Each tour belongs to an Organisation and, optionally, one of its
+        Teams; a tour with no team (`team_id` null) is the Organisation's default, for people whose teams have
+        none. Only a `live` tour is shown to people. Each stop focuses on one part of a page and either waits
+        for Next or asks the person to click something (`action: click`).
+
+        System Access users (Makerble staff) see every tour. An Organisation Admin sees their own
+        Organisation's tours. Anyone else gets 403.
+      operationId: listTours
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: organisation_id
+          in: query
+          required: false
+          description: Only this Organisation's tours. An Organisation the user isn't an Organisation Admin of is refused with 403.
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Welcome Tours
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTours'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      tags: [Welcome Tours]
+      summary: Create a Welcome Tour
+      description: |
+        Creates a Welcome Tour for an Organisation, as Site Overview › Welcome Tours does. It is a `draft`
+        (seen by nobody) until `status` is `live`; each Team, and the default, can have one live tour.
+        Each stop's `stop_key` is one of the stops Makerble knows: navbar_spaces, navbar_user, focus_table,
+        contacts_table, contacts_search, contacts_filters, events_table, event_guests. System Access users only.
+      operationId: createTour
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TourInput'
+            example:
+              name: Centre Administrators Welcome Tour
+              organisation_id: 123
+              team_id: 45
+              mode: required
+              status: draft
+              later_limit: 3
+              stops:
+                - stop_key: navbar_spaces
+                  position: 1
+                  group_name: Essentials
+                  title: Your work lives in Spaces
+                  body: Everything you do starts in one of your workspaces.
+                  action_text: Click Spaces to see yours.
+      responses:
+        "201":
+          description: The created Welcome Tour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tour'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /tours/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Welcome Tours]
+      summary: Get a Welcome Tour
+      description: One Welcome Tour with its stops in order. System Access users, or an Organisation Admin of its Organisation.
+      operationId: getTour
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Welcome Tour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tour'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Welcome Tours]
+      summary: Update a Welcome Tour
+      description: |
+        Changes only the fields sent. System Access users can change everything; a stop with `_destroy: true`
+        is removed, and a stop without an `id` is added.
+
+        An Organisation Admin of the tour's Organisation can change only how strict it is, as their Welcome
+        journey settings page does: `mode` (`required` is "Mandatory", `optional` lets people skip or end it),
+        `start_skippable` ("People can skip the tour when it is first offered"), `later_limit` (how many times
+        someone can choose "I'll do this later", 1 to 10) and `skippable` on stops that ask for a click. Sending
+        anything else as an Organisation Admin is refused with 403.
+      operationId: updateTour
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TourInput'
+            example:
+              later_limit: 2
+              stops:
+                - id: 678
+                  skippable: true
+      responses:
+        "200":
+          description: The updated Welcome Tour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tour'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /organisations/{organisation_id}/welcome_journey_settings:
+    parameters:
+      - name: organisation_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Welcome Tours]
+      summary: Get an Organisation's welcome journey settings
+      description: Whether people joining the Organisation can skip adding a profile picture on their welcome journey, and its Welcome Tours. An Organisation Admin of it, or a System Access user.
+      operationId: getWelcomeJourneySettings
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WelcomeJourneySettings'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Welcome Tours]
+      summary: Update an Organisation's welcome journey settings
+      description: Sets "People can skip adding a profile picture". Change each tour's own settings with PATCH /tours/{id}.
+      operationId: updateWelcomeJourneySettings
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photo_skippable]
+              properties:
+                photo_skippable:
+                  type: boolean
+            example:
+              photo_skippable: false
+      responses:
+        "200":
+          description: The settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WelcomeJourneySettings'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -14362,6 +14568,153 @@ components:
         updated_at:
           type: string
           format: date-time
+    Tour:
+      type: object
+      description: A Welcome Tour and its stops in order
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        organisation_id:
+          type: integer
+        team_id:
+          type: integer
+          nullable: true
+          description: The Team it is for; null for the Organisation's default tour
+        audience:
+          type: string
+          description: The Team's name, or "Everyone in the organisation (default)"
+        mode:
+          type: string
+          enum: [required, optional]
+          description: required is shown as Mandatory
+        status:
+          type: string
+          enum: [draft, live]
+        start_skippable:
+          type: boolean
+          description: Whether people can skip the tour when it is first offered
+        later_limit:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: How many times someone can choose "I'll do this later" on a mandatory tour
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        stops:
+          type: array
+          items:
+            $ref: '#/components/schemas/TourStop'
+    TourStop:
+      type: object
+      properties:
+        id:
+          type: integer
+        position:
+          type: integer
+        group_name:
+          type: string
+          nullable: true
+        stop_key:
+          type: string
+          enum: [navbar_spaces, navbar_user, focus_table, contacts_table, contacts_search, contacts_filters, events_table, event_guests]
+        stop_label:
+          type: string
+          nullable: true
+          description: Which part of which page the stop focuses on
+        action:
+          type: string
+          enum: [next, click, ""]
+          description: Whether the stop waits for Next or asks the person to click something
+        title:
+          type: string
+        body:
+          type: string
+          nullable: true
+        action_text:
+          type: string
+          nullable: true
+          description: What to click, on a click stop
+        after_text:
+          type: string
+          nullable: true
+          description: Shown after the click
+        skippable:
+          type: boolean
+          description: Whether a click stop shows Skip this stop
+    TourInput:
+      type: object
+      properties:
+        name:
+          type: string
+        organisation_id:
+          type: integer
+        team_id:
+          type: integer
+          nullable: true
+        mode:
+          type: string
+          enum: [required, optional]
+        status:
+          type: string
+          enum: [draft, live]
+        start_skippable:
+          type: boolean
+        later_limit:
+          type: integer
+          minimum: 1
+          maximum: 10
+        stops:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              position:
+                type: integer
+              group_name:
+                type: string
+              stop_key:
+                type: string
+              title:
+                type: string
+              body:
+                type: string
+              action_text:
+                type: string
+              after_text:
+                type: string
+              skippable:
+                type: boolean
+              _destroy:
+                type: boolean
+    PaginatedTours:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Tour'
+    WelcomeJourneySettings:
+      type: object
+      properties:
+        organisation_id:
+          type: integer
+        photo_skippable:
+          type: boolean
+          description: Whether people can skip adding a profile picture
+        tour_ids:
+          type: array
+          items:
+            type: integer
     PaginatedAnnouncements:
       allOf:
         - $ref: '#/components/schemas/PaginationEnvelope'
