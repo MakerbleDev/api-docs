@@ -640,13 +640,35 @@ paths:
       tags: [Announcements]
       summary: List Announcements
       description: |
-        Lists the "What's new in Makerble" popups written in Site Overview › Announcements, newest
-        first, with how many people have seen each one and how many clicked its "Learn more" link.
-        Each signed-in user in an announcement's audience sees it once, between its start and end
-        dates. System Access users only (Makerble staff); anyone else gets 403.
+        Lists popup announcements, newest first, with how many people have seen each one and how
+        many clicked its "Learn more" link. Each signed-in user in an announcement's audience sees
+        it once, between its start and end dates.
+
+        There are two kinds. Makerble's own "What's new in Makerble" popups (`scope_type` null) are
+        written in Site Overview › Announcements. An Organisation, Workspace (Project) or Team's
+        announcements (`scope_type` `Charity`, `Project` or `Team`) are written by the people who
+        look after it, for the colleagues there, on that place's Announcements page.
+
+        System Access users (Makerble staff) see every announcement. Anyone else sees only those for
+        places where they hold the role now: an Organisation Admin sees their Organisation's and its
+        Workspaces' and Teams'; a Workspace editor (Project Editor) sees that Workspace's; a Team
+        leader sees that Team's. Someone who can make announcements nowhere gets 403.
       operationId: listAnnouncements
       security: [{tokenAuth: []}]
       parameters:
+        - name: scope_type
+          in: query
+          required: false
+          description: With `scope_id`, only this place's announcements.
+          schema:
+            type: string
+            enum: [Charity, Project, Team]
+        - name: scope_id
+          in: query
+          required: false
+          description: The Organisation, Workspace or Team id, with `scope_type`.
+          schema:
+            type: integer
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
@@ -665,10 +687,20 @@ paths:
       tags: [Announcements]
       summary: Create an Announcement
       description: |
-        Creates a "What's new in Makerble" popup. It is saved as a draft (seen by nobody) unless
-        `status` is `scheduled`, when it shows from `starts_on` to `ends_on` to its audience.
-        Write the headline in sentence case, saying plainly what changed, and a message that says
-        what the person needs to do, which is often nothing. System Access users only.
+        Creates a popup announcement. It is saved as a draft (seen by nobody) unless `status` is
+        `scheduled`, when it shows from `starts_on` to `ends_on` to its audience. Write the headline
+        in sentence case, saying plainly what changed, and a message that says what the person
+        needs to do, which is often nothing.
+
+        With `scope_type` and `scope_id`, it is that Organisation's, Workspace's or Team's
+        announcement. Its audience is always the colleagues there (`audience` is ignored), it can't
+        use the name change animation, and its Learn more link can be any https page. The user must
+        be an Organisation Admin of that Organisation (or of the Workspace's or Team's
+        Organisation), an editor of that Workspace, or a leader of that Team; otherwise 403. A place
+        that doesn't exist gets 404.
+
+        Without them, it is one of Makerble's own "What's new in Makerble" popups: System Access
+        users only.
       operationId: createAnnouncement
       security: [{tokenAuth: []}]
       requestBody:
@@ -677,20 +709,35 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AnnouncementInput'
-            example:
-              title: Projects are now Workspaces, and Albums are now Portfolios
-              body: Nothing has moved. Only the names have changed.
-              visual_type: name_change
-              name_changes:
-                - old_name: Projects
-                  new_name: Workspaces
-                - old_name: Albums
-                  new_name: Portfolios
-              learn_more_url: https://makerble.atlassian.net/wiki/spaces/MCPD/pages/123/Workspaces
-              audience: everyone
-              starts_on: "2026-12-01"
-              ends_on: "2026-12-31"
-              status: scheduled
+            examples:
+              makerble:
+                summary: One of Makerble's own (System Access users)
+                value:
+                  title: Projects are now Workspaces, and Albums are now Portfolios
+                  body: Nothing has moved. Only the names have changed.
+                  visual_type: name_change
+                  name_changes:
+                    - old_name: Projects
+                      new_name: Workspaces
+                    - old_name: Albums
+                      new_name: Portfolios
+                  learn_more_url: https://makerble.atlassian.net/wiki/spaces/MCPD/pages/123/Workspaces
+                  audience: everyone
+                  starts_on: "2026-12-01"
+                  ends_on: "2026-12-31"
+                  status: scheduled
+              workspace:
+                summary: A Workspace's, for the colleagues on it
+                value:
+                  scope_type: Project
+                  scope_id: 42
+                  title: Term dates are out
+                  body: Have a look before you book leave.
+                  visual_type: none
+                  learn_more_url: https://riverside.org.uk/term-dates
+                  starts_on: "2026-12-01"
+                  ends_on: "2026-12-08"
+                  status: scheduled
       responses:
         "201":
           description: The created Announcement
@@ -702,6 +749,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "403":
           $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
   /announcements/{id}:
@@ -714,7 +763,9 @@ paths:
     get:
       tags: [Announcements]
       summary: Get an Announcement
-      description: One "What's new in Makerble" popup, with its seen and "Learn more" click counts. System Access users only.
+      description: |
+        One announcement, with its seen and "Learn more" click counts. System Access users can get any;
+        anyone else only one for a place where they hold the role (see List Announcements), or 403.
       operationId: getAnnouncement
       security: [{tokenAuth: []}]
       responses:
@@ -736,7 +787,9 @@ paths:
       description: |
         Changes only the fields sent. Without `status`, a draft stays a draft and a scheduled
         announcement stays scheduled. Editing a live announcement doesn't show it again to people
-        who have already seen it. To end one early, set `ends_on` to today. System Access users only.
+        who have already seen it. To end one early, set `ends_on` to today. An announcement never
+        moves to another place: `scope_type` and `scope_id` are ignored here. System Access users can
+        change any; anyone else only one for a place where they hold the role now, or 403.
       operationId: updateAnnouncement
       security: [{tokenAuth: []}]
       requestBody:
@@ -14850,6 +14903,15 @@ components:
     AnnouncementInput:
       type: object
       properties:
+        scope_type:
+          type: string
+          enum: [Charity, Project, Team]
+          description: |
+            On create only: whose announcement it is, an Organisation (`Charity`), a Workspace
+            (`Project`) or a Team, with `scope_id`. Leave out for one of Makerble's own.
+        scope_id:
+          type: integer
+          description: On create only, with `scope_type`.
         title:
           type: string
           maxLength: 90
@@ -14861,7 +14923,7 @@ components:
         visual_type:
           type: string
           enum: [name_change, vimeo, none]
-          description: The name-change animation, a Vimeo video, or nothing.
+          description: The name-change animation (Makerble's own only), a Vimeo video, or nothing.
         name_changes:
           type: array
           minItems: 1
@@ -14875,7 +14937,10 @@ components:
         learn_more_url:
           type: string
           nullable: true
-          description: Optional. A page in the Makerble User Guide (https://makerble.atlassian.net/wiki/spaces/MCPD/...).
+          description: |
+            Optional. For Makerble's own, a page in the Makerble User Guide
+            (https://makerble.atlassian.net/wiki/spaces/MCPD/...). For a place's, any https page; one
+            outside the User Guide is marked as opening outside Makerble.
         button_label:
           type: string
           maxLength: 24
@@ -14886,6 +14951,7 @@ components:
           description: |
             `everyone`: every signed-in user. `colleagues`: everyone except Contacts with a login
             (active participants). `administrators`: Organisation Admins of at least one organisation.
+            Ignored for a place's announcement, which is always for the colleagues there.
         starts_on:
           type: string
           format: date
@@ -14903,6 +14969,17 @@ components:
       properties:
         id:
           type: integer
+        scope_type:
+          type: string
+          enum: [Charity, Project, Team, null]
+          nullable: true
+          description: |
+            Whose announcement it is: an Organisation (`Charity`), a Workspace (`Project`) or a Team.
+            Null for Makerble's own. Its audience is that place's colleagues: an Organisation's
+            colleagues, a Workspace's editors, reporters and observers, or a Team's members and leaders.
+        scope_id:
+          type: integer
+          nullable: true
         title:
           type: string
         body:

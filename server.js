@@ -4001,8 +4001,9 @@ function buildDocsPage() {
         <div class="section-eyebrow">Integrations</div>
         <h2 class="section-title">Announcements</h2>
         <div class="section-desc">
-          <p>An Announcement is the "What's new in Makerble" popup that each signed-in user in its audience sees once, between its start and end dates, for example "Projects are now Workspaces". Makerble staff write them in Site Overview › Announcements. These endpoints are for System Access users only; anyone else gets <code>403</code>.</p>
-          <p><code>visual_type</code> is <code>name_change</code> (an animation of 1 to 3 <code>name_changes</code>, old name → new name), <code>vimeo</code> (a Vimeo video at <code>vimeo_url</code>) or <code>none</code>. <code>audience</code> is <code>everyone</code>, <code>colleagues</code> (everyone except Contacts with a login) or <code>administrators</code> (Organisation Admins). <code>status</code> stores <code>draft</code> or <code>scheduled</code>; <code>current_status</code> also says whether a scheduled one is <code>live</code> or has <code>ended</code>.</p>
+          <p>An Announcement is a popup that each signed-in user in its audience sees once, between its start and end dates. There are two kinds. Makerble's own "What's new in Makerble" popups, for example "Projects are now Workspaces", are written by Makerble staff in Site Overview › Announcements; their <code>scope_type</code> is <code>null</code>. An Organisation's, Workspace's or Team's announcements are written by the people who look after it, for the colleagues there: <code>scope_type</code> is <code>Charity</code>, <code>Project</code> or <code>Team</code>, with <code>scope_id</code>.</p>
+          <p>System Access users can see and change every announcement. Anyone else can see and change only those for places where they hold the role now: an Organisation Admin, for their Organisation and its Workspaces and Teams; a Workspace editor (Project Editor), for that Workspace; a Team leader, for that Team. Someone who can make announcements nowhere gets <code>403</code>.</p>
+          <p><code>visual_type</code> is <code>name_change</code> (an animation of 1 to 3 <code>name_changes</code>, old name → new name), <code>vimeo</code> (a Vimeo video at <code>vimeo_url</code>) or <code>none</code>. <code>audience</code> is <code>everyone</code>, <code>colleagues</code> (everyone except Contacts with a login) or <code>administrators</code> (Organisation Admins); a place's announcement is always for its colleagues (an Organisation's colleagues, a Workspace's editors, reporters and observers, or a Team's members and leaders), can't use <code>name_change</code>, and its <code>learn_more_url</code> can be any https page. <code>status</code> stores <code>draft</code> or <code>scheduled</code>; <code>current_status</code> also says whether a scheduled one is <code>live</code> or has <code>ended</code>.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -4010,33 +4011,36 @@ function buildDocsPage() {
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/announcements", "List Announcements", true, [
+            { name: "scope_type", type: "string", required: false, desc: "With <code>scope_id</code>, only this place's: <code>Charity</code>, <code>Project</code> or <code>Team</code>" },
+            { name: "scope_id", type: "integer", required: false, desc: "The Organisation, Workspace or Team ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated Announcements, newest first, each with <code>seen_count</code> and <code>learn_more_click_count</code>" },
-            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
+            { code: "200", cls: "response-2xx", desc: "Paginated Announcements the user may see, newest first, each with <code>scope_type</code>, <code>scope_id</code>, <code>seen_count</code> and <code>learn_more_click_count</code>" },
+            { code: "403", cls: "response-4xx", desc: "The user can make announcements nowhere" }
           ])}
           ${endpointCard("GET", "/announcements/{id}", "Get an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The Announcement, with its seen and Learn more click counts" },
-            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "403", cls: "response-4xx", desc: "Not one the user may see" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
           ${endpointCard("POST", "/announcements", "Create an Announcement", true, [], [
             { code: "201", cls: "response-2xx", desc: "Announcement created (a draft unless <code>status</code> is <code>scheduled</code>)" },
-            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no headline, a headline over 90 characters, or a Vimeo visual with a YouTube link" }
-          ], "Body: <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>learn_more_url</code> (a Makerble User Guide page), <code>button_label</code> (default \"Got it\"), <code>audience</code>, <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
+            { code: "403", cls: "response-4xx", desc: "The user doesn't hold the role on that place, or (with no place) doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "The Organisation, Workspace or Team doesn't exist" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no headline, a headline over 90 characters, a Vimeo visual with a YouTube link, or the name change animation for a place" }
+          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>button_label</code> (default \"Got it\"), <code>audience</code>, <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
           ${endpointCard("PATCH", "/announcements/{id}", "Update an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Announcement updated" },
-            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "403", cls: "response-4xx", desc: "Not one the user may change" },
             { code: "404", cls: "response-4xx", desc: "Not found" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. 4 name changes" }
-          ], "Same body as create; only the fields sent change. Without <code>status</code>, a draft stays a draft and a scheduled announcement stays scheduled. Editing a live announcement doesn't show it again to people who have already seen it.")}
+          ], "Same body as create; only the fields sent change. Without <code>status</code>, a draft stays a draft and a scheduled announcement stays scheduled. Editing a live announcement doesn't show it again to people who have already seen it. An announcement never moves to another place, so <code>scope_type</code> and <code>scope_id</code> are ignored.")}
         </div>
       </section>
 
