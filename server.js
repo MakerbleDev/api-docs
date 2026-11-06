@@ -1507,6 +1507,17 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "User record" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
+          ${endpointCard("POST", "/users/{id}/resend_invitation", "Resend a colleague's invitation", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "User ID of someone invited but not yet accepted" },
+            { name: "organisation_id", in: "body", type: "integer", required: false, desc: "The Organisation to invite them into. Without it, the first Organisation they're a colleague in that you're an Organisation Admin of" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{id, email, organisation_id, invitation_status: \"sent\", message}</code>. Never the link or its token" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Admin of that Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or someone outside your Organisations" },
+            { code: "422", cls: "response-4xx", desc: "They have already set their password" },
+            { code: "429", cls: "response-4xx", desc: "They have been sent 3 new links in the last hour" }
+          ], "Sends a new invitation to someone shown as <b>Invited, not yet accepted</b> on Manage Colleagues, as its <b>Resend invitation</b> button does. Makerble never emails a password: the invitation has a link where they set their own. The new link stops the earlier one working.")}
           ${endpointCard("POST", "/users", "Create a new User", false, [], [
             { code: "200", cls: "response-2xx", desc: "User created — returns id and email" },
             { code: "422", cls: "response-4xx", desc: "Validation failed (check password requirements)" }
