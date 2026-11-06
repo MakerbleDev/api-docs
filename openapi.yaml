@@ -2679,6 +2679,132 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /beneficiaries/bulk_groups:
+    post:
+      tags: [Beneficiaries]
+      summary: Add many Contacts to Groups, or take them out of Groups
+      description: |
+        Adds many Contacts (Beneficiaries) to some of the organisation's Groups and takes them out of
+        others, in one request. This is **Add or remove › Groups** for the Contacts selected on the
+        Manage Contacts page, e.g. putting every selected Contact in "Girls' football". Each change is
+        made the same way as ticking or unticking a Group on the Edit Contact page, so it appears on
+        the Contact's History.
+
+        **Which Groups.** `add_ids` and `remove_ids` are ids of the organisation's Groups
+        (`GET /groups`). Give at least one, and never the same Group in both. A Contact already in a
+        Group being added, or not in a Group being removed, is left as they are.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` (the user only has
+        Headline Only Access to them) and `not_allowed` (the user may not edit them).
+
+        Up to 50 Contacts are changed straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: changeBeneficiaryGroups
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to change
+                add_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Groups to add every Contact to
+                remove_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Groups to take every Contact out of
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to change, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              add_ids: [31]
+              remove_ids: [32]
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Contacts were changed straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+              example:
+                id: 72
+                status: completed
+                total_count: 3
+                processed_count: 3
+                changed_count: 2
+                skip_counts: { not_allowed: 1 }
+                background: false
+                summary: "2 contacts changed. 1 skipped: 1 because you aren't allowed to edit them."
+        "202":
+          description: More than 50 Contacts, so they are changed in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /groups:
+    get:
+      tags: [Beneficiaries]
+      summary: List the organisation's Groups
+      description: |
+        The organisation's Groups (Contact Groups), the labels Contacts are sorted into, e.g. "Girls'
+        football". These are the Groups the Edit Contact page offers. Use an `id` with
+        `POST /beneficiaries/bulk_groups`. Any member of the organisation can list them.
+        `charity_id` may be left out when the user belongs to one organisation.
+      operationId: listGroups
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of Groups, by title
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Group' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /relationship_categories:
     get:
       tags: [Beneficiaries]
@@ -17433,6 +17559,17 @@ components:
             name:
               type: string
               enum: [Person, Organisation, Animal, Object]
+
+    Group:
+      type: object
+      description: A Group (Contact Group) of the organisation
+      properties:
+        id: { type: integer }
+        title:
+          type: string
+          description: The Group's name, e.g. Girls' football
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
 
     RelationshipCategory:
       type: object

@@ -1664,6 +1664,31 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found, or started by someone else" }
           ], "Only the user who started the move can see it.")}
+          ${endpointCard("POST", "/beneficiaries/bulk_groups", "Add many Contacts to Groups, or take them out of Groups", true, [
+            { name: "add_ids", in: "body", type: "integer[]", required: false, desc: "Groups to add every Contact to, from <code>GET /groups</code>" },
+            { name: "remove_ids", in: "body", type: "integer[]", required: false, desc: "Groups to take every Contact out of. Give at least one of <code>add_ids</code> and <code>remove_ids</code>, and never the same Group in both" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts to change, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts, e.g. <code>{\"project_ids\": [\"572\"]}</code>" },
+            { name: "project_id", in: "body", type: "integer", required: false, desc: "Shortcut for <code>filter_data</code>: the Contacts in this Project" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, changed straight away: <code>id</code>, <code>status</code>, <code>total_count</code>, <code>processed_count</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: the change runs in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "Nothing to add or remove, a Group that isn't the organisation's, a Group in both lists, more than 500 <code>beneficiary_ids</code>, or no <code>charity_id</code> when you belong to several organisations" }
+          ], "<strong>Add or remove › Groups</strong> for the Contacts selected on the Manage Contacts page. Each change is made as ticking or unticking a Group on the Edit Contact page is, so it appears on the Contact's History. Contacts you only have Headline Only Access to (<code>skip_counts.headline_only</code>), or may not edit (<code>skip_counts.not_allowed</code>), are skipped. A Contact already in a Group being added, or not in one being removed, is left as they are.")}
+          ${endpointCard("GET", "/groups", "List the organisation's Groups", true, [
+            { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only Groups changed since then" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each Group's <code>id</code> and <code>title</code>, by title, in the paginated envelope" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
+          ], "Groups (Contact Groups), e.g. Girls' football: the Groups the Edit Contact page offers. Use an <code>id</code> with <code>POST /beneficiaries/bulk_groups</code>. Any member of the organisation can list them.")}
           ${endpointCard("GET", "/relationship_categories", "List the organisation's Relationship Categories", true, [
             { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
             { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
