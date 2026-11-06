@@ -1839,6 +1839,174 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /projects/bulk_status_change:
+    post:
+      tags: [Projects]
+      summary: Close or reopen many Projects at once
+      description: |
+        Closes or reopens several Projects in one request. This is **Close projects** and **Reopen
+        projects** for the projects ticked in the Rows view of the My Projects page. Each Project is
+        closed or reopened the same way as from its own settings menu, so its team is told.
+
+        A closed Project can't get new updates (Stories) or Contacts, and its existing updates can't
+        be edited, until it is reopened. Closed Projects are listed on the organisation's Closed
+        Projects page.
+
+        **Who may do it.** An Organisation Admin of the Project's organisation, or a Project Manager
+        (Project Editor) of the Project. If any listed Project is one the user may not change, nothing
+        is changed and the reply is `403` naming those Projects.
+
+        **Already closed or open.** `close` changes only the listed Projects that are open, and
+        `reopen` only those that are closed. The others are left as they are.
+
+        **Signup Pages.** Closing a Project that an active Signup Page uses would break that Signup
+        Page, so `close` needs `signup_pages`:
+        - `deactivate`: deactivate those Signup Pages, then close the Project. A Project whose Signup
+          Page the user may not deactivate is left open.
+        - `skip`: leave those Projects open and close the rest.
+
+        **In the background.** The reply is `202` straight away. The user is emailed when it has
+        finished: how many Projects were closed, with a link to the Closed Projects page, or which
+        Projects were reopened. Check the result with `GET /projects/{id}` (`is_closed`).
+      operationId: bulkChangeProjectStatus
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status_action, project_ids]
+              properties:
+                status_action:
+                  type: string
+                  enum: [close, reopen]
+                  description: Whether to close or reopen the Projects
+                project_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: integer }
+                  description: The Projects to change, at most 200
+                signup_pages:
+                  type: string
+                  enum: [deactivate, skip]
+                  description: Required with `close`. What to do with Projects that an active Signup Page uses.
+            example:
+              status_action: close
+              project_ids: [619, 620]
+              signup_pages: skip
+      responses:
+        "202":
+          description: The Projects are being closed or reopened in the background
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status_action:
+                    type: string
+                    enum: [close, reopen]
+                  project_ids:
+                    type: array
+                    items: { type: integer }
+                  message:
+                    type: string
+              example:
+                status_action: close
+                project_ids: [619, 620]
+                message: The projects are being changed in the background. You will be emailed when this is done.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not close or reopen one of the listed Projects. Nothing is changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "You don't have permission to close or reopen project 619."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /projects/bulk_deletion:
+    post:
+      tags: [Projects]
+      summary: Delete many closed Projects at once
+      description: |
+        Permanently deletes several closed Projects in one request. This is **Delete projects** for
+        the projects ticked in the Rows view of the My Projects page. Each Project is deleted the
+        same way as with the Delete project button on the organisation's Closed Projects page: its
+        team is emailed, it is listed under Deleted Projects there, and its automations are turned
+        off. **Deletion is permanent and cannot be undone**, so confirm the list with the user first.
+
+        **Only closed Projects are deleted.** Open Projects in the list are kept and returned in
+        `kept_project_ids`; close them first (`POST /projects/bulk_status_change`) to delete them. A
+        list with no closed Project is refused with `422`.
+
+        **Who may do it.** An Organisation Admin of the Project's organisation, or a Project Manager
+        (Project Editor) of the Project. If any listed Project is one the user may not delete,
+        nothing is deleted and the reply is `403` naming those Projects.
+
+        **In the background.** The reply is `202` straight away and the Projects are deleted soon
+        after. `GET /projects/{id}` returns `404` for a Project once it has been deleted.
+      operationId: bulkDeleteProjects
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_ids]
+              properties:
+                project_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: integer }
+                  description: The Projects to delete, at most 200. Only the closed ones are deleted.
+            example:
+              project_ids: [619, 620]
+      responses:
+        "202":
+          description: The closed Projects are being deleted in the background
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project_ids:
+                    type: array
+                    items: { type: integer }
+                    description: The closed Projects that will be deleted
+                  kept_project_ids:
+                    type: array
+                    items: { type: integer }
+                    description: The open Projects in the list, which are kept
+                  message:
+                    type: string
+              example:
+                project_ids: [619]
+                kept_project_ids: [620]
+                message: The closed projects are being deleted in the background.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not delete one of the listed Projects. Nothing is deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "You don't have permission to delete project 619."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /beneficiaries:
     get:
       tags: [Beneficiaries]
@@ -2486,7 +2654,10 @@ paths:
     get:
       tags: [Beneficiary Categories]
       summary: List Custom Field definitions (Contact Bio Forms)
-      description: Filter by `beneficiary_category_ids[]` to get fields for specific forms.
+      description: |
+        Filter by `beneficiary_category_ids[]` to get fields for specific forms. Each field's
+        `capture_type` is `video`, `audio` or `picture` for a Video, Audio or Picture question (an
+        Attachment field, `field_data_type: file`, that asks for that kind of media), otherwise null.
       operationId: listCustomFields
       security: [{tokenAuth: []}]
       parameters:
@@ -6951,7 +7122,8 @@ paths:
           `activity_trackers` and `metrics`.
         - **toolkit**: `description` and `contents`, each with `type`, `id` and `name`.
         - **activity_tracker**: `description`, `instruction`. **outcome**: `description`, `metrics`.
-          **unit**: `alignment`. **field**: `field_type`. **project_type**: `strapline`,
+          **unit**: `alignment`. **field**: `field_type`, and `capture_type` (`video`, `audio` or
+          `picture`) for a Video, Audio or Picture question. **project_type**: `strapline`,
           `description`. **idea**: `description`.
 
         Linked Outcomes and Metrics are named only when you may see them. An item you may not see
@@ -7218,6 +7390,13 @@ paths:
         Field is a heading with `section_text` under it; it isn't listed in the library, so the
         response has only its `id`, `type`, `name` and `approved`. Fields are never shared in the
         public library. Near-identical names get `409`, as for **Create a List**.
+
+        **Video, Audio and Picture questions.** `video`, `audio` and `picture` create a Video, Audio
+        or Picture question for a Survey (Story Category): an Attachment Field that asks for that kind
+        of media, which the person answering can record or take there and then with their camera or
+        microphone, or attach from their device. It is stored and returned as `field_type: file` with
+        `capture_type` set to `video`, `audio` or `picture`, and its answers are uploaded files like any
+        other Attachment answer.
       security: [{tokenAuth: []}]
       requestBody:
         required: true
@@ -7234,7 +7413,10 @@ paths:
                   type: string
                 field_data_type:
                   type: string
-                  enum: [text, number, date, time, file, section_title, email_address, telephone, signature]
+                  enum: [text, number, date, time, file, video, audio, picture, section_title, email_address, telephone, signature]
+                  description: |
+                    The kind of answer. `file` is an Attachment for any file; `video`, `audio` and
+                    `picture` ask for that kind of media (see above).
                 section_text:
                   type: string
                   description: For a section_title Field only
@@ -7243,10 +7425,19 @@ paths:
                   description: True if only the organisation's staff may see the answers
                 force:
                   $ref: '#/components/schemas/ForceCreate'
-            example:
-              organisation_id: 913
-              field_name: "Postcode"
-              field_data_type: text
+            examples:
+              text:
+                summary: A text Field
+                value:
+                  organisation_id: 913
+                  field_name: "Postcode"
+                  field_data_type: text
+              video:
+                summary: A Video question
+                value:
+                  organisation_id: 913
+                  field_name: "Record a short video telling us what you learnt today"
+                  field_data_type: video
       responses:
         "201":
           $ref: '#/components/responses/LibraryItemCreated'
@@ -9319,7 +9510,9 @@ paths:
         It is added through a Project, the one whose records count for actions set to "Only count
         records in this project": the only Project that allows it, or `project_id` when more than one
         does (required then). Adding one that was removed from the Contact earlier restores the
-        actions they had done.
+        actions they had done. An Organisation Admin may also add back a Checklist that was removed
+        from the Contact while one of their Projects adds it automatically; it is added through that
+        Project.
       operationId: addContactChecklist
       security: [{tokenAuth: []}]
       parameters:
