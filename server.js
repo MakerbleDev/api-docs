@@ -4226,6 +4226,7 @@ function buildDocsPage() {
           <p>The Snapshot, under <strong>Today</strong> in the sidebar, puts one Album's (Portfolio's) or Project's headline numbers on one page. <strong>Who we're working with</strong> shows how its Contacts split by a Ratio Set (as on the Demographics tab), by age band and, on an Album, by Project. <strong>How the work is going</strong> shows one headline number per Results Canvas column. <strong>Workload</strong> shows up to three Workflow, Cohort or Formula Trackers.</p>
           <p>The Album's or Project's editors choose what goes on it on the <strong>Snapshot</strong> tab of its Preferences. GET lists what it shows and every choice there is, each with a <code>key</code> such as <code>age_band</code>, <code>ratio_set:12</code> or <code>Change:31</code>; PUT takes those keys. Until anyone chooses, <code>customised</code> is false and the defaults apply: Age band and the first two Ratio Sets, the first metric in each column, and no Workload tiles.</p>
           <p><code>GET /snapshot</code> gives the numbers themselves, counted by the Demographics tab's rules for the Contacts you can view, with each tile's result for the Results Canvas's current period, or all time when there are no deadlines (<code>timeframe</code> says which). Without an id it reads your pinned Album or Project, or else the last one you viewed; <code>PUT /snapshot/pin</code> pins one.</p>
+          <p><code>POST /snapshot/share_link</code> makes your read-only link to an Album's or Project's Snapshot, as the <strong>Share</strong> button does, or returns the one you already have. Anyone with the link can open the Snapshot without a Makerble account; it shows the numbers as you see them, and stops working when you turn it off with <code>DELETE</code> or can no longer see the Album or Project.</p>
           <p>Anyone in the Organisation (or who can see the Album) can read the settings. Only the Album's managers, or whoever can change a Project's Preferences, can change them. Another Organisation's records answer <code>404</code>.</p>
         </div>
         <div class="callout callout-tip">
@@ -4246,6 +4247,27 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "pinned: the Album or Project now pinned" },
             { code: "404", cls: "response-4xx", desc: "An Album or Project you can't see" }
+          ])}
+          ${endpointCard("GET", "/snapshot/share_link", "Get your share link to a Snapshot", true, [
+            { name: "album_id", type: "integer", required: false, desc: "The Album's (Bundle's) ID" },
+            { name: "project_id", type: "integer", required: false, desc: "The Project's ID. Give this or album_id" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "share_link: url, created_at and showing" },
+            { code: "404", cls: "response-4xx", desc: "No working link, or an Album or Project you can't see" }
+          ])}
+          ${endpointCard("POST", "/snapshot/share_link", "Share an Album's or Project's Snapshot", true, [
+            { name: "album_id", in: "body", type: "integer", required: false, desc: "The Album's (Bundle's) ID" },
+            { name: "project_id", in: "body", type: "integer", required: false, desc: "The Project's ID. Give this or album_id" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "share_link: your working read-only link (url, created_at, showing), made or already there" },
+            { code: "404", cls: "response-4xx", desc: "An Album or Project you can't see" }
+          ])}
+          ${endpointCard("DELETE", "/snapshot/share_link", "Turn off your share link to a Snapshot", true, [
+            { name: "album_id", type: "integer", required: false, desc: "The Album's (Bundle's) ID" },
+            { name: "project_id", type: "integer", required: false, desc: "The Project's ID. Give this or album_id" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{disabled: true}</code>; the link no longer opens" },
+            { code: "404", cls: "response-4xx", desc: "No working link, or an Album or Project you can't see" }
           ])}
           ${endpointCard("GET", "/albums/{album_id}/snapshot_settings", "Get what an Album's Snapshot shows", true, [
             { name: "album_id", in: "path", type: "integer", required: true, desc: "The Album's (Bundle's) ID" }

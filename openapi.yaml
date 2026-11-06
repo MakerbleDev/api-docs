@@ -13258,6 +13258,112 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /snapshot/share_link:
+    parameters:
+      - name: album_id
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: The Album's (Bundle's) ID. Give this or project_id.
+      - name: project_id
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: The Project's ID. Give this or album_id.
+    get:
+      tags: [Snapshot]
+      summary: Get your share link to an Album's (Portfolio's) or Project's Snapshot
+      description: |
+        Your working read-only link to the Snapshot of one Album or Project, made with POST or the
+        **Share** button on Today › Snapshot. `404` when you have no working link to it, or can't see it.
+      operationId: getSnapshotShareLink
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Your working link
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [share_link]
+                properties:
+                  share_link:
+                    $ref: '#/components/schemas/SnapshotShareLink'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Snapshot]
+      summary: Share an Album's (Portfolio's) or Project's Snapshot
+      description: |
+        Makes a read-only link to the Snapshot of an Album or Project you can see, as the **Share**
+        button on Today › Snapshot does, or returns the working one you already have. Anyone with the
+        link can open the Snapshot without a Makerble account. It shows the numbers as you see them
+        (only Contacts you can view are counted, and groups below the Minimum Results Threshold stay
+        hidden), and it stops working when you turn it off with DELETE or can no longer see the Album
+        or Project. Each user has their own link to each Album or Project. Give `album_id` or
+        `project_id` in the query or the body.
+      operationId: createSnapshotShareLink
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                album_id:
+                  type: integer
+                project_id:
+                  type: integer
+            examples:
+              project:
+                value:
+                  project_id: 412
+      responses:
+        "201":
+          description: Your working link
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [share_link]
+                properties:
+                  share_link:
+                    $ref: '#/components/schemas/SnapshotShareLink'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Snapshot]
+      summary: Turn off your share link to an Album's (Portfolio's) or Project's Snapshot
+      description: |
+        Turns off your working link to the Snapshot of an Album or Project, as **Turn off link** on
+        Today › Snapshot does. Anyone who opens it afterwards is told it isn't working. Only turns off
+        your own link. `404` when you have no working link to it.
+      operationId: deleteSnapshotShareLink
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The link is turned off
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [disabled]
+                properties:
+                  disabled:
+                    type: boolean
+                    example: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /guidance_panels:
     get:
       tags: [Guidance Panels]
@@ -21518,6 +21624,19 @@ components:
         name:
           type: string
           example: Youth Programme 2026
+    SnapshotShareLink:
+      type: object
+      required: [url, created_at, showing]
+      properties:
+        url:
+          type: string
+          description: The read-only link to send. Opens without signing in.
+          example: https://makerble.com/shared/snapshot/3vKq9wXbT2mYp8sLd4nR6cHf1jZa7eUo
+        created_at:
+          type: string
+          format: date-time
+        showing:
+          $ref: '#/components/schemas/SnapshotOwner'
     SnapshotTile:
       type: object
       required: [column, key, name, kind, value, unit]
