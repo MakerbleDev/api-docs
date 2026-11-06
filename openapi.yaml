@@ -165,6 +165,8 @@ tags:
     description: Guided tours of Makerble's own pages for new colleagues, written by Makerble staff; Organisation Admins choose how strict they are
   - name: Announcements
     description: '"What''s new in Makerble" popups, written and scheduled by Makerble staff in Site Overview'
+  - name: Wishlist
+    description: The gift icon's Wishlist - your feature requests and feedback, and what Makerble is building next (Coming soon)
   - name: Albums
     description: Albums (Bundles; being renamed Portfolios on screen) group Projects so their results can be seen together
   - name: Age Bands
@@ -827,6 +829,156 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Announcement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /wishes:
+    get:
+      tags: [Wishlist]
+      summary: List your Wishlist
+      description: |
+        Lists your own feature requests and feedback from Wishlist › Your wishlist (the gift icon), newest
+        first, with where each one is. You only ever see your own, never a colleague's. A feature request
+        also goes to Makerble's Helpdesk; `status` then follows it ("Received", "We are looking at this",
+        "Estimate sent to your bill payer", "Being built", "Shipped" and so on). Feedback stays in Makerble
+        and reads "Read by the Makerble team".
+      operationId: listWishes
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Wishes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWishes'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Wishlist]
+      summary: Request a feature or give feedback
+      description: |
+        Sends a feature request or feedback, as Wishlist › Your wishlist does. A feature request goes to
+        Makerble's Helpdesk; if it needs custom work, Makerble sends an estimate to your organisation's
+        bill payer, not to you. Feedback stays in Makerble. Don't include details of people you support.
+        `charity_id` says which of your organisations it's about. It must be one you belong to; leave it
+        out if you belong to only one.
+      operationId: createWish
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WishInput'
+            example:
+              kind: feature_request
+              body: Remind me when a register hasn't been filled in by the end of the day.
+      responses:
+        "201":
+          description: The Wish you sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wish'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /roadmap_items:
+    get:
+      tags: [Wishlist]
+      summary: List Coming soon
+      description: |
+        What Makerble has committed to building, as Wishlist › Coming soon shows it: published items,
+        Building now before Up next, each in order. There are no dates. System Access users (Makerble
+        staff) also see unpublished items, and `stale` flags any unchanged for 60 days.
+      operationId: listRoadmapItems
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Coming soon items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRoadmapItems'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Wishlist]
+      summary: Create a Coming soon item
+      description: |
+        Adds an item to Coming soon, at the end of its stage, as Site Overview › Coming soon does. Write it
+        in customer language, with no dates. Nobody but Makerble staff sees it until `published` is true.
+        System Access users only.
+      operationId: createRoadmapItem
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoadmapItemInput'
+            example:
+              title: Formula Trackers
+              body: Add metrics together to show a combined result.
+              stage: up_next
+              published: true
+      responses:
+        "201":
+          description: The created item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoadmapItem'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /roadmap_items/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      tags: [Wishlist]
+      summary: Update a Coming soon item
+      description: |
+        Changes only the fields sent. Moving an item to another stage puts it at the end of that stage.
+        Set `published` to false to take it out of Coming soon. System Access users only.
+      operationId: updateRoadmapItem
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoadmapItemInput'
+            example:
+              stage: building_now
+      responses:
+        "200":
+          description: The updated item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoadmapItem'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -15188,6 +15340,113 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Announcement'
+    Wish:
+      type: object
+      description: A feature request or feedback from Wishlist › Your wishlist
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [feature_request, feedback]
+        body:
+          type: string
+        status:
+          type: string
+          description: Where it is, as the person sees it, e.g. "Received", "Read by the Makerble team" or "Shipped".
+        helpdesk_key:
+          type: string
+          nullable: true
+          description: The Helpdesk ticket a feature request became (e.g. MC-2501), once it exists.
+        charity_id:
+          type: integer
+          nullable: true
+          description: The organisation it's about.
+        announcement_id:
+          type: integer
+          nullable: true
+          description: The Announcement that answered it, if one has.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WishInput:
+      type: object
+      required: [kind, body]
+      properties:
+        kind:
+          type: string
+          enum: [feature_request, feedback]
+        body:
+          type: string
+          maxLength: 2000
+        charity_id:
+          type: integer
+          description: One of your organisations. Needed only if you belong to more than one.
+    PaginatedWishes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Wish'
+    RoadmapItem:
+      type: object
+      description: Something in Wishlist › Coming soon
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        body:
+          type: string
+        stage:
+          type: string
+          enum: [building_now, up_next]
+        stage_label:
+          type: string
+          enum: [Building now, Up next]
+        position:
+          type: integer
+          description: Its order within its stage.
+        published:
+          type: boolean
+        stale:
+          type: boolean
+          description: Unchanged for 60 days.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RoadmapItemInput:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 90
+        body:
+          type: string
+          maxLength: 280
+        stage:
+          type: string
+          enum: [building_now, up_next]
+        published:
+          type: boolean
+    PaginatedRoadmapItems:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/RoadmapItem'
     BulkProjectMove:
       type: object
       description: A move of many Contacts through Projects, and how far it has got
