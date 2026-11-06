@@ -2840,6 +2840,124 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_flags:
+    post:
+      tags: [Beneficiaries]
+      summary: Raise Flags on many Contacts, or remove them
+      description: |
+        Raises some of the organisation's Flags (Contact Flags) on many Contacts (Beneficiaries) and
+        removes others, in one request. This is **Add or remove › Flags** for the Contacts selected
+        on the Manage Contacts page. Each Flag is raised the same way as on a Contact's profile, by
+        you, enabled and with no description.
+
+        **Which Flags.** `add_ids` and `remove_ids` are ids of Flags you may raise
+        (`GET /flags`): a Flag restricted to Teams is only yours to use if you are in one of them.
+        Give at least one, and never the same Flag in both. A Contact who already has a Flag being
+        added, or lacks one being removed, is left as they are. You need to be an Organisation
+        Editor, or a colleague on one of the organisation's Projects, to raise Flags.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` (the user only has
+        Headline Only Access to them) and `raised_by_someone_else` (only the person who raised a Flag
+        may remove it; such a Contact is left unchanged).
+
+        Up to 50 Contacts are changed straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: changeBeneficiaryFlags
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to change
+                add_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Flags to raise on every Contact
+                remove_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Flags to remove from every Contact
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to change, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              add_ids: [5]
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Contacts were changed straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "202":
+          description: More than 50 Contacts, so they are changed in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /flags:
+    get:
+      tags: [Beneficiaries]
+      summary: List the Flags you may raise
+      description: |
+        The organisation's Flags (Contact Flags), e.g. "Safeguarding concern", that you may raise on a
+        Contact: a Flag restricted to Teams is listed only for members of those Teams. Use an `id`
+        with `POST /beneficiaries/bulk_flags`. `charity_id` may be left out when the user belongs to
+        one organisation.
+      operationId: listFlags
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of Flags, by name
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Flag' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /groups:
     get:
       tags: [Beneficiaries]
@@ -17738,6 +17856,20 @@ components:
             name:
               type: string
               enum: [Person, Organisation, Animal, Object]
+
+    Flag:
+      type: object
+      description: A Flag (Contact Flag) of the organisation
+      properties:
+        id: { type: integer }
+        name:
+          type: string
+          description: The Flag's name, e.g. Safeguarding concern
+        color:
+          type: string
+          description: The colour the Flag is shown in
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
 
     Group:
       type: object

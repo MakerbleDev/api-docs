@@ -1690,6 +1690,30 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
             { code: "422", cls: "response-4xx", desc: "Nothing to add or remove, a Group that isn't the organisation's, a Group in both lists, more than 500 <code>beneficiary_ids</code>, or no <code>charity_id</code> when you belong to several organisations" }
           ], "<strong>Add or remove › Groups</strong> for the Contacts selected on the Manage Contacts page. Each change is made as ticking or unticking a Group on the Edit Contact page is, so it appears on the Contact's History. Contacts you only have Headline Only Access to (<code>skip_counts.headline_only</code>), or may not edit (<code>skip_counts.not_allowed</code>), are skipped. A Contact already in a Group being added, or not in one being removed, is left as they are.")}
+          ${endpointCard("POST", "/beneficiaries/bulk_flags", "Raise Flags on many Contacts, or remove them", true, [
+            { name: "add_ids", in: "body", type: "integer[]", required: false, desc: "Flags to raise on every Contact, from <code>GET /flags</code>" },
+            { name: "remove_ids", in: "body", type: "integer[]", required: false, desc: "Flags to remove from every Contact. Give at least one of <code>add_ids</code> and <code>remove_ids</code>, and never the same Flag in both" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts to change, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, changed straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: the change runs in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "Nothing to add or remove, a Flag you can't see, a Flag in both lists, or you can't raise Flags in this organisation" }
+          ], "<strong>Add or remove › Flags</strong> for the Contacts selected on the Manage Contacts page. Each Flag is raised by you, as on a Contact's profile. Only the person who raised a Flag may remove it: a Contact with one raised by someone else is skipped (<code>skip_counts.raised_by_someone_else</code>), as are Contacts you only have Headline Only Access to.")}
+          ${endpointCard("GET", "/flags", "List the Flags you may raise", true, [
+            { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only Flags changed since then" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each Flag's <code>id</code>, <code>name</code> and <code>color</code>, by name, in the paginated envelope" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
+          ], "Flags (Contact Flags), e.g. Safeguarding concern. A Flag restricted to Teams is listed only if you are in one of them. Use an <code>id</code> with <code>POST /beneficiaries/bulk_flags</code>.")}
           ${endpointCard("GET", "/groups", "List the organisation's Groups", true, [
             { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
             { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
