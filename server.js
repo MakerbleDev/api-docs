@@ -975,6 +975,7 @@ function buildDocsPage() {
         <a href="#eventbrite"      class="nav-link"><span class="nav-method method-GET">GET</span>Eventbrite</a>
         <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
+        <a href="#usage"           class="nav-link"><span class="nav-method method-GET">GET</span>Usage</a>
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
         <a href="#welcome-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Welcome Tours</a>
       </div>
@@ -3946,6 +3947,31 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Makerble Support, who can only look" },
             { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation, or the Contract, colleague or Billing Role isn't one of its own" },
             { code: "422", cls: "response-4xx", desc: "A billing_role_id on a Flat Pricing Contract" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Usage -->
+      <section class="section" id="usage">
+        <div class="section-eyebrow">Billing</div>
+        <h2 class="section-title">Usage</h2>
+        <div class="section-desc">
+          <p>An Organisation's usage against the allowances in its plan: Contacts, Stories (survey responses), automation runs, API and integration runs, file storage uploaded, SMS and email. This is the <strong>Our Account › Usage</strong> page. For this calendar month it gives each usage type's quantity so far, allowance, <code>percent_used</code>, <code>status</code> (<code>within</code>, <code>near</code> at 80% or more, <code>over</code> or <code>waived</code>), the quantity expected by the end of the month at the current rate, the price over the allowance, and the charge so far and expected. Amounts are in the Organisation's billing currency, before VAT, and use its own prices.</p>
+          <p>File storage is what was uploaded this month, in GB, not what is stored. Contacts are the current total, archived ones included, and their bundle is charged every month the total is over the allowance. A charge is <code>null</code> when no price is set, and <code>unpriced</code> is then <code>true</code>. Going over an allowance never stops anyone working.</p>
+          <p>Only the Organisation's admins (and Makerble staff) can read it; anyone else gets <code>404</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/organisations/{organisation_id}/usage", "Get an Organisation's usage this month", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "month, currency, charge_so_far, expected_charge, unpriced, and data: one entry per usage type used or allowed, with quantity, allowance, percent_used, status, expected_quantity, price, charge_so_far and expected_charge" },
+            { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation" }
+          ])}
+          ${endpointCard("GET", "/organisations/{organisation_id}/usage/history", "Get an Organisation's usage in the previous 12 months", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "data: the 12 months before this one, newest first, each with its currency, charge and usage (quantity, allowance, charge and waived per usage type)" },
+            { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation" }
           ])}
         </div>
       </section>
