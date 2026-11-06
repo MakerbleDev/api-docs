@@ -308,6 +308,13 @@ tags:
       Seats per Colleague: which seat each colleague holds on each of an Organisation's current
       Contracts, and changing one. A colleague's roles decide the lowest seat (Billing Role) they
       need on Role-based Pricing. Only the Organisation's admins can change seats.
+  - name: Usage
+    description: |
+      An Organisation's usage against the allowances in its plan: Contacts, Stories (survey
+      responses), automation runs, API and integration runs, file storage uploaded, SMS and email.
+      Shows the charge so far this month, the charge expected by the end of the month if usage
+      carries on at the same rate, and the 12 months before. Prices are the Organisation's own.
+      This is the Usage page under Our Account › Usage. Organisation Admins and Makerble staff can read it.
   - name: Guidance Panels
     description: |
       The Show/Hide Guidance introduction at the top of each Manage page. Makerble staff with System
@@ -12527,6 +12534,91 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /organisations/{organisation_id}/usage:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+    get:
+      tags: [Usage]
+      summary: Get an Organisation's usage this month
+      description: |
+        This calendar month's usage (UK time) of each thing an Organisation (Charity) is charged for
+        when it goes over an allowance, with the allowance, how much of it is used, the usage expected
+        by the end of the month if it carries on at the same rate, the price over the allowance, and the
+        charge so far and expected. Amounts are in the currency the Organisation is billed in, before VAT.
+
+        A usage type is listed when the Organisation used it this month or has an allowance for it.
+        `status` is `within`, `near` (80% or more of the allowance), `over`, `waived` (a waiver means it
+        isn't charged this month), or null when there is no allowance (charged from the first one).
+        File storage is what was uploaded this month, in GB, not what is stored. Contacts are the
+        current total, archived ones included; while it is over the allowance the bundle is charged
+        every month. A charge is null when no price is set for usage over the allowance, and then
+        `unpriced` is true and the totals leave it out.
+
+        This is the Usage page under Our Account › Usage. Organisation Admins and Makerble staff can
+        read it. Going over an allowance never stops anyone working.
+      operationId: getOrganisationUsage
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: This month's usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganisationUsage'
+              example:
+                organisation_id: 42
+                month: "2026-11"
+                currency: GBP
+                charge_so_far: 50
+                expected_charge: 1060
+                unpriced: false
+                data:
+                  - usage_type: story_created
+                    name: Stories (survey responses)
+                    unit: Stories
+                    quantity: 5000
+                    allowance: 6000
+                    percent_used: 83
+                    status: near
+                    expected_quantity: 15000
+                    unit_price: 0.1
+                    per_quantity: 1
+                    tier_min: null
+                    tier_max: null
+                    charge_so_far: 0
+                    expected_charge: 900
+                    note: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /organisations/{organisation_id}/usage/history:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+    get:
+      tags: [Usage]
+      summary: Get an Organisation's usage in the previous 12 months
+      description: |
+        The 12 calendar months before this one, newest first, from the usage charges worked out at the
+        end of each month: each usage type the Organisation was charged for, its usage, allowance and
+        charge, after any waivers. A month with no usage charges has an empty `usage` list. Amounts are
+        in the currency the Organisation is billed in, before VAT; the usage bills show what was invoiced.
+        Organisation Admins and Makerble staff can read it.
+      operationId: getOrganisationUsageHistory
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The previous 12 months
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganisationUsageHistory'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /organisations/{organisation_id}/age_bands:
     parameters:
       - $ref: '#/components/parameters/OrganisationId'
@@ -21576,6 +21668,119 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/SeatColleague'
+
+    OrganisationUsage:
+      type: object
+      properties:
+        organisation_id:
+          type: integer
+        month:
+          type: string
+          description: The calendar month, YYYY-MM.
+        currency:
+          type: string
+          description: The currency the Organisation is billed in (GBP when no exchange rate is stored).
+        charge_so_far:
+          type: number
+        expected_charge:
+          type: number
+          description: The charge by the end of the month if usage carries on at the rate so far.
+        unpriced:
+          type: boolean
+          description: True when some usage over an allowance has no price set, so the totals leave it out.
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganisationUsageType'
+
+    OrganisationUsageType:
+      type: object
+      properties:
+        usage_type:
+          type: string
+          enum: [sms_sent, sms_received, sms_line_rental, email_sent, email_received, file_upload_bytes, automation_run, story_created, api_integration_run, contacts_snapshot]
+        name:
+          type: string
+          description: The name shown on the Usage page, e.g. "Stories (survey responses)".
+        unit:
+          type: string
+          description: The unit of quantity, allowance and per_quantity, e.g. Stories, segments, GB.
+        quantity:
+          type: number
+        allowance:
+          type: number
+          nullable: true
+          description: How much can be used before being charged; 0 means charged from the first one, null means not set.
+        percent_used:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          nullable: true
+          enum: [within, near, over, waived, null]
+        expected_quantity:
+          type: number
+        unit_price:
+          type: number
+          nullable: true
+          description: The price of each per_quantity over the allowance, or of the bundle (tier_min to tier_max) the expected quantity falls in.
+        per_quantity:
+          type: number
+          nullable: true
+        tier_min:
+          type: integer
+          nullable: true
+        tier_max:
+          type: integer
+          nullable: true
+        charge_so_far:
+          type: number
+          nullable: true
+        expected_charge:
+          type: number
+          nullable: true
+        note:
+          type: string
+          nullable: true
+          description: How the usage type is counted, for file storage and Contacts.
+
+    OrganisationUsageHistory:
+      type: object
+      properties:
+        organisation_id:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              currency:
+                type: string
+              charge:
+                type: number
+              usage:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    usage_type:
+                      type: string
+                    name:
+                      type: string
+                    unit:
+                      type: string
+                    quantity:
+                      type: number
+                    allowance:
+                      type: number
+                      nullable: true
+                    charge:
+                      type: number
+                      nullable: true
+                    waived:
+                      type: boolean
 
     ApiKey:
       type: object
