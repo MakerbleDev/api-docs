@@ -2836,7 +2836,7 @@ function buildDocsPage() {
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" },
             { name: "checklist_id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "<code>{checklist_id, beneficiary_id, removed_at, removed_by_user_id}</code>. The Contact's progress is kept: adding the Checklist again restores it" },
+            { code: "200", cls: "response-2xx", desc: "<code>{checklist_id, beneficiary_id, removed_at, removed_by_user_id}</code>. The Contact's progress is kept: adding the Checklist again restores it. An Organisation Admin can add back one a Project adds automatically" },
             { code: "403", cls: "response-4xx", desc: "Only an Organisation Admin, or a colleague who can add this Checklist to the Contact, can remove it" },
             { code: "404", cls: "response-4xx", desc: "A Contact the user can't see, or a Checklist the Contact doesn't have" }
           ])}
