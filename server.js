@@ -2242,7 +2242,7 @@ function buildDocsPage() {
           ${endpointCard("POST", "/fields", "Create a Field", true, [
             { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
             { name: "field_name", in: "body", type: "string", required: true, desc: "The question, e.g. <code>Date of birth</code>" },
-            { name: "field_data_type", in: "body", type: "string", required: true, desc: "<code>text</code>, <code>number</code>, <code>date</code>, <code>time</code>, <code>file</code>, <code>section_title</code>, <code>email_address</code> or <code>telephone</code>" },
+            { name: "field_data_type", in: "body", type: "string", required: true, desc: "<code>text</code>, <code>number</code>, <code>date</code>, <code>time</code>, <code>file</code>, <code>video</code>, <code>audio</code>, <code>picture</code>, <code>section_title</code>, <code>email_address</code>, <code>telephone</code> or <code>signature</code>. <code>video</code>, <code>audio</code> and <code>picture</code> make a Video, Audio or Picture question: an Attachment that asks for that kind of media, which people can record or take in the survey. It is returned with <code>field_type: file</code> and <code>capture_type</code>" },
             { name: "section_text", in: "body", type: "string", required: false, desc: "For a <code>section_title</code> Field only" },
             { name: "private", in: "body", type: "boolean", required: false, desc: "Only the organisation's staff may see the answers" },
             { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create it even though a near-identical one exists (see 409)" }

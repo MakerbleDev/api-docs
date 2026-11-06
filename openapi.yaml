@@ -2647,7 +2647,10 @@ paths:
     get:
       tags: [Beneficiary Categories]
       summary: List Custom Field definitions (Contact Bio Forms)
-      description: Filter by `beneficiary_category_ids[]` to get fields for specific forms.
+      description: |
+        Filter by `beneficiary_category_ids[]` to get fields for specific forms. Each field's
+        `capture_type` is `video`, `audio` or `picture` for a Video, Audio or Picture question (an
+        Attachment field, `field_data_type: file`, that asks for that kind of media), otherwise null.
       operationId: listCustomFields
       security: [{tokenAuth: []}]
       parameters:
@@ -7112,7 +7115,8 @@ paths:
           `activity_trackers` and `metrics`.
         - **toolkit**: `description` and `contents`, each with `type`, `id` and `name`.
         - **activity_tracker**: `description`, `instruction`. **outcome**: `description`, `metrics`.
-          **unit**: `alignment`. **field**: `field_type`. **project_type**: `strapline`,
+          **unit**: `alignment`. **field**: `field_type`, and `capture_type` (`video`, `audio` or
+          `picture`) for a Video, Audio or Picture question. **project_type**: `strapline`,
           `description`. **idea**: `description`.
 
         Linked Outcomes and Metrics are named only when you may see them. An item you may not see
@@ -7379,6 +7383,13 @@ paths:
         Field is a heading with `section_text` under it; it isn't listed in the library, so the
         response has only its `id`, `type`, `name` and `approved`. Fields are never shared in the
         public library. Near-identical names get `409`, as for **Create a List**.
+
+        **Video, Audio and Picture questions.** `video`, `audio` and `picture` create a Video, Audio
+        or Picture question for a Survey (Story Category): an Attachment Field that asks for that kind
+        of media, which the person answering can record or take there and then with their camera or
+        microphone, or attach from their device. It is stored and returned as `field_type: file` with
+        `capture_type` set to `video`, `audio` or `picture`, and its answers are uploaded files like any
+        other Attachment answer.
       security: [{tokenAuth: []}]
       requestBody:
         required: true
@@ -7395,7 +7406,10 @@ paths:
                   type: string
                 field_data_type:
                   type: string
-                  enum: [text, number, date, time, file, section_title, email_address, telephone, signature]
+                  enum: [text, number, date, time, file, video, audio, picture, section_title, email_address, telephone, signature]
+                  description: |
+                    The kind of answer. `file` is an Attachment for any file; `video`, `audio` and
+                    `picture` ask for that kind of media (see above).
                 section_text:
                   type: string
                   description: For a section_title Field only
@@ -7404,10 +7418,19 @@ paths:
                   description: True if only the organisation's staff may see the answers
                 force:
                   $ref: '#/components/schemas/ForceCreate'
-            example:
-              organisation_id: 913
-              field_name: "Postcode"
-              field_data_type: text
+            examples:
+              text:
+                summary: A text Field
+                value:
+                  organisation_id: 913
+                  field_name: "Postcode"
+                  field_data_type: text
+              video:
+                summary: A Video question
+                value:
+                  organisation_id: 913
+                  field_name: "Record a short video telling us what you learnt today"
+                  field_data_type: video
       responses:
         "201":
           $ref: '#/components/responses/LibraryItemCreated'
