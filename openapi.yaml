@@ -487,6 +487,79 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /users/{id}/resend_invitation:
+    post:
+      tags: [Users]
+      summary: Resend a colleague's invitation
+      description: |
+        Sends a new invitation email to someone who was invited to an Organisation but hasn't yet set
+        their password (Manage Colleagues shows them as "Invited, not yet accepted"). The new link stops
+        the earlier one working. Makerble never emails a password: the invitation has a link where the
+        person sets their own, and this response never contains the link or its token.
+
+        Only an Organisation Admin of an Organisation the person is a colleague in can do this, as on
+        the Manage Colleagues page. Pass `organisation_id` to choose the Organisation the invitation is
+        for; without it, the first such Organisation is used. An address can be sent at most 3 new links
+        an hour.
+      operationId: resendInvitation
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                organisation_id:
+                  type: integer
+                  description: The Organisation (Charity) to invite them into. Optional.
+            example:
+              organisation_id: 512
+      responses:
+        "200":
+          description: A new invitation is being sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, email, organisation_id, invitation_status, message]
+                properties:
+                  id:
+                    type: integer
+                  email:
+                    type: string
+                  organisation_id:
+                    type: integer
+                  invitation_status:
+                    type: string
+                    enum: [sent]
+                  message:
+                    type: string
+              example:
+                id: 4012
+                email: thandi@example.org
+                organisation_id: 512
+                invitation_status: sent
+                message: A new invitation is on its way. The earlier link no longer works.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+        "429":
+          description: The address has been sent 3 new links in the last hour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: This colleague has been sent 3 new links in the last hour. Try again later.
+
   /users/permissions:
     get:
       tags: [Users]
