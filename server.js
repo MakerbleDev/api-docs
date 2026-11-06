@@ -1724,6 +1724,58 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
           ], "Groups (Contact Groups), e.g. Girls' football: the Groups the Edit Contact page offers. Use an <code>id</code> with <code>POST /beneficiaries/bulk_groups</code>. Any member of the organisation can list them.")}
+          ${endpointCard("POST", "/beneficiaries/bulk_audiences", "Give many Contacts Audiences, or end them", true, [
+            { name: "add_ids", in: "body", type: "integer[]", required: false, desc: "Audiences to give every Contact, from <code>GET /audiences</code>" },
+            { name: "remove_ids", in: "body", type: "integer[]", required: false, desc: "Audiences to end for every Contact, today" },
+            { name: "start_date", in: "body", type: "date", required: false, desc: "When the Audiences being added start. Default today" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts to change, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, changed straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: the change runs in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "Nothing to add or remove, an Audience of another organisation, a bad <code>start_date</code>, or you aren't a colleague in the organisation" }
+          ], "<strong>Add or remove › Audiences</strong> for the Contacts selected on the Manage Contacts page. Ending an Audience sets its end date to today rather than deleting it, so it stays in the Contact's history. Contacts whose Audience you may not end are skipped (<code>skip_counts.not_allowed_to_end</code>).")}
+          ${endpointCard("POST", "/beneficiaries/bulk_required_skills", "Add Skills to many Contacts' Skills Required, or remove them", true, [
+            { name: "add_ids", in: "body", type: "integer[]", required: false, desc: "Skills to add, from <code>GET /skills</code>" },
+            { name: "remove_ids", in: "body", type: "integer[]", required: false, desc: "Skills to remove. Only Organisation Editors may remove one" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts to change, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, changed straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: the change runs in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "Nothing to add or remove, or a Skill of another organisation" }
+          ], "<strong>Add or remove › Skills Required</strong> for the Contacts selected on the Manage Contacts page, as the Skills Required box on a Contact's profile does. Anyone who can see a Contact may add a Skill; for anyone but an Organisation Editor, a removal skips the Contact (<code>skip_counts.not_allowed_to_remove</code>).")}
+          ${endpointCard("GET", "/skills", "List the organisation's Skills", true, [
+            { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only Skills changed since then" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each Skill's <code>id</code> and <code>name</code>, by name, in the paginated envelope" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
+          ], "Skills, e.g. First aid. Use an <code>id</code> with <code>POST /beneficiaries/bulk_required_skills</code>.")}
+          ${endpointCard("POST", "/beneficiaries/bulk_type", "Change the Type of many Contacts", true, [
+            { name: "beneficiary_type_id", in: "body", type: "integer", required: true, desc: "The Contact Type to change every Contact to, from <code>GET /beneficiary_types</code>" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts to change, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, changed straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: the change runs in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "No Type given" }
+          ], "<strong>Add or remove › Type</strong> for the Contacts selected on the Manage Contacts page. Bio fields that only show for one Type stay saved, but are hidden while a Contact has a Type without them. Contacts you may not edit are skipped (<code>skip_counts.not_allowed</code>).")}
           ${endpointCard("GET", "/relationship_categories", "List the organisation's Relationship Categories", true, [
             { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
             { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
