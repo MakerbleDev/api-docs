@@ -2173,6 +2173,10 @@ paths:
         **Already closed or open.** `close` changes only the listed Projects that are open, and
         `reopen` only those that are closed. The others are left as they are.
 
+        **Progress Boards.** Closing a Project also archives the Progress Boards generated for it
+        ("<Survey> on <Project>"), and reopening it reopens those boards. A board someone archived by
+        hand stays archived when the Project is reopened.
+
         **Signup Pages.** Closing a Project that an active Signup Page uses would break that Signup
         Page, so `close` needs `signup_pages`:
         - `deactivate`: deactivate those Signup Pages, then close the Project. A Project whose Signup
