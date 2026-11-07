@@ -2997,6 +2997,530 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /beneficiaries/bulk_groups:
+    post:
+      tags: [Beneficiaries]
+      summary: Add many Contacts to Groups, or take them out of Groups
+      description: |
+        Adds many Contacts (Beneficiaries) to some of the organisation's Groups and takes them out of
+        others, in one request. This is **Add or remove › Groups** for the Contacts selected on the
+        Manage Contacts page, e.g. putting every selected Contact in "Girls' football". Each change is
+        made the same way as ticking or unticking a Group on the Edit Contact page, so it appears on
+        the Contact's History.
+
+        **Which Groups.** `add_ids` and `remove_ids` are ids of the organisation's Groups
+        (`GET /groups`). Give at least one, and never the same Group in both. A Contact already in a
+        Group being added, or not in a Group being removed, is left as they are.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` (the user only has
+        Headline Only Access to them) and `not_allowed` (the user may not edit them).
+
+        Up to 50 Contacts are changed straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: changeBeneficiaryGroups
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to change
+                add_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Groups to add every Contact to
+                remove_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Groups to take every Contact out of
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to change, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              add_ids: [31]
+              remove_ids: [32]
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Contacts were changed straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+              example:
+                id: 72
+                status: completed
+                total_count: 3
+                processed_count: 3
+                changed_count: 2
+                skip_counts: { not_allowed: 1 }
+                background: false
+                summary: "2 contacts changed. 1 skipped: 1 because you aren't allowed to edit them."
+        "202":
+          description: More than 50 Contacts, so they are changed in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_flags:
+    post:
+      tags: [Beneficiaries]
+      summary: Raise Flags on many Contacts, or remove them
+      description: |
+        Raises some of the organisation's Flags (Contact Flags) on many Contacts (Beneficiaries) and
+        removes others, in one request. This is **Add or remove › Flags** for the Contacts selected
+        on the Manage Contacts page. Each Flag is raised the same way as on a Contact's profile, by
+        you, enabled and with no description.
+
+        **Which Flags.** `add_ids` and `remove_ids` are ids of Flags you may raise
+        (`GET /flags`): a Flag restricted to Teams is only yours to use if you are in one of them.
+        Give at least one, and never the same Flag in both. A Contact who already has a Flag being
+        added, or lacks one being removed, is left as they are. You need to be an Organisation
+        Editor, or a colleague on one of the organisation's Projects, to raise Flags.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` (the user only has
+        Headline Only Access to them) and `raised_by_someone_else` (only the person who raised a Flag
+        may remove it; such a Contact is left unchanged).
+
+        Up to 50 Contacts are changed straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: changeBeneficiaryFlags
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to change
+                add_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Flags to raise on every Contact
+                remove_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Flags to remove from every Contact
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to change, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              add_ids: [5]
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Contacts were changed straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "202":
+          description: More than 50 Contacts, so they are changed in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /flags:
+    get:
+      tags: [Beneficiaries]
+      summary: List the Flags you may raise
+      description: |
+        The organisation's Flags (Contact Flags), e.g. "Safeguarding concern", that you may raise on a
+        Contact: a Flag restricted to Teams is listed only for members of those Teams. Use an `id`
+        with `POST /beneficiaries/bulk_flags`. `charity_id` may be left out when the user belongs to
+        one organisation.
+      operationId: listFlags
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of Flags, by name
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Flag' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /groups:
+    get:
+      tags: [Beneficiaries]
+      summary: List the organisation's Groups
+      description: |
+        The organisation's Groups (Contact Groups), the labels Contacts are sorted into, e.g. "Girls'
+        football". These are the Groups the Edit Contact page offers. Use an `id` with
+        `POST /beneficiaries/bulk_groups`. Any member of the organisation can list them.
+        `charity_id` may be left out when the user belongs to one organisation.
+      operationId: listGroups
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of Groups, by title
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Group' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_audiences:
+    post:
+      tags: [Beneficiaries]
+      summary: Give many Contacts Audiences, or end them
+      description: |
+        Gives many Contacts (Beneficiaries) some of the organisation's Audiences (Contact Roles) and
+        ends others, in one request. This is **Add or remove › Audiences** for the Contacts selected
+        on the Manage Contacts page.
+
+        **Which Audiences.** `add_ids` and `remove_ids` are ids from `GET /audiences`. Audiences being
+        added start on `start_date` (default today). Removing an Audience ends it today rather than
+        deleting it, so it stays in the Contact's history. A Contact already in an Audience being
+        added, or not in one being removed, is left as they are. You need to be a colleague in the
+        organisation.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` and `not_allowed_to_end`
+        (you may end an Audience only if you added it, are an Organisation Editor, or are an editor or
+        reporter on one of the Contact's Projects).
+
+        Up to 50 Contacts are changed straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: changeBeneficiaryAudiences
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to change
+                add_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Audiences to give every Contact
+                remove_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Audiences to end for every Contact, today
+                start_date:
+                  type: string
+                  format: date
+                  description: When the Audiences being added start. Default today.
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to change, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              add_ids: [7]
+              start_date: "2026-11-01"
+              beneficiary_ids: [160498, 160499]
+      responses:
+        "200":
+          description: The Contacts were changed straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "202":
+          description: More than 50 Contacts, so they are changed in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_type:
+    post:
+      tags: [Beneficiaries]
+      summary: Change the Type of many Contacts
+      description: |
+        Changes the Type (Contact Type, e.g. Person or Organisation) of many Contacts (Beneficiaries)
+        in one request. This is **Add or remove › Type** for the Contacts selected on the Manage
+        Contacts page. A Contact has one Type, so `beneficiary_type_id` (from `GET /beneficiary_types`)
+        is the Type to change them all to. Bio fields that only show for one Type stay saved, but are
+        hidden while a Contact has a Type without them.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` and `not_allowed` (you may
+        not edit them). A Contact already of that Type is left as they are.
+
+        Up to 50 Contacts are changed straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: changeBeneficiaryType
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [beneficiary_type_id]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to change
+                beneficiary_type_id:
+                  type: integer
+                  description: The Type to change every Contact to
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to change, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              beneficiary_type_id: 3
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Contacts were changed straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "202":
+          description: More than 50 Contacts, so they are changed in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_required_skills:
+    post:
+      tags: [Beneficiaries]
+      summary: Add Skills to many Contacts' Skills Required, or remove them
+      description: |
+        Adds some of the organisation's Skills to many Contacts' (Beneficiaries') **Skills Required**
+        and removes others, in one request. This is **Add or remove › Skills Required** for the
+        Contacts selected on the Manage Contacts page. Each change is made as in the Skills Required
+        box on a Contact's profile.
+
+        **Which Skills.** `add_ids` and `remove_ids` are ids from `GET /skills`. Give at least one,
+        and never the same Skill in both. A Contact who already requires a Skill being added, or
+        doesn't require one being removed, is left as they are. Anyone who can see a Contact may add
+        a Skill; only Organisation Editors may remove one.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` and
+        `not_allowed_to_remove` (you aren't an Organisation Editor, so the Contact is left unchanged).
+
+        Up to 50 Contacts are changed straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: changeBeneficiaryRequiredSkills
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to change
+                add_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Skills to add to every Contact's Skills Required
+                remove_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Skills to remove from every Contact's Skills Required
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to change, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              add_ids: [31]
+              remove_ids: [32]
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Contacts were changed straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+              example:
+                id: 72
+                status: completed
+                total_count: 3
+                processed_count: 3
+                changed_count: 2
+                skip_counts: {}
+                background: false
+                summary: "2 contacts changed."
+        "202":
+          description: More than 50 Contacts, so they are changed in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkProjectMove' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /skills:
+    get:
+      tags: [Beneficiaries]
+      summary: List the organisation's Skills
+      description: |
+        The organisation's Skills, e.g. "First aid", as offered in the Skills Required box on a
+        Contact's profile. Use an `id` with `POST /beneficiaries/bulk_required_skills`. Any member of
+        the organisation can list them. `charity_id` may be left out when the user belongs to one
+        organisation.
+      operationId: listSkills
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of Skills, by name
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Skill' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /relationship_categories:
     get:
       tags: [Beneficiaries]
@@ -18056,6 +18580,42 @@ components:
             name:
               type: string
               enum: [Person, Organisation, Animal, Object]
+
+    Flag:
+      type: object
+      description: A Flag (Contact Flag) of the organisation
+      properties:
+        id: { type: integer }
+        name:
+          type: string
+          description: The Flag's name, e.g. Safeguarding concern
+        color:
+          type: string
+          description: The colour the Flag is shown in
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Group:
+      type: object
+      description: A Group (Contact Group) of the organisation
+      properties:
+        id: { type: integer }
+        title:
+          type: string
+          description: The Group's name, e.g. Girls' football
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Skill:
+      type: object
+      description: A Skill of the organisation
+      properties:
+        id: { type: integer }
+        name:
+          type: string
+          description: The Skill's name, e.g. First aid
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
 
     RelationshipCategory:
       type: object
