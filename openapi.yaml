@@ -162,7 +162,7 @@ tags:
   - name: Projects
     description: The primary organisational unit — every Story and Case belongs to a Project
   - name: Welcome Tours
-    description: Guided tours of Makerble's own pages for new colleagues, written by Makerble staff; Organisation Admins choose how strict they are
+    description: Guided tours of Makerble's own pages for new colleagues; Organisation Admins choose each team's stops, wording and how strict they are, and see who has finished
   - name: Announcements
     description: '"What''s new in Makerble" popups, written and scheduled by Makerble staff in Site Overview'
   - name: Wishlist
@@ -1099,11 +1099,15 @@ paths:
         Changes only the fields sent. System Access users can change everything; a stop with `_destroy: true`
         is removed, and a stop without an `id` is added.
 
-        An Organisation Admin of the tour's Organisation can change only how strict it is, as their Welcome
-        journey settings page does: `mode` (`required` is "Mandatory", `optional` lets people skip or end it),
-        `start_skippable` ("People can skip the tour when it is first offered"), `later_limit` (how many times
-        someone can choose "I'll do this later", 1 to 10) and `skippable` on stops that ask for a click. Sending
-        anything else as an Organisation Admin is refused with 403.
+        An Organisation Admin of the tour's Organisation can change what their Welcome journey settings page
+        changes: `mode` (`required` is "Mandatory", `optional` lets people skip or end it), `start_skippable`
+        ("People can skip the tour when it is first offered"), `later_limit` (how many times someone can choose
+        "I'll do this later", 1 to 10), and for each stop, named by its `id` or its `stop_key`: `included`
+        (whether the tour shows it; an unticked stop keeps its wording for when it is ticked again), `body` (its
+        wording, up to 280 characters of plain text; empty means Makerble's `default_body`) and `skippable` (on
+        stops that ask for a click). A `stop_key` the tour doesn't have yet adds that stop. Essentials stops
+        (navbar_spaces, navbar_user) are always included. Only the fields sent change. Sending anything else as
+        an Organisation Admin is refused with 403.
       operationId: updateTour
       security: [{tokenAuth: []}]
       requestBody:
@@ -1117,6 +1121,10 @@ paths:
               stops:
                 - id: 678
                   skippable: true
+                - id: 679
+                  included: false
+                - stop_key: contacts_table
+                  body: Every child you work with has a record here.
       responses:
         "200":
           description: The updated Welcome Tour
@@ -1124,6 +1132,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Tour'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /tours/{id}/progress:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Welcome Tours]
+      summary: See who has finished a Welcome Tour
+      description: |
+        Who has finished the tour, as the Who has finished page shows it: the colleagues in the tour's Team
+        (everyone in the Organisation for its default tour), by name, each with their team, how far they have
+        got, how many times they have chosen "I'll do this later" and when they were last reminded. Only
+        colleagues (Organisation Admins, reporters and observers) are listed, never Contacts or active
+        participants. `summary` counts the same people: `average_minutes` counts only tours finished without
+        "I'll do this later". An Organisation Admin of the tour's Organisation, or a System Access user.
+      operationId: listTourProgress
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated colleagues and how far each has got
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTourProgress'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /tours/{id}/reminders:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Welcome Tours]
+      summary: Remind a colleague to finish their Welcome Tour
+      description: |
+        Emails a colleague who hasn't finished their Welcome Tour a link that opens it at the stop they reached,
+        as Send a reminder on the Who has finished page does. Each person can be reminded once every 7 days;
+        a second reminder sooner is refused with 422, saying when the next one can be sent, as is someone who
+        has finished or isn't a colleague in the Organisation. An Organisation Admin of the tour's Organisation,
+        or a System Access user.
+      operationId: createTourReminder
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: integer
+                  description: The colleague to remind
+            example:
+              user_id: 4567
+      responses:
+        "201":
+          description: The reminder was sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TourReminder'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -15263,6 +15352,13 @@ components:
         skippable:
           type: boolean
           description: Whether a click stop shows Skip this stop
+        included:
+          type: boolean
+          description: Whether the tour shows this stop. An unticked stop keeps its wording for when it is ticked again.
+        default_body:
+          type: string
+          nullable: true
+          description: Makerble's wording for this stop, shown when `body` is empty
     TourInput:
       type: object
       properties:
@@ -15298,10 +15394,16 @@ components:
                 type: string
               stop_key:
                 type: string
+                description: For an Organisation Admin, names the stop instead of `id`, and adds it if the tour doesn't have it
               title:
                 type: string
               body:
                 type: string
+                nullable: true
+                description: The stop's wording; empty means Makerble's default. Up to 280 characters for an Organisation Admin.
+              included:
+                type: boolean
+                description: Whether the tour shows this stop
               action_text:
                 type: string
               after_text:
@@ -15319,6 +15421,76 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Tour'
+    PaginatedTourProgress:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            summary:
+              $ref: '#/components/schemas/TourProgressSummary'
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/TourProgress'
+    TourProgressSummary:
+      type: object
+      description: The tiles on the Who has finished page
+      properties:
+        finished:
+          type: integer
+        part_way:
+          type: integer
+        not_started:
+          type: integer
+          description: Not started, or skipped an optional tour
+        average_minutes:
+          type: number
+          nullable: true
+          description: Average minutes to finish, counting only tours finished without "I'll do this later"
+    TourProgress:
+      type: object
+      description: One colleague and how far they have got
+      properties:
+        user_id:
+          type: integer
+        name:
+          type: string
+        team:
+          type: string
+          nullable: true
+          description: The first of the Organisation's Teams they joined
+        status:
+          type: string
+          enum: [not_started, in_progress, deferred, completed, skipped]
+          description: deferred means they chose "I'll do this later"
+        tour:
+          type: string
+          description: As the page shows it, for example "Paused at stop 3 of 7" or "Finished"
+        later_used:
+          type: string
+          nullable: true
+          description: How many times they chose "I'll do this later" of how many allowed, on a mandatory tour
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+        reminded_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When they were last sent a reminder
+    TourReminder:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        reminded_at:
+          type: string
+          format: date-time
+        next_reminder_from:
+          type: string
+          format: date-time
+          description: The earliest another reminder can be sent to them
     WelcomeJourneySettings:
       type: object
       properties:

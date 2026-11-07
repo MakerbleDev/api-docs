@@ -4105,7 +4105,7 @@ function buildDocsPage() {
         <h2 class="section-title">Welcome Tours</h2>
         <div class="section-desc">
           <p>A Welcome Tour is the guided tour of Makerble's own pages that a new colleague is offered after adding their name and photo. Each stop dims the page except one area, such as the Spaces menu or the Contacts table, and either waits for Next or asks the person to click something (<code>action: click</code>). A tour belongs to an Organisation and, optionally, one of its Teams; <code>team_id: null</code> is the Organisation's default tour. Only a <code>live</code> tour is shown, and each Team (and the default) has at most one.</p>
-          <p>Makerble staff (System Access) see and change every tour. An Organisation Admin sees their own Organisation's tours and can change only how strict they are: <code>mode</code> (<code>required</code> is shown as Mandatory), <code>start_skippable</code>, <code>later_limit</code> (how many times someone can choose "I'll do this later", 1 to 10) and <code>skippable</code> on click stops. Anyone else gets <code>403</code>. How far each person has got isn't available through the API.</p>
+          <p>Makerble staff (System Access) see and change every tour. An Organisation Admin sees their own Organisation's tours and changes what their Welcome journey settings page changes: how strict a tour is (<code>mode</code>, where <code>required</code> is shown as Mandatory; <code>start_skippable</code>; <code>later_limit</code>, how many times someone can choose "I'll do this later", 1 to 10), and for each stop whether it is <code>included</code>, its wording (<code>body</code>, up to 280 characters; empty uses Makerble's <code>default_body</code>) and whether a click stop is <code>skippable</code>. Essentials stops are always included. They can also see who has finished a tour and send reminders. Anyone else gets <code>403</code>.</p>
           <p>Stop keys: <code>navbar_spaces</code>, <code>navbar_user</code>, <code>focus_table</code>, <code>contacts_table</code>, <code>contacts_search</code>, <code>contacts_filters</code>, <code>events_table</code>, <code>event_guests</code>.</p>
         </div>
         <div class="endpoint-list">
@@ -4137,7 +4137,25 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not allowed, e.g. an Organisation Admin changing the name, status or a stop's wording" },
             { code: "404", cls: "response-4xx", desc: "Not found" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. a later_limit of 11" }
-          ], "Only the fields sent change. Staff can send everything, and <code>_destroy: true</code> on a stop removes it. An Organisation Admin can send <code>mode</code>, <code>start_skippable</code>, <code>later_limit</code> and <code>stops: [{id, skippable}]</code>.")}
+          ], "Only the fields sent change. Staff can send everything, and <code>_destroy: true</code> on a stop removes it. An Organisation Admin can send <code>mode</code>, <code>start_skippable</code>, <code>later_limit</code> and <code>stops: [{id or stop_key, included, body, skippable}]</code>; a <code>stop_key</code> the tour doesn't have yet adds that stop.")}
+          ${endpointCard("GET", "/tours/{id}/progress", "See who has finished a Welcome Tour", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Welcome Tour ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated colleagues in the tour's Team (everyone for a default tour), each with <code>status</code>, <code>tour</code> (e.g. \"Paused at stop 3 of 7\"), <code>later_used</code>, <code>last_active_at</code> and <code>reminded_at</code>, plus a <code>summary</code> of finished, part-way, not started and average minutes" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of its Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ], "Colleagues only, never Contacts or active participants. <code>average_minutes</code> counts only tours finished without \"I'll do this later\".")}
+          ${endpointCard("POST", "/tours/{id}/reminders", "Remind a colleague to finish their Welcome Tour", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Welcome Tour ID" },
+            { name: "user_id", in: "body", type: "integer", required: true, desc: "The colleague to remind" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Reminder emailed: <code>user_id</code>, <code>reminded_at</code> and <code>next_reminder_from</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of its Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "Already reminded in the last 7 days, already finished, or not a colleague in the Organisation" }
+          ], "Emails a link that opens the tour at the stop they reached. Once every 7 days per person.")}
           ${endpointCard("GET", "/organisations/{organisation_id}/welcome_journey_settings", "Get an Organisation's welcome journey settings", true, [
             { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" }
           ], [
