@@ -2573,7 +2573,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user may not create a set with this <code>availability</code>" },
             { code: "404", cls: "response-4xx", desc: "Unknown Organisation" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no name or no Impact Frameworks" }
-          ], "Body: <code>charity_id</code>, <code>name</code>, <code>availability</code>, <code>network_id</code>, <code>level1_singular</code>, <code>level1_plural</code>, <code>level2_singular</code>, <code>level2_plural</code>, <code>value_source</code>, <code>version_label</code>, <code>supersedes_id</code>, <code>status</code>, <code>frameworks: [{template_id, short_code, colour, text_colour}]</code> in order, and <code>new_frameworks: [name]</code> to create new Impact Frameworks.")}
+          ], "Body: <code>charity_id</code>, <code>name</code>, <code>availability</code>, <code>network_id</code>, <code>level1_singular</code>, <code>level1_plural</code>, <code>level2_singular</code>, <code>level2_plural</code>, <code>level3_singular</code>, <code>level3_plural</code> (the name of each Outcome's own Indicators, e.g. Measure), <code>value_source</code>, <code>version_label</code>, <code>supersedes_id</code>, <code>status</code>, <code>frameworks: [{template_id, short_code, colour, text_colour}]</code> in order, and <code>new_frameworks: [name]</code> to create new Impact Frameworks.")}
           ${endpointCard("PATCH", "/framework_sets/{id}", "Update a Framework Set", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" }
           ], [
@@ -2581,7 +2581,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user can't edit this set" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Same body as create; only the fields sent change. <code>frameworks</code> (when sent) replaces the ordered list; <code>financial_values: [{outcome_id, financial_value_id}]</code> replaces the Financial Value chosen for each Outcome.")}
+          ], "Same body as create; only the fields sent change. <code>frameworks</code> (when sent) replaces the ordered list; <code>financial_values: [{outcome_id, indicator_id, financial_value_id}]</code> replaces the Financial Values chosen for the set: leave out <code>indicator_id</code> for an Outcome's own value, or give one of the Outcome's own Indicators (e.g. a TOMs Measure) to value it separately. An Indicator's value is used instead of its Outcome's.")}
           ${endpointCard("GET", "/framework_sets/{id}/contribution", "Get an organisation's contribution to a Framework Set", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" },
             { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID; the user must belong to it" },
@@ -2608,14 +2608,14 @@ function buildDocsPage() {
             { name: "per_page", type: "integer", required: false, desc: "Records per page" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated links with <code>indicator_name</code>, <code>outcome_title</code>, <code>project_ids</code> and <code>all_projects</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated links with <code>indicator_name</code>, <code>outcome_title</code>, <code>framework_indicator_id</code> and <code>framework_indicator_name</code> (which of the Outcome's own Indicators it counts as, if any), <code>project_ids</code> and <code>all_projects</code>" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't belong to the Organisation" }
           ])}
           ${endpointCard("POST", "/framework_links", "Link an Indicator to an Outcome in a Framework Set", true, [], [
             { code: "201", cls: "response-2xx", desc: "The Linked indicator" },
             { code: "403", cls: "response-4xx", desc: "Not an organisation admin" },
             { code: "422", cls: "response-4xx", desc: "Not one of the organisation's Indicators or projects, an Outcome outside the sets it can use, or already linked" }
-          ], "Body: <code>charity_id</code>, <code>indicator_id</code>, <code>outcome_id</code>, <code>project_ids</code> (empty: every project). Linking again with more projects adds them to the existing link.")}
+          ], "Body: <code>charity_id</code>, <code>indicator_id</code>, <code>outcome_id</code>, <code>framework_indicator_id</code> (optional: which of the Outcome's own Indicators it counts as, e.g. a TOMs Measure; can't be changed on an existing link), <code>project_ids</code> (empty: every project). Linking again with more projects adds them to the existing link.")}
           ${endpointCard("DELETE", "/framework_links/{id}", "Remove a Linked indicator", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Linked indicator ID" },
             { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
