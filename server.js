@@ -4212,7 +4212,7 @@ function buildDocsPage() {
         <h2 class="section-title">Welcome Tours</h2>
         <div class="section-desc">
           <p>A Welcome Tour is the guided tour of Makerble's own pages that a new colleague is offered after adding their name and photo. Each stop dims the page except one area, such as the Spaces menu or the Contacts table, and either waits for Next or asks the person to click something (<code>action: click</code>). A tour belongs to an Organisation and, optionally, one of its Teams; <code>team_id: null</code> is the Organisation's default tour. Only a <code>live</code> tour is shown, and each Team (and the default) has at most one.</p>
-          <p>Makerble staff (System Access) see and change every tour. An Organisation Admin sees their own Organisation's tours and changes what their Welcome journey settings page changes: how strict a tour is (<code>mode</code>, where <code>required</code> is shown as Mandatory; <code>start_skippable</code>; <code>later_limit</code>, how many times someone can choose "I'll do this later", 1 to 10), and for each stop whether it is <code>included</code>, its wording (<code>body</code>, up to 280 characters; empty uses Makerble's <code>default_body</code>) and whether a click stop is <code>skippable</code>. Essentials stops are always included. They can also see who has finished a tour and send reminders. Anyone else gets <code>403</code>.</p>
+          <p>Makerble staff (System Access) see and change every tour. An Organisation Admin sees their own Organisation's tours and changes what their Welcome journey settings page changes: how strict a tour is (<code>mode</code>, where <code>required</code> is shown as Mandatory; <code>start_skippable</code>; <code>later_limit</code>, how many times someone can choose "I'll do this later", 1 to 10), and for each stop whether it is <code>included</code>, its wording (<code>body</code>, up to 280 characters; empty uses Makerble's <code>default_body</code>) and whether a click stop is <code>skippable</code>. Essentials stops are always included. Both can choose up to 2 Checklists, <code>watch_checklist_ids</code>, that Watch the journey shows a new colleague straight after the tour. They can also see who has finished a tour and send reminders. Anyone else gets <code>403</code>.</p>
           <p>Stop keys: <code>navbar_spaces</code>, <code>navbar_user</code>, <code>focus_table</code>, <code>contacts_table</code>, <code>contacts_search</code>, <code>contacts_filters</code>, <code>events_table</code>, <code>event_guests</code>.</p>
         </div>
         <div class="endpoint-list">
@@ -4236,15 +4236,15 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "Welcome Tour created (a draft unless <code>status</code> is <code>live</code>)" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no name, an unknown stop_key, or a second live tour for the Team" }
-          ], "Body: <code>name</code>, <code>organisation_id</code>, <code>team_id</code>, <code>mode</code>, <code>status</code>, <code>start_skippable</code>, <code>later_limit</code>, <code>stops: [{stop_key, position, group_name, title, body, action_text, after_text, skippable}]</code>.")}
+          ], "Body: <code>name</code>, <code>organisation_id</code>, <code>team_id</code>, <code>mode</code>, <code>status</code>, <code>start_skippable</code>, <code>later_limit</code>, <code>watch_checklist_ids</code>, <code>stops: [{stop_key, position, group_name, title, body, action_text, after_text, skippable}]</code>.")}
           ${endpointCard("PATCH", "/tours/{id}", "Update a Welcome Tour", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Welcome Tour ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Welcome Tour updated" },
             { code: "403", cls: "response-4xx", desc: "Not allowed, e.g. an Organisation Admin changing the name, status or a stop's wording" },
             { code: "404", cls: "response-4xx", desc: "Not found" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. a later_limit of 11" }
-          ], "Only the fields sent change. Staff can send everything, and <code>_destroy: true</code> on a stop removes it. An Organisation Admin can send <code>mode</code>, <code>start_skippable</code>, <code>later_limit</code> and <code>stops: [{id or stop_key, included, body, skippable}]</code>; a <code>stop_key</code> the tour doesn't have yet adds that stop.")}
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. a later_limit of 11, or more than 2 watch_checklist_ids" }
+          ], "Only the fields sent change. Staff can send everything, and <code>_destroy: true</code> on a stop removes it. An Organisation Admin can send <code>mode</code>, <code>start_skippable</code>, <code>later_limit</code>, <code>watch_checklist_ids</code> and <code>stops: [{id or stop_key, included, body, skippable}]</code>; a <code>stop_key</code> the tour doesn't have yet adds that stop. <code>watch_checklist_ids</code> takes up to 2 of the Organisation's Checklists, in order; a person sees only those on their own workspaces. Send <code>[]</code> to fall back to up to 2 Checklists on their workspaces, most recently updated first.")}
           ${endpointCard("GET", "/tours/{id}/progress", "See who has finished a Welcome Tour", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Welcome Tour ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
@@ -4266,18 +4266,19 @@ function buildDocsPage() {
           ${endpointCard("GET", "/organisations/{organisation_id}/welcome_journey_settings", "Get an Organisation's welcome journey settings", true, [
             { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "<code>photo_skippable</code> and the Organisation's <code>tour_ids</code>" },
+            { code: "200", cls: "response-2xx", desc: "<code>photo_skippable</code>, <code>watch_skippable</code> and the Organisation's <code>tour_ids</code>" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
           ${endpointCard("PATCH", "/organisations/{organisation_id}/welcome_journey_settings", "Update an Organisation's welcome journey settings", true, [
             { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
-            { name: "photo_skippable", in: "body", type: "boolean", required: true, desc: "Whether people can skip adding a profile picture" }
+            { name: "photo_skippable", in: "body", type: "boolean", required: false, desc: "Whether people can skip adding a profile picture" },
+            { name: "watch_skippable", in: "body", type: "boolean", required: false, desc: "Whether people can skip Watch the journey, the Checklists shown after the Welcome Tour" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The settings after the change" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
-            { code: "422", cls: "response-4xx", desc: "photo_skippable missing" }
-          ])}
+            { code: "422", cls: "response-4xx", desc: "Neither photo_skippable nor watch_skippable sent" }
+          ], "Send either setting or both.")}
         </div>
       </section>
 
