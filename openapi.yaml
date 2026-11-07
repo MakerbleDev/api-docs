@@ -1161,6 +1161,11 @@ paths:
         stops that ask for a click). A `stop_key` the tour doesn't have yet adds that stop. Essentials stops
         (navbar_spaces, navbar_user) are always included. Only the fields sent change. Sending anything else as
         an Organisation Admin is refused with 403.
+
+        Both can set `watch_checklist_ids`: up to 2 Checklists of the tour's Organisation that Watch the journey
+        shows a new colleague straight after the tour, one step at a time, in the order sent. A person sees only
+        those on their own workspaces. An empty list means they see up to 2 Checklists on their workspaces, most
+        recently updated first. More than 2, or a Checklist from another Organisation, is refused with 422.
       operationId: updateTour
       security: [{tokenAuth: []}]
       requestBody:
@@ -1303,7 +1308,7 @@ paths:
     patch:
       tags: [Welcome Tours]
       summary: Update an Organisation's welcome journey settings
-      description: Sets "People can skip adding a profile picture". Change each tour's own settings with PATCH /tours/{id}.
+      description: Sets "People can skip adding a profile picture" and "People can skip Watch the journey". Send either or both. Change each tour's own settings with PATCH /tours/{id}.
       operationId: updateWelcomeJourneySettings
       security: [{tokenAuth: []}]
       requestBody:
@@ -1312,9 +1317,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [photo_skippable]
               properties:
                 photo_skippable:
+                  type: boolean
+                watch_skippable:
                   type: boolean
             example:
               photo_skippable: false
@@ -15904,6 +15910,13 @@ components:
         audience:
           type: string
           description: The Team's name, or "Everyone in the organisation (default)"
+        watch_checklist_ids:
+          type: array
+          items:
+            type: integer
+          description: >-
+            The Checklists that Watch the journey shows straight after the tour, in order (up to 2). Empty means
+            people see up to 2 Checklists on their workspaces, most recently updated first.
         mode:
           type: string
           enum: [required, optional]
@@ -15995,6 +16008,12 @@ components:
           type: integer
           minimum: 1
           maximum: 10
+        watch_checklist_ids:
+          type: array
+          maxItems: 2
+          items:
+            type: integer
+          description: Up to 2 Checklists of the tour's Organisation for Watch the journey, in order. Send [] to clear them.
         stops:
           type: array
           items:
@@ -16113,6 +16132,9 @@ components:
         photo_skippable:
           type: boolean
           description: Whether people can skip adding a profile picture
+        watch_skippable:
+          type: boolean
+          description: Whether people can skip Watch the journey, the Checklists shown after the Welcome Tour
         tour_ids:
           type: array
           items:
