@@ -977,6 +977,7 @@ function buildDocsPage() {
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
         <a href="#usage"           class="nav-link"><span class="nav-method method-GET">GET</span>Usage</a>
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
+        <a href="#wishlist"        class="nav-link"><span class="nav-method method-POST">POST</span>Wishlist</a>
         <a href="#welcome-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Welcome Tours</a>
       </div>
       <div class="nav-section">
@@ -4048,6 +4049,53 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. 4 name changes" }
           ], "Same body as create; only the fields sent change. Without <code>status</code>, a draft stays a draft and a scheduled announcement stays scheduled. Editing a live announcement doesn't show it again to people who have already seen it.")}
+        </div>
+      </section>
+
+      <!-- Wishlist -->
+      <section class="section" id="wishlist">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Wishlist</h2>
+        <div class="section-desc">
+          <p>Wishlist is the page behind the gift icon. <strong>Your wishlist</strong> holds the feature requests and feedback a person has sent, and where each one is; you only ever see your own, never a colleague's. A feature request also goes to Makerble's Helpdesk, and its <code>status</code> follows it: "Received", "We are looking at this", "Estimate sent to your bill payer", "Being built", "Shipped" and so on. Feedback stays in Makerble and reads "Read by the Makerble team".</p>
+          <p><strong>Coming soon</strong> (Roadmap items) is what Makerble has committed to building, under <code>building_now</code> and <code>up_next</code>, with no dates. Everyone can read the published items. Makerble staff (System Access) also see unpublished ones, can create and change them, and see <code>stale</code> on any unchanged for 60 days. Anyone else gets <code>403</code> when writing. What's new is <a href="#announcements">Announcements</a>.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Before you send a request:</strong> don't include details of people you support. If a feature request needs custom work, Makerble sends an estimate to the organisation's bill payer, not to the person who asked.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/wishes", "List your Wishlist", true, [
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Wishes, your own only, newest first, each with <code>kind</code>, <code>status</code> and, for a feature request, its <code>helpdesk_key</code> once the ticket exists" }
+          ])}
+          ${endpointCard("POST", "/wishes", "Request a feature or give feedback", true, [], [
+            { code: "201", cls: "response-2xx", desc: "The Wish you sent. A feature request shows \"Received\" straight away" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. empty text, an unknown <code>kind</code>, or an organisation you're not part of" }
+          ], "Body: <code>kind</code> (<code>feature_request</code> or <code>feedback</code>), <code>body</code> (up to 2,000 characters), <code>charity_id</code> (which of your organisations it's about; needed only if you belong to more than one).")}
+          ${endpointCard("GET", "/roadmap_items", "List Coming soon", true, [
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated items, Building now before Up next, each in order. Published items only, unless you have System Access" }
+          ])}
+          ${endpointCard("POST", "/roadmap_items", "Create a Coming soon item", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Item created, at the end of its stage" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no title, or a description over 280 characters" }
+          ], "Body: <code>title</code> (up to 90), <code>body</code> (up to 280, in customer language, no dates), <code>stage</code> (<code>building_now</code> or <code>up_next</code>), <code>published</code>.")}
+          ${endpointCard("PATCH", "/roadmap_items/{id}", "Update a Coming soon item", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Item ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Item updated" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Same body as create; only the fields sent change. Moving an item to another stage puts it at the end of that stage. Set <code>published</code> to false to take it out of Coming soon.")}
         </div>
       </section>
 
