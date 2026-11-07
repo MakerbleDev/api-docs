@@ -1446,7 +1446,7 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list of Signup Pages, ordered by name" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" }
-          ], "What the <b>Manage Sign-up Pages</b> table shows for each Signup Page: <code>type</code> (<code>fixed</code> or <code>flexible</code>), <code>status</code> and <code>active</code>, <code>public_link</code> (the customised link when there is one), <code>emails_enabled</code>, who created and last updated it and when, and <code>individuals</code>: each individual or audience with its Contact Form, Project, project status, Surveys and any Wave, and <code>send_emails</code>. Deactivated Signup Pages are included.")}
+          ], "What the <b>Manage Sign-up Pages</b> table shows for each Signup Page: <code>type</code> (<code>fixed</code> or <code>flexible</code>), <code>status</code> and <code>active</code>, <code>public_link</code> (the customised link when there is one), <code>emails_enabled</code>, <code>allow_finish_later</code> (whether people can save it part-way through and finish it later), who created and last updated it and when, and <code>individuals</code>: each individual or audience with its Contact Form, Project, project status, Surveys and any Wave, and <code>send_emails</code>. Deactivated Signup Pages are included.")}
           ${endpointCard("POST", "/referral_link_details", "Make a Signup Page", true, [
             { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation. You must be an Organisation Editor of it" },
             { name: "name", in: "body", type: "string", required: true, desc: "The Signup Page's name" },
@@ -1456,6 +1456,7 @@ function buildDocsPage() {
             { name: "beneficiary_state_id", in: "body", type: "integer", required: false, desc: "The project status people are added with" },
             { name: "contact_form_id", in: "body", type: "integer", required: false, desc: "Individual A's Contact Form" },
             { name: "surveys", in: "body", type: "object[]", required: false, desc: "<code>{id, wave_id}</code>: Surveys the Project collects, each with an optional Wave" },
+            { name: "allow_finish_later", in: "body", type: "boolean", required: false, desc: "Default <code>false</code>. Let people save the Signup Page part-way through and finish it later from a resume link (<b>Allow people to save this form and finish it later</b>). Unfinished forms are deleted 30 days after they were last saved" },
             { name: "individuals", in: "body", type: "object[]", required: false, desc: "Fixed: Individual B, C, ... each with <code>relationship_category_id</code>, <code>relationship</code> (its parent or child title, e.g. <code>Child</code>), <code>project_id</code>, <code>beneficiary_state_id</code>, <code>contact_form_id</code> and <code>surveys</code>" },
             { name: "audiences", in: "body", type: "object[]", required: false, desc: "Flexible: one per audience with <code>beneficiary_role_id</code>, <code>project_id</code>, <code>beneficiary_state_id</code>, <code>contact_form_id</code> and <code>surveys</code>" }
           ], [

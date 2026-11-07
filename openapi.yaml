@@ -20537,6 +20537,9 @@ components:
         emails_enabled:
           type: boolean
           description: Whether any Send Emails email is switched on
+        allow_finish_later:
+          type: boolean
+          description: Whether people filling in the Signup Page can save it part-way through and finish it later from a resume link (the "Allow people to save this form and finish it later" setting)
         created_by:
           type: object
           nullable: true
@@ -20695,6 +20698,10 @@ components:
           type: string
         thank_you_message:
           type: string
+        allow_finish_later:
+          type: boolean
+          default: false
+          description: Let people filling in the Signup Page save it part-way through and finish it later from a resume link. Unfinished forms are deleted 30 days after they were last saved.
         individuals:
           type: array
           description: Fixed only. Individual B, C, ... in order
