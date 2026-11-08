@@ -5663,7 +5663,7 @@ paths:
       description: |
         Updates a Framework Set the user can edit. Send `frameworks` to replace the list of Impact
         Frameworks (in order), and `financial_values` to replace the Financial Value defined for each
-        Outcome. `charity_id` is the organisation the user is acting for.
+        Outcome, and optionally for each of an Outcome's own Indicators (`indicator_id`, e.g. a TOMs Measure). `charity_id` is the organisation the user is acting for.
       operationId: updateFrameworkSet
       security: [{tokenAuth: []}]
       parameters:
@@ -5684,6 +5684,9 @@ paths:
               financial_values:
                 - outcome_id: 5521
                   financial_value_id: 88
+                - outcome_id: 5521
+                  indicator_id: 2240
+                  financial_value_id: 91
       responses:
         "200":
           description: The updated Framework Set
@@ -5869,6 +5872,12 @@ paths:
                   type: integer
                 outcome_id:
                   type: integer
+                framework_indicator_id:
+                  type: integer
+                  description: |
+                    Optional. Which of the Outcome's own Indicators this indicator counts as (e.g. a TOMs
+                    Measure). In a Framework Set with its own Financial Values, Stories are then valued at
+                    that Indicator's value. It can't be changed on an existing link; remove the link first.
                 project_ids:
                   type: array
                   items:
@@ -20033,6 +20042,13 @@ components:
             level2_plural:
               type: string
               example: targets
+            level3_singular:
+              type: string
+              example: Indicator
+              description: The name of each Outcome's own indicators in this set, e.g. Measure for the TOM System
+            level3_plural:
+              type: string
+              example: indicators
             value_source:
               type: string
               enum: [organisation_values, set_values]
@@ -20074,6 +20090,10 @@ components:
                 properties:
                   outcome_id:
                     type: integer
+                  indicator_id:
+                    type: integer
+                    nullable: true
+                    description: One of the Outcome's own Indicators whose value this is; empty for the Outcome's own value
                   financial_value_id:
                     type: integer
 
@@ -20109,6 +20129,10 @@ components:
           type: string
         level2_plural:
           type: string
+        level3_singular:
+          type: string
+        level3_plural:
+          type: string
         value_source:
           type: string
           enum: [organisation_values, set_values]
@@ -20143,12 +20167,18 @@ components:
             type: string
         financial_values:
           type: array
-          description: The Financial Value for each Outcome, used when value_source is set_values. Replaces the current list.
+          description: |
+            The Financial Value for each Outcome, and optionally for each of an Outcome's own Indicators
+            (give indicator_id), used when value_source is set_values. An Indicator's value is used instead
+            of its Outcome's. Replaces the current list.
           items:
             type: object
             properties:
               outcome_id:
                 type: integer
+              indicator_id:
+                type: integer
+                description: One of the Outcome's own Indicators, e.g. a TOMs Measure
               financial_value_id:
                 type: integer
 
@@ -20234,6 +20264,13 @@ components:
                             type: integer
                           financial_value:
                             type: number
+                          framework_indicator_id:
+                            type: integer
+                            nullable: true
+                            description: For a linked Indicator, which of the Outcome's own Indicators it counts as
+                          counted_through_links:
+                            type: boolean
+                            description: For a core Indicator no Story records directly, whether linked Indicators count as it
 
     FrameworkLinkMigration:
       type: object
@@ -20276,6 +20313,13 @@ components:
             outcome_title:
               type: string
               example: "4.4 Increase the number of youth and adults who have relevant skills"
+            framework_indicator_id:
+              type: integer
+              nullable: true
+              description: Which of the Outcome's own Indicators this indicator counts as, if any (e.g. a TOMs Measure)
+            framework_indicator_name:
+              type: string
+              nullable: true
             project_ids:
               type: array
               items:
