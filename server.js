@@ -979,6 +979,7 @@ function buildDocsPage() {
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
         <a href="#wishlist"        class="nav-link"><span class="nav-method method-POST">POST</span>Wishlist</a>
         <a href="#welcome-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Welcome Tours</a>
+        <a href="#training-materials" class="nav-link"><span class="nav-method method-POST">POST</span>Training Materials</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
@@ -4147,7 +4148,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user doesn't hold the role on that place, or (with no place) doesn't have System Access" },
             { code: "404", cls: "response-4xx", desc: "The Organisation, Workspace or Team doesn't exist" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no headline, a headline over 90 characters, a Vimeo visual with a YouTube link, or the name change animation for a place" }
-          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>button_label</code> (default \"Got it\"), <code>audience</code>, <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
+          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>training_material_id</code> (a place's announcement only: one of its Organisation's Training materials, linked for the colleagues it is shared with), <code>button_label</code> (default \"Got it\"), <code>audience</code>, <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
           ${endpointCard("PATCH", "/announcements/{id}", "Update an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
@@ -4244,7 +4245,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not allowed, e.g. an Organisation Admin changing the name, status or a stop's wording" },
             { code: "404", cls: "response-4xx", desc: "Not found" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. a later_limit of 11, or more than 2 watch_checklist_ids" }
-          ], "Only the fields sent change. Staff can send everything, and <code>_destroy: true</code> on a stop removes it. An Organisation Admin can send <code>mode</code>, <code>start_skippable</code>, <code>later_limit</code>, <code>watch_checklist_ids</code> and <code>stops: [{id or stop_key, included, body, skippable}]</code>; a <code>stop_key</code> the tour doesn't have yet adds that stop. <code>watch_checklist_ids</code> takes up to 2 of the Organisation's Checklists, in order; a person sees only those on their own workspaces. Send <code>[]</code> to fall back to up to 2 Checklists on their workspaces, most recently updated first.")}
+          ], "Only the fields sent change. Staff can send everything, and <code>_destroy: true</code> on a stop removes it. An Organisation Admin can send <code>mode</code>, <code>start_skippable</code>, <code>later_limit</code>, <code>watch_checklist_ids</code>, <code>training_material_id</code> (one of the Organisation's Training materials, linked as the Full guide on the last stop; <code>null</code> clears it) and <code>stops: [{id or stop_key, included, body, skippable}]</code>; a <code>stop_key</code> the tour doesn't have yet adds that stop. <code>watch_checklist_ids</code> takes up to 2 of the Organisation's Checklists, in order; a person sees only those on their own workspaces. Send <code>[]</code> to fall back to up to 2 Checklists on their workspaces, most recently updated first.")}
           ${endpointCard("GET", "/tours/{id}/progress", "See who has finished a Welcome Tour", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Welcome Tour ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
@@ -4279,6 +4280,52 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Neither photo_skippable nor watch_skippable sent" }
           ], "Send either setting or both.")}
+        </div>
+      </section>
+
+      <section class="section" id="training-materials">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Training Materials</h2>
+        <div class="section-desc">
+          <p>An Organisation's Training materials are links to its own training documents and videos, such as crib sheets in Google Docs, Word Online or SharePoint, or Loom videos. They appear on the Training materials page under Helpdesk. Makerble keeps the link, not the document. Each material is for the whole Organisation (<code>all_organisation</code>), or for one or more Teams (<code>team_ids</code>) and Workspaces (<code>project_ids</code>).</p>
+          <p>Anyone in the Organisation can list the materials they may see: those for everyone, for their Teams, and for Workspaces they have a role on. Organisation Admins and Makerble staff (System Access) see them all, add, change and remove them, and see <code>review_due</code> on any last reviewed more than 12 months ago. Someone with no part in the Organisation gets <code>403</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/organisations/{organisation_id}/training_materials", "List an Organisation's Training materials", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "project_id", type: "integer", required: false, desc: "Only the materials linked to this Workspace" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Training materials the user may see, by name" },
+            { code: "403", cls: "response-4xx", desc: "The user has no part in the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Organisation not found" }
+          ])}
+          ${endpointCard("POST", "/organisations/{organisation_id}/training_materials", "Add a Training material", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "Organisation ID" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Training material added" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no name, a link not starting https://, or not linked to anyone" }
+          ], "Body: <code>name</code>, <code>url</code> (starting https://), <code>description</code>, <code>material_type</code> (<code>document</code> or <code>video</code>), <code>all_organisation</code>, <code>team_ids</code>, <code>project_ids</code> (at least one of the three), <code>owner_id</code> (an Organisation Admin; defaults to the user). Share the document with the same people, or they will see a request-access page.")}
+          ${endpointCard("PATCH", "/organisations/{organisation_id}/training_materials/{id}", "Change a Training material", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "Training material ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Training material updated" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Only the fields sent change; <code>team_ids</code> and <code>project_ids</code> replace who it is linked to. Send <code>mark_as_reviewed: true</code> to set its last reviewed date to now.")}
+          ${endpointCard("DELETE", "/organisations/{organisation_id}/training_materials/{id}", "Remove a Training material", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "Training material ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Removed from Makerble; the document itself is untouched" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
         </div>
       </section>
 

@@ -163,6 +163,8 @@ tags:
     description: The primary organisational unit — every Story and Case belongs to a Project
   - name: Welcome Tours
     description: Guided tours of Makerble's own pages for new colleagues; Organisation Admins choose each team's stops, wording and how strict they are, and see who has finished
+  - name: Training Materials
+    description: An Organisation's links to its own training documents and videos, each shown to the whole Organisation or to chosen Teams and Workspaces
   - name: Announcements
     description: '"What''s new in Makerble" popups, written and scheduled by Makerble staff in Site Overview'
   - name: Wishlist
@@ -1279,6 +1281,155 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /organisations/{organisation_id}/training_materials:
+    parameters:
+      - name: organisation_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Training Materials]
+      summary: List an Organisation's Training materials
+      description: |
+        The Organisation's Training materials, as on the Training materials page under Helpdesk: links to its own
+        training documents and videos (Google Docs, Word Online, SharePoint, Loom and so on). Returns only those the
+        caller may see: an Organisation Admin or System Access user sees them all; anyone else sees those linked to
+        the whole Organisation, to a Team they are in, or to a Workspace they hold a role on. Someone with no part in
+        the Organisation gets 403. `project_id` narrows the list to the materials linked to one Workspace.
+      operationId: listTrainingMaterials
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: project_id
+          in: query
+          required: false
+          description: Only the materials linked to this Workspace (Project) of the Organisation
+          schema: { type: integer }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of Training materials, by name
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/TrainingMaterial' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Training Materials]
+      summary: Add a Training material
+      description: |
+        Adds a link to one of the Organisation's training documents or videos, and says who it is for: the whole
+        Organisation (`all_organisation`), or one or more Teams (`team_ids`) and Workspaces (`project_ids`). At least one
+        is required. Makerble keeps only the link, so share the document with the same people. The owner defaults to
+        the caller. An Organisation Admin of the Organisation, or a System Access user.
+      operationId: createTrainingMaterial
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrainingMaterialInput'
+            example:
+              name: How to add a new school
+              url: https://docs.google.com/document/d/abc123
+              description: For centre administrators
+              material_type: document
+              team_ids: [12]
+      responses:
+        "201":
+          description: The Training material added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingMaterial'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /organisations/{organisation_id}/training_materials/{id}:
+    parameters:
+      - name: organisation_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      tags: [Training Materials]
+      summary: Change a Training material
+      description: |
+        Changes only the fields sent. `team_ids` and `project_ids` replace the Teams and Workspaces it is linked to.
+        Send `mark_as_reviewed: true` to set its last reviewed date to now ("Mark as reviewed"). An Organisation Admin of
+        the Organisation, or a System Access user.
+      operationId: updateTrainingMaterial
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/TrainingMaterialInput'
+                - type: object
+                  properties:
+                    mark_as_reviewed:
+                      type: boolean
+                      description: Set its last reviewed date to now
+            example:
+              team_ids: [14]
+              mark_as_reviewed: true
+      responses:
+        "200":
+          description: The Training material
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingMaterial'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+    delete:
+      tags: [Training Materials]
+      summary: Remove a Training material
+      description: Removes the link from Makerble. The document itself is not touched. An Organisation Admin of the Organisation, or a System Access user.
+      operationId: deleteTrainingMaterial
+      security: [{tokenAuth: []}]
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /organisations/{organisation_id}/welcome_journey_settings:
     parameters:
       - name: organisation_id
@@ -15789,6 +15940,12 @@ components:
         scope_id:
           type: integer
           description: On create only, with `scope_type`.
+        training_material_id:
+          type: integer
+          nullable: true
+          description: >-
+            For an Organisation's, Workspace's or Team's announcement: one of that Organisation's Training materials
+            to link to. Send null to clear it.
         title:
           type: string
           maxLength: 90
@@ -15857,6 +16014,12 @@ components:
         scope_id:
           type: integer
           nullable: true
+        training_material_id:
+          type: integer
+          nullable: true
+          description: >-
+            One of the place's Organisation's Training materials that the announcement links to (shown only to
+            colleagues it is shared with), or null
         title:
           type: string
         body:
@@ -15913,6 +16076,88 @@ components:
         updated_at:
           type: string
           format: date-time
+    TrainingMaterialInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          description: For example "How to add a new school". Required.
+        url:
+          type: string
+          maxLength: 2048
+          description: The document's link, starting https://. Required.
+        description:
+          type: string
+          maxLength: 280
+          nullable: true
+          description: One or two lines saying who it is for
+        material_type:
+          type: string
+          enum: [document, video]
+          description: Shown as an icon. Defaults to document.
+        all_organisation:
+          type: boolean
+          description: For everyone in the Organisation
+        team_ids:
+          type: array
+          items: { type: integer }
+          description: The Organisation's Teams it is for
+        project_ids:
+          type: array
+          items: { type: integer }
+          description: The Organisation's Workspaces (Projects) it is for
+        owner_id:
+          type: integer
+          description: The person to ask about it. An Organisation Admin of the Organisation, or the caller.
+    TrainingMaterial:
+      type: object
+      description: A link to one of an Organisation's own training documents or videos, and who it is for
+      properties:
+        id:
+          type: integer
+        organisation_id:
+          type: integer
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+          nullable: true
+        material_type:
+          type: string
+          enum: [document, video]
+        all_organisation:
+          type: boolean
+        team_ids:
+          type: array
+          items: { type: integer }
+        project_ids:
+          type: array
+          items: { type: integer }
+          description: The Workspaces (Projects) it is for
+        owner_id:
+          type: integer
+          nullable: true
+        owner_name:
+          type: string
+          nullable: true
+          description: Shown to viewers as "Questions? Ask [name]"
+        reviewed_at:
+          type: string
+          format: date-time
+          description: When it was added or last marked as reviewed
+        review_due:
+          type: boolean
+          nullable: true
+          description: Last reviewed more than 12 months ago. Null unless the caller can manage the Organisation's Training materials.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     Tour:
       type: object
       description: A Welcome Tour and its stops in order
@@ -15937,6 +16182,12 @@ components:
           description: >-
             The Checklists that Watch the journey shows straight after the tour, in order (up to 2). Empty means
             people see up to 2 Checklists on their workspaces, most recently updated first.
+        training_material_id:
+          type: integer
+          nullable: true
+          description: >-
+            The Training material the tour's last stop links to as the Full guide (shown only to people it is shared
+            with), or null
         mode:
           type: string
           enum: [required, optional]
@@ -16034,6 +16285,12 @@ components:
           items:
             type: integer
           description: Up to 2 Checklists of the tour's Organisation for Watch the journey, in order. Send [] to clear them.
+        training_material_id:
+          type: integer
+          nullable: true
+          description: >-
+            One of the Organisation's Training materials, linked as the Full guide on the tour's last stop. Send null to
+            clear it.
         stops:
           type: array
           items:
