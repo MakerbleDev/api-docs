@@ -692,6 +692,11 @@ paths:
               properties:
                 default_project_story_privacy:
                   $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+                participant_pass_sign_in_enabled:
+                  type: boolean
+                  description: >-
+                    "Enable contacts to sign in using a participant pass". When false, a Contact's profile
+                    hides the Participating As tab unless the Contact is already linked to a user.
             example:
               default_project_story_privacy: only_project_colleagues
       responses:
@@ -17779,6 +17784,12 @@ components:
               example: "Greenfield Community Trust"
             default_project_story_privacy:
               $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+            participant_pass_sign_in_enabled:
+              type: boolean
+              description: >-
+                "Enable contacts to sign in using a participant pass" (Charity Preferences, Contacts). Off
+                by default.
+              example: false
 
     DefaultProjectStoryPrivacy:
       type: string

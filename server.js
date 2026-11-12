@@ -1176,19 +1176,20 @@ function buildDocsPage() {
           ${endpointCard("GET", "/charities/{id}", "Get a single Organisation", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Organisation ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Charity record with id, name, timestamps and <code>default_project_story_privacy</code>: the Story Privacy Level each new project in the Organisation starts with" },
+            { code: "200", cls: "response-2xx", desc: "Charity record with id, name, timestamps, <code>default_project_story_privacy</code>: the Story Privacy Level each new project in the Organisation starts with, and <code>participant_pass_sign_in_enabled</code>" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
           ${endpointCard("PATCH", "/charities/{id}", "Change an Organisation's settings", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Organisation ID" },
-            { name: "default_project_story_privacy", in: "body", type: "string", required: false, desc: "<strong>Default story level privacy setting on each project</strong>: the Story Privacy Level each new project starts with. One of <code>only_project_colleagues</code> (Project colleagues only), <code>only_charity_colleagues</code> (Organisation colleagues only), <code>charity_plus_network</code> (Network &amp; organisation colleagues only) or <code>everyone</code>. Existing projects keep their own level." }
+            { name: "default_project_story_privacy", in: "body", type: "string", required: false, desc: "<strong>Default story level privacy setting on each project</strong>: the Story Privacy Level each new project starts with. One of <code>only_project_colleagues</code> (Project colleagues only), <code>only_charity_colleagues</code> (Organisation colleagues only), <code>charity_plus_network</code> (Network &amp; organisation colleagues only) or <code>everyone</code>. Existing projects keep their own level." },
+            { name: "participant_pass_sign_in_enabled", in: "body", type: "boolean", required: false, desc: "<strong>Enable contacts to sign in using a participant pass</strong>. When false, a Contact's profile hides the Participating As tab unless the Contact is already linked to a user." }
           ], [
             { code: "200", cls: "response-2xx", desc: "The Organisation, with the setting changed" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of this Organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not one of your Organisations" },
-            { code: "422", cls: "response-4xx", desc: "<code>default_project_story_privacy</code> isn't one of the four levels" }
+            { code: "422", cls: "response-4xx", desc: "<code>default_project_story_privacy</code> isn't one of the four levels, or <code>participant_pass_sign_in_enabled</code> isn't true or false" }
           ], "Only an Organisation Admin can change these settings, the same people who can use Charity Preferences. Only the settings sent are changed.")}
         </div>
       </section>
