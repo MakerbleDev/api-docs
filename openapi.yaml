@@ -10163,6 +10163,75 @@ paths:
         "404":
           description: The Checklist or Project wasn't found, or the user can't edit the Project
 
+  /checklists/{id}/summary:
+    get:
+      tags: [Checklists]
+      operationId: getChecklistSummary
+      summary: Checklist Summary across the projects you oversee
+      description: >
+        The Checklist Summary (the Summary tab of the Focus page) for one Checklist: one row for each
+        project (Workspace) you oversee that uses the Checklist, with its Project Managers ("Managed by"),
+        its other Workspace colleagues (reporters and observers), and for each step of the Checklist how
+        many of the project's contacts with the Checklist have done that step, as a count and a percentage.
+        Only Organisation Admins (every open project of their organisation), Team Leaders (open projects
+        where someone in a Team they lead is a colleague) and Album Editors (open projects in organisation
+        Albums they edit) may call it; anyone else gets 403. A Checklist that none of your projects uses
+        returns 404. Only contacts you may see, that aren't deleted and are still active in the project,
+        are counted. Rows are sorted before pagination; the sort is not remembered.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Checklist id
+          schema: {type: integer}
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: sort
+          in: query
+          description: "project (default), managed_by, colleagues, or step_<number> (1 = first step)"
+          schema: {type: string, example: step_1}
+        - name: direction
+          in: query
+          schema: {type: string, enum: [asc, desc], default: asc}
+      responses:
+        "200":
+          description: One page of projects
+          content:
+            application/json:
+              example:
+                checklist_id: 12
+                checklist_name: Intake
+                sort: project
+                direction: asc
+                steps:
+                  - {id: 31, number: 1, action_type: create_task, title: Consent form}
+                  - {id: 32, number: 2, action_type: add_role, title: Enrol}
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - project_id: 7
+                    project_name: Youth Club
+                    managed_by: [Ama Ng]
+                    workspace_colleagues: [Obi Eze]
+                    contacts_count: 2
+                    steps:
+                      - {action_id: 31, number: 1, done_count: 1, percent: 50}
+                      - {action_id: 32, number: 2, done_count: 0, percent: 0}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: Not an Organisation Admin, Team Leader or Album Editor
+          content:
+            application/json:
+              example: {error: forbidden}
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /checklists/{id}/progress:
     get:
       tags: [Checklists]
@@ -10229,8 +10298,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
-        "422":
-          $ref: '#/components/responses/UnprocessableEntity'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 

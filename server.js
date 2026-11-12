@@ -2825,6 +2825,18 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Checklist with <code>stages</code> (<code>id, name, icon, position, colour</code>), <code>actions</code> (each with <code>stage_id</code>, <code>due_within_days</code>, <code>video_url</code>, its owner fields and <code>owner_description</code>; <code>action_name</code> is \"Not set yet\" while no type is chosen), <code>projects</code> and <code>contacts_count</code>" },
             { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
           ])}
+          ${endpointCard("GET", "/checklists/{id}/summary", "Get a Checklist Summary across the projects you oversee", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Projects per page (default 10, max 200)" },
+            { name: "sort", type: "string", required: false, desc: "<code>project</code> (default), <code>managed_by</code>, <code>colleagues</code> or <code>step_&lt;number&gt;</code>" },
+            { name: "direction", type: "string", required: false, desc: "<code>asc</code> (default) or <code>desc</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{checklist_id, checklist_name, sort, direction, steps: [{id, number, action_type, title}], page, page_size, page_count, total_count, data: [{project_id, project_name, managed_by, workspace_colleagues, contacts_count, steps: [{action_id, number, done_count, percent}]}]}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin, Team Leader or Album Editor" },
+            { code: "404", cls: "response-4xx", desc: "None of your projects uses this Checklist" },
+            { code: "422", cls: "response-4xx", desc: "An unknown <code>sort</code> or <code>direction</code>" }
+          ], "The Summary tab of the Focus page: a row per project (Workspace) you oversee that uses the Checklist, with its Project Managers (\"Managed by\"), its reporters and observers (\"Workspace colleagues\"), and for each step how many of the project's contacts with the Checklist have done it. Only contacts you may see, not deleted and still active in the project, are counted.")}
           ${endpointCard("POST", "/checklists", "Create a Checklist", true, [], [
             { code: "201", cls: "response-2xx", desc: "The new Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
