@@ -9868,9 +9868,11 @@ paths:
         choice for it, e.g. "Any relationship" (`criteria: {any: true}`). Criteria values are strings:
         IDs, or pairs such as `project_states` "<project_id>:<beneficiary_state_id>",
         `project_event_categories` "<project_id>:<event_category_id>", `relationship_sides`
-        "<relationship_category_id>:parent|child", and `survey_waves` "<Survey Campaign id>:<Wave id, or 0
-        for a campaign without Waves>". The "for a relative" types take `relatives: [{relationship_side,
-        beneficiary_category_ids | survey_waves}]`.
+        "<relationship_category_id>:parent|child", and `survey_waves`, one of: "<Survey Campaign id>:<Wave id,
+        or 0 for a campaign without Waves>" (that Survey Campaign in its Project); "survey:<Survey (Story
+        Category) id>" (a survey made with that Survey in any Project); or "shared:<Survey id>:<Shared Wave
+        id>" (a survey tagged to that Shared Wave (Shared Interval) of the Survey, in any Project). The "for a
+        relative" types take `relatives: [{relationship_side, beneficiary_category_ids | survey_waves}]`.
       operationId: listChecklistActionTypes
       security: [{tokenAuth: []}]
       responses:

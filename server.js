@@ -2804,7 +2804,7 @@ function buildDocsPage() {
           ])}
           ${endpointCard("GET", "/checklists/action_types", "List the actions a Checklist can contain", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>{data: [{action_type, name, criteria_keys, any_name, project_scopable}]}</code>; <code>any_name</code> names the \"Any\" choice, e.g. \"Any relationship\" (<code>criteria: {any: true}</code>); <code>project_scopable</code> types can take <code>only_this_project</code>" }
-          ], "Criteria values are strings: IDs, or pairs such as <code>project_states</code> \"&lt;project_id&gt;:&lt;state_id&gt;\", <code>project_event_categories</code> \"&lt;project_id&gt;:&lt;event_category_id&gt;\", <code>relationship_sides</code> \"&lt;category_id&gt;:parent|child\" and <code>survey_waves</code> \"&lt;Survey Campaign id&gt;:&lt;Wave id, or 0&gt;\".")}
+          ], "Criteria values are strings: IDs, or pairs such as <code>project_states</code> \"&lt;project_id&gt;:&lt;state_id&gt;\", <code>project_event_categories</code> \"&lt;project_id&gt;:&lt;event_category_id&gt;\", <code>relationship_sides</code> \"&lt;category_id&gt;:parent|child\" and <code>survey_waves</code>: \"&lt;Survey Campaign id&gt;:&lt;Wave id, or 0&gt;\" for that Survey Campaign, \"survey:&lt;Survey id&gt;\" for that Survey in any Project, or \"shared:&lt;Survey id&gt;:&lt;Shared Wave id&gt;\" for that Shared Interval of the Survey in any Project.")}
           ${endpointCard("GET", "/checklists/owner_options", "List the choices for who is responsible for an action", true, [
             { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
           ], [
