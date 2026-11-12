@@ -1176,19 +1176,20 @@ function buildDocsPage() {
           ${endpointCard("GET", "/charities/{id}", "Get a single Organisation", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Organisation ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Charity record with id, name, timestamps and <code>default_project_story_privacy</code>: the Story Privacy Level each new project in the Organisation starts with" },
+            { code: "200", cls: "response-2xx", desc: "Charity record with id, name, timestamps, <code>default_project_story_privacy</code>: the Story Privacy Level each new project in the Organisation starts with, and <code>participant_pass_sign_in_enabled</code>" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
           ${endpointCard("PATCH", "/charities/{id}", "Change an Organisation's settings", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Organisation ID" },
-            { name: "default_project_story_privacy", in: "body", type: "string", required: false, desc: "<strong>Default story level privacy setting on each project</strong>: the Story Privacy Level each new project starts with. One of <code>only_project_colleagues</code> (Project colleagues only), <code>only_charity_colleagues</code> (Organisation colleagues only), <code>charity_plus_network</code> (Network &amp; organisation colleagues only) or <code>everyone</code>. Existing projects keep their own level." }
+            { name: "default_project_story_privacy", in: "body", type: "string", required: false, desc: "<strong>Default story level privacy setting on each project</strong>: the Story Privacy Level each new project starts with. One of <code>only_project_colleagues</code> (Project colleagues only), <code>only_charity_colleagues</code> (Organisation colleagues only), <code>charity_plus_network</code> (Network &amp; organisation colleagues only) or <code>everyone</code>. Existing projects keep their own level." },
+            { name: "participant_pass_sign_in_enabled", in: "body", type: "boolean", required: false, desc: "<strong>Enable contacts to sign in using a participant pass</strong>. When false, a Contact's profile hides the Participating As tab unless the Contact is already linked to a user." }
           ], [
             { code: "200", cls: "response-2xx", desc: "The Organisation, with the setting changed" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of this Organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not one of your Organisations" },
-            { code: "422", cls: "response-4xx", desc: "<code>default_project_story_privacy</code> isn't one of the four levels" }
+            { code: "422", cls: "response-4xx", desc: "<code>default_project_story_privacy</code> isn't one of the four levels, or <code>participant_pass_sign_in_enabled</code> isn't true or false" }
           ], "Only an Organisation Admin can change these settings, the same people who can use Charity Preferences. Only the settings sent are changed.")}
         </div>
       </section>
@@ -1938,6 +1939,15 @@ function buildDocsPage() {
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects" }])}
+          ${endpointCard("PATCH", "/project_story_categories/{id}", "Change a Survey Campaign's settings", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
+            { name: "force_interval", in: "body", type: "boolean", required: true, desc: "\"Force colleagues to select an interval\": when true and the campaign has Waves, every story, survey invitation, shared link and automation for it must name an interval" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The updated Survey Campaign, with <code>force_interval</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Editor or Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "Survey Campaign not found, or another organisation's" },
+            { code: "422", cls: "response-4xx", desc: "<code>force_interval</code> missing or not true/false" }
+          ], "New Survey Campaigns have <code>force_interval: true</code>; existing ones were left at <code>false</code>.")}
           ${endpointCard("GET", "/project_story_categories/{id}/survey_waves", "List the Waves of a Survey Campaign", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
@@ -1950,14 +1960,14 @@ function buildDocsPage() {
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "Contacts in the Survey Campaign's Project" },
             { name: "emails", in: "body", type: "string[]", required: false, desc: "Email addresses, matched to an existing Contact of the organisation or creating one. No email is sent." },
-            { name: "send_survey_wave_id", in: "body", type: "integer", required: false, desc: "Wave, from the Waves endpoint" },
+            { name: "send_survey_wave_id", in: "body", type: "integer", required: false, desc: "Wave, from the Waves endpoint. Required when the Survey Campaign's <code>force_interval</code> is true and it has Waves" },
             { name: "link_expiry", in: "body", type: "string", required: false, desc: "<code>use_once</code> (default) or <code>evergreen</code>" },
             { name: "is_anonymised", in: "body", type: "boolean", required: false, desc: "Default false" }
           ], [
             { code: "201", cls: "response-2xx", desc: "<code>send_survey_id</code> and <code>data</code>: one link per Contact with <code>survey_url</code>, <code>survey_token</code>, <code>link_expiry</code>, <code>expired</code>" },
             { code: "403", cls: "response-4xx", desc: "Not a Project Editor or Organisation Editor" },
             { code: "404", cls: "response-4xx", desc: "Survey Campaign not found" },
-            { code: "422", cls: "response-4xx", desc: "Contacts outside the Project (<code>invalid_beneficiary_ids</code>, split into <code>beneficiary_ids_not_in_project</code>: in the organisation but not the Project, add them with <code>POST /project_beneficiaries</code> first; and <code>beneficiary_ids_not_found</code>: not Contacts of the organisation), over 200 recipients, no recipients, or an unavailable Wave" }
+            { code: "422", cls: "response-4xx", desc: "Contacts outside the Project (<code>invalid_beneficiary_ids</code>, split into <code>beneficiary_ids_not_in_project</code>: in the organisation but not the Project, add them with <code>POST /project_beneficiaries</code> first; and <code>beneficiary_ids_not_found</code>: not Contacts of the organisation), over 200 recipients, no recipients, an unavailable Wave, or no Wave when the Survey Campaign forces one (<code>errors: [\"Select an interval for this survey.\"]</code>)" }
           ], "Generates the same personal links as the Send Survey page, but <strong>sends nothing</strong>: share the returned <code>survey_url</code> yourself. At most 200 contacts and email addresses per request. A <code>use_once</code> link stops working after one response; an <code>evergreen</code> link stays active.")}
           ${endpointCard("GET", "/project_story_categories/{id}/survey_links", "List personal survey links", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
@@ -2804,7 +2814,7 @@ function buildDocsPage() {
           ])}
           ${endpointCard("GET", "/checklists/action_types", "List the actions a Checklist can contain", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>{data: [{action_type, name, criteria_keys, any_name, project_scopable}]}</code>; <code>any_name</code> names the \"Any\" choice, e.g. \"Any relationship\" (<code>criteria: {any: true}</code>); <code>project_scopable</code> types can take <code>only_this_project</code>" }
-          ], "Criteria values are strings: IDs, or pairs such as <code>project_states</code> \"&lt;project_id&gt;:&lt;state_id&gt;\", <code>project_event_categories</code> \"&lt;project_id&gt;:&lt;event_category_id&gt;\", <code>relationship_sides</code> \"&lt;category_id&gt;:parent|child\" and <code>survey_waves</code> \"&lt;Survey Campaign id&gt;:&lt;Wave id, or 0&gt;\".")}
+          ], "Criteria values are strings: IDs, or pairs such as <code>project_states</code> \"&lt;project_id&gt;:&lt;state_id&gt;\", <code>project_event_categories</code> \"&lt;project_id&gt;:&lt;event_category_id&gt;\", <code>relationship_sides</code> \"&lt;category_id&gt;:parent|child\" and <code>survey_waves</code>: \"&lt;Survey Campaign id&gt;:&lt;Wave id, or 0&gt;\" for that Survey Campaign, \"survey:&lt;Survey id&gt;\" for that Survey in any Project, or \"shared:&lt;Survey id&gt;:&lt;Shared Wave id&gt;\" for that Shared Interval of the Survey in any Project.")}
           ${endpointCard("GET", "/checklists/owner_options", "List the choices for who is responsible for an action", true, [
             { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" }
           ], [
@@ -2825,6 +2835,18 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Checklist with <code>stages</code> (<code>id, name, icon, position, colour</code>), <code>actions</code> (each with <code>stage_id</code>, <code>due_within_days</code>, <code>video_url</code>, its owner fields and <code>owner_description</code>; <code>action_name</code> is \"Not set yet\" while no type is chosen), <code>projects</code> and <code>contacts_count</code>" },
             { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
           ])}
+          ${endpointCard("GET", "/checklists/{id}/summary", "Get a Checklist Summary across the projects you oversee", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Projects per page (default 10, max 200)" },
+            { name: "sort", type: "string", required: false, desc: "<code>project</code> (default), <code>managed_by</code>, <code>colleagues</code> or <code>step_&lt;number&gt;</code>" },
+            { name: "direction", type: "string", required: false, desc: "<code>asc</code> (default) or <code>desc</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{checklist_id, checklist_name, sort, direction, steps: [{id, number, action_type, title}], page, page_size, page_count, total_count, data: [{project_id, project_name, managed_by, workspace_colleagues, contacts_count, steps: [{action_id, number, done_count, percent}]}]}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin, Team Leader or Album Editor" },
+            { code: "404", cls: "response-4xx", desc: "None of your projects uses this Checklist" },
+            { code: "422", cls: "response-4xx", desc: "An unknown <code>sort</code> or <code>direction</code>" }
+          ], "The Summary tab of the Focus page: a row per project (Workspace) you oversee that uses the Checklist, with its Project Managers (\"Managed by\"), its reporters and observers (\"Workspace colleagues\"), and for each step how many of the project's contacts with the Checklist have done it. Only contacts you may see, not deleted and still active in the project, are counted.")}
           ${endpointCard("POST", "/checklists", "Create a Checklist", true, [], [
             { code: "201", cls: "response-2xx", desc: "The new Checklist" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },

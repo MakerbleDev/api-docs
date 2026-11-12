@@ -692,6 +692,11 @@ paths:
               properties:
                 default_project_story_privacy:
                   $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+                participant_pass_sign_in_enabled:
+                  type: boolean
+                  description: >-
+                    "Enable contacts to sign in using a participant pass". When false, a Contact's profile
+                    hides the Participating As tab unless the Contact is already linked to a user.
             example:
               default_project_story_privacy: only_project_colleagues
       responses:
@@ -4297,6 +4302,51 @@ paths:
         "401":
           $ref: '#/components/responses/Unauthorized'
 
+  /project_story_categories/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: integer}
+        description: The Survey Campaign (Project Story Category) ID
+    patch:
+      tags: [Project Story Categories]
+      summary: Change a Survey Campaign's settings
+      description: |
+        Turns "Force colleagues to select an interval" on or off, as the Survey Campaign
+        Settings page does. When on and the Survey Campaign has intervals (Waves), every story,
+        survey invitation, shared link and automation for it must name an interval. Requires
+        Project Editor (Project Manager) or Organisation Editor (Organisation Admin) access.
+      operationId: updateProjectStoryCategory
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [force_interval]
+              properties:
+                force_interval: {type: boolean}
+            example: {force_interval: true}
+      responses:
+        "200":
+          description: The updated Survey Campaign
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectStoryCategory'}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not change this Survey Campaign
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /project_story_categories/{id}/survey_links:
     parameters:
       - name: id
@@ -4344,7 +4394,9 @@ paths:
                   description: Email addresses, matched to or creating Contacts. No email is sent.
                 send_survey_wave_id:
                   type: integer
-                  description: Optional Wave, from GET /project_story_categories/{id}/survey_waves
+                  description: >-
+                    Wave, from GET /project_story_categories/{id}/survey_waves. Required when the
+                    Survey Campaign's force_interval is true and it has Waves; otherwise optional.
                 link_expiry:
                   type: string
                   enum: [use_once, evergreen]
@@ -9879,9 +9931,11 @@ paths:
         choice for it, e.g. "Any relationship" (`criteria: {any: true}`). Criteria values are strings:
         IDs, or pairs such as `project_states` "<project_id>:<beneficiary_state_id>",
         `project_event_categories` "<project_id>:<event_category_id>", `relationship_sides`
-        "<relationship_category_id>:parent|child", and `survey_waves` "<Survey Campaign id>:<Wave id, or 0
-        for a campaign without Waves>". The "for a relative" types take `relatives: [{relationship_side,
-        beneficiary_category_ids | survey_waves}]`.
+        "<relationship_category_id>:parent|child", and `survey_waves`, one of: "<Survey Campaign id>:<Wave id,
+        or 0 for a campaign without Waves>" (that Survey Campaign in its Project); "survey:<Survey (Story
+        Category) id>" (a survey made with that Survey in any Project); or "shared:<Survey id>:<Shared Wave
+        id>" (a survey tagged to that Shared Wave (Shared Interval) of the Survey, in any Project). The "for a
+        relative" types take `relatives: [{relationship_side, beneficiary_category_ids | survey_waves}]`.
       operationId: listChecklistActionTypes
       security: [{tokenAuth: []}]
       responses:
@@ -10172,6 +10226,75 @@ paths:
         "404":
           description: The Checklist or Project wasn't found, or the user can't edit the Project
 
+  /checklists/{id}/summary:
+    get:
+      tags: [Checklists]
+      operationId: getChecklistSummary
+      summary: Checklist Summary across the projects you oversee
+      description: >
+        The Checklist Summary (the Summary tab of the Focus page) for one Checklist: one row for each
+        project (Workspace) you oversee that uses the Checklist, with its Project Managers ("Managed by"),
+        its other Workspace colleagues (reporters and observers), and for each step of the Checklist how
+        many of the project's contacts with the Checklist have done that step, as a count and a percentage.
+        Only Organisation Admins (every open project of their organisation), Team Leaders (open projects
+        where someone in a Team they lead is a colleague) and Album Editors (open projects in organisation
+        Albums they edit) may call it; anyone else gets 403. A Checklist that none of your projects uses
+        returns 404. Only contacts you may see, that aren't deleted and are still active in the project,
+        are counted. Rows are sorted before pagination; the sort is not remembered.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Checklist id
+          schema: {type: integer}
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: sort
+          in: query
+          description: "project (default), managed_by, colleagues, or step_<number> (1 = first step)"
+          schema: {type: string, example: step_1}
+        - name: direction
+          in: query
+          schema: {type: string, enum: [asc, desc], default: asc}
+      responses:
+        "200":
+          description: One page of projects
+          content:
+            application/json:
+              example:
+                checklist_id: 12
+                checklist_name: Intake
+                sort: project
+                direction: asc
+                steps:
+                  - {id: 31, number: 1, action_type: create_task, title: Consent form}
+                  - {id: 32, number: 2, action_type: add_role, title: Enrol}
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - project_id: 7
+                    project_name: Youth Club
+                    managed_by: [Ama Ng]
+                    workspace_colleagues: [Obi Eze]
+                    contacts_count: 2
+                    steps:
+                      - {action_id: 31, number: 1, done_count: 1, percent: 50}
+                      - {action_id: 32, number: 2, done_count: 0, percent: 0}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: Not an Organisation Admin, Team Leader or Album Editor
+          content:
+            application/json:
+              example: {error: forbidden}
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /checklists/{id}/progress:
     get:
       tags: [Checklists]
@@ -10238,8 +10361,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
-        "422":
-          $ref: '#/components/responses/UnprocessableEntity'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -17674,6 +17795,12 @@ components:
               example: "Greenfield Community Trust"
             default_project_story_privacy:
               $ref: '#/components/schemas/DefaultProjectStoryPrivacy'
+            participant_pass_sign_in_enabled:
+              type: boolean
+              description: >-
+                "Enable contacts to sign in using a participant pass" (Charity Preferences, Contacts). Off
+                by default.
+              example: false
 
     DefaultProjectStoryPrivacy:
       type: string
@@ -19317,6 +19444,14 @@ components:
               type: boolean
             display_respondent_name:
               type: boolean
+            force_interval:
+              type: boolean
+              description: >-
+                "Force colleagues to select an interval". When true and the Survey Campaign has
+                intervals (Waves), colleagues must choose one when they add a story, send the survey,
+                share its link or set up an automation that sends it, and POST
+                /project_story_categories/{id}/survey_links requires send_survey_wave_id.
+                On by default for new Survey Campaigns.
 
     StoryCategoryResponse:
       allOf:
