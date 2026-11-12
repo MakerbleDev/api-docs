@@ -1938,6 +1938,15 @@ function buildDocsPage() {
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects" }])}
+          ${endpointCard("PATCH", "/project_story_categories/{id}", "Change a Survey Campaign's settings", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
+            { name: "force_interval", in: "body", type: "boolean", required: true, desc: "\"Force colleagues to select an interval\": when true and the campaign has Waves, every story, survey invitation, shared link and automation for it must name an interval" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The updated Survey Campaign, with <code>force_interval</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Editor or Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "Survey Campaign not found, or another organisation's" },
+            { code: "422", cls: "response-4xx", desc: "<code>force_interval</code> missing or not true/false" }
+          ], "New Survey Campaigns have <code>force_interval: true</code>; existing ones were left at <code>false</code>.")}
           ${endpointCard("GET", "/project_story_categories/{id}/survey_waves", "List the Waves of a Survey Campaign", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
@@ -1950,14 +1959,14 @@ function buildDocsPage() {
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "Contacts in the Survey Campaign's Project" },
             { name: "emails", in: "body", type: "string[]", required: false, desc: "Email addresses, matched to an existing Contact of the organisation or creating one. No email is sent." },
-            { name: "send_survey_wave_id", in: "body", type: "integer", required: false, desc: "Wave, from the Waves endpoint" },
+            { name: "send_survey_wave_id", in: "body", type: "integer", required: false, desc: "Wave, from the Waves endpoint. Required when the Survey Campaign's <code>force_interval</code> is true and it has Waves" },
             { name: "link_expiry", in: "body", type: "string", required: false, desc: "<code>use_once</code> (default) or <code>evergreen</code>" },
             { name: "is_anonymised", in: "body", type: "boolean", required: false, desc: "Default false" }
           ], [
             { code: "201", cls: "response-2xx", desc: "<code>send_survey_id</code> and <code>data</code>: one link per Contact with <code>survey_url</code>, <code>survey_token</code>, <code>link_expiry</code>, <code>expired</code>" },
             { code: "403", cls: "response-4xx", desc: "Not a Project Editor or Organisation Editor" },
             { code: "404", cls: "response-4xx", desc: "Survey Campaign not found" },
-            { code: "422", cls: "response-4xx", desc: "Contacts outside the Project (<code>invalid_beneficiary_ids</code>, split into <code>beneficiary_ids_not_in_project</code>: in the organisation but not the Project, add them with <code>POST /project_beneficiaries</code> first; and <code>beneficiary_ids_not_found</code>: not Contacts of the organisation), over 200 recipients, no recipients, or an unavailable Wave" }
+            { code: "422", cls: "response-4xx", desc: "Contacts outside the Project (<code>invalid_beneficiary_ids</code>, split into <code>beneficiary_ids_not_in_project</code>: in the organisation but not the Project, add them with <code>POST /project_beneficiaries</code> first; and <code>beneficiary_ids_not_found</code>: not Contacts of the organisation), over 200 recipients, no recipients, an unavailable Wave, or no Wave when the Survey Campaign forces one (<code>errors: [\"Select an interval for this survey.\"]</code>)" }
           ], "Generates the same personal links as the Send Survey page, but <strong>sends nothing</strong>: share the returned <code>survey_url</code> yourself. At most 200 contacts and email addresses per request. A <code>use_once</code> link stops working after one response; an <code>evergreen</code> link stays active.")}
           ${endpointCard("GET", "/project_story_categories/{id}/survey_links", "List personal survey links", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
