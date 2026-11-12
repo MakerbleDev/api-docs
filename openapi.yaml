@@ -5935,12 +5935,23 @@ paths:
         Reusable dropdown field definitions. Each has a type:
         - **Identity** — for Beneficiary Categories (Contact Bio Forms)
         - **Progress** — for Scale Indicators
+
+        Pass `search` to find Dropdowns the way the search box on Manage Dropdowns does: it matches a Dropdown's
+        name, its answer choices, or a place it is used (Contact Bio Forms, Project Templates and Event Forms in your
+        organisations, choice trackers built on it, and the Surveys those trackers are in), ignoring case.
       operationId: listRatioSets
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: search
+          in: query
+          required: false
+          description: Text to look for in the Dropdown's name, answer choices or places used
+          schema:
+            type: string
+          example: housing
       responses:
         "200":
           description: Paginated list of Ratio Sets
