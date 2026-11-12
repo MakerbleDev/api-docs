@@ -4664,13 +4664,38 @@ paths:
     get:
       tags: [Cases]
       summary: List all Cases
-      description: Each Case is linked to one Beneficiary and one Project.
+      description: |
+        Each Case is linked to one Beneficiary and one Project.
+
+        Filter the Cases by their answers to Case Form questions with `custom_field_definition_hash`, as the Manage Cases page does.
+        Call `GET /cases/filter_fields` first for the question IDs and the shape of value each one takes (its `filter_format`):
+
+        - `text`: text the answer contains, ignoring case, e.g. `custom_field_definition_hash[71]=theft`
+        - `number_range`: `[min]` and/or `[max]`
+        - `date_range`, `time_range`, `datetime_range`: `[from]` and/or `[to]`, both included (e.g. `2025-01-31`, `09:00`, `2025-01-31T14:00`)
+        - `choice_ids`: answer choice IDs, e.g. `custom_field_definition_hash[72][]=5`
+        - `yes_no`: `[]=yes` for ticked, `[]=no` for not ticked
+        - `has_files_no_files`: `[]=has_files` or `[]=no_files`
+        - `album_ids`: Album IDs the Case is linked to through the question
+
+        A Case must match every question given. A question the user can't filter by is ignored.
       operationId: listCases
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: custom_field_definition_hash
+          in: query
+          style: deepObject
+          explode: true
+          required: false
+          description: Answers to Case Form questions to filter by, keyed by question (custom field definition) ID. See the description above.
+          schema:
+            type: object
+            additionalProperties: true
+          example:
+            "71": theft
       responses:
         "200":
           description: Paginated list of Cases
@@ -4717,6 +4742,47 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+
+  /cases/filter_fields:
+    get:
+      tags: [Cases]
+      summary: List the Case Form questions Cases can be filtered by
+      description: |
+        Lists the questions (custom field definitions) on the Case Forms of the organisations whose Cases the user can see, each once, alphabetically.
+        These are the custom filters on the Manage Cases page. Pass a question's `id` and a value in its `filter_format` to
+        `GET /cases` as `custom_field_definition_hash`. Select questions list their answer `choices`.
+      operationId: listCaseFilterFields
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of Case Form questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCaseFilterFields'
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - id: 71
+                    name: Type of crime
+                    field_type: ratio_set
+                    filter_format: choice_ids
+                    choices:
+                      - { id: 5, name: Harassment }
+                      - { id: 4, name: Theft }
+                  - id: 72
+                    name: Date of incident
+                    field_type: date
+                    filter_format: date_range
+                    choices: []
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /projects_beneficiaries_cases:
     get:
@@ -19957,6 +20023,42 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Case'
+
+    CaseFilterField:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The question (custom field definition) ID, used as the key in `custom_field_definition_hash`
+        name:
+          type: string
+        field_type:
+          type: string
+          description: The question type, e.g. string, text, integer, float, date, time, datetime, ratio_set (select), boolean (checkbox), media (attachment), album, location, email_address
+        filter_format:
+          type: string
+          nullable: true
+          enum: [text, number_range, date_range, time_range, datetime_range, choice_ids, yes_no, has_files_no_files, album_ids, null]
+        choices:
+          type: array
+          description: A select question's answer choices, alphabetically
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+
+    PaginatedCaseFilterFields:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CaseFilterField'
 
     PaginatedProjectsBeneficiariesCases:
       allOf:
