@@ -4500,6 +4500,7 @@ function buildDocsPage() {
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/ratio_sets", "List all Ratio Sets", true, [
+            { name: "search", type: "string", required: false, desc: "Finds Dropdowns whose name, answer choices or places used (Contact Bio Forms, Project Templates, Event Forms, choice trackers and their Surveys) contain this text, ignoring case" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [{ code: "200", cls: "response-2xx", desc: "Paginated list — type: identity (Contact Bio Forms) or progress (Scale Indicators)" }])}
