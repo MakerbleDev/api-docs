@@ -922,6 +922,7 @@ function buildDocsPage() {
         <div class="nav-section-label">Core resources</div>
         <a href="#organisations"   class="nav-link"><span class="nav-method method-GET">GET</span>Organisations</a>
         <a href="#projects"        class="nav-link"><span class="nav-method method-GET">GET</span>Projects</a>
+        <a href="#saved-filters"   class="nav-link"><span class="nav-method method-POST">POST</span>Saved Filters</a>
         <a href="#albums"          class="nav-link"><span class="nav-method method-GET">GET</span>Albums (Portfolios)</a>
         <a href="#signup-pages"    class="nav-link"><span class="nav-method method-POST">POST</span>Signup Pages</a>
         <a href="#users"           class="nav-link"><span class="nav-method method-POST">POST</span>Users</a>
@@ -1335,6 +1336,41 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "422", cls: "response-4xx", desc: "Invalid project_ids, date, tracker_types, group_by, per_page or template_id" }
           ], "Returns the figures on each Project's Results Canvas (the Results panel on a Project page), one entry per tracker, for the Projects you can view. Activity and Engagement trackers (Changes) give <code>times_recorded</code> and <code>contacts</code>; Achievement trackers (Binary Indicators) give <code>times_recorded</code> and <code>contacts_achieved</code>; Choice trackers (Scale Indicators) give <code>answers</code> with a count and contacts per Sub Ratio; Numerical trackers (Value Indicators) give <code>total</code> and <code>average_per_contact</code>. <code>times_recorded</code> counts records, not people; <code>contacts</code> counts distinct Contacts tagged. <code>anonymous_count</code> is what was recorded with no Contact tagged. <code>target</code>, <code>target_deadline</code> and <code>percent_of_target</code> appear when the Project has a target.")}
+        </div>
+      </section>
+
+      <!-- Saved Filters -->
+      <section class="section" id="saved-filters">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Saved Filters</h2>
+        <div class="section-desc">
+          <p>A <strong>Saved Filter</strong> is a filter on Contacts, Events or Cases that someone saved, either for themselves or shared with colleagues. Any of them can be added to a Project's toolbar (its Workflow) as a <strong>shortcut</strong>: clicking it opens the chosen view, such as Contacts &rsaquo; Overview, Events &rsaquo; Calendar or one of your Custom tables, with the filter applied.</p>
+          <p>A Saved Filter can be added only to a Project named in its criteria (<code>project_ids</code>), by an Organisation Admin or an Editor of that Project. Colleagues who can't see the Saved Filter don't see its shortcut. To add one: list the filters, get one for its <code>shortcut_views</code> and <code>shortcut_projects</code>, then post a shortcut with one of each.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/saved_filters", "List Saved Filters", true, [
+            { name: "type", type: "string", required: false, desc: "Only <code>contacts</code>, <code>events</code> or <code>cases</code> filters" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Saved Filters you can see, your own and colleagues' shared ones, by name, each with <code>type</code>, <code>project_ids</code> and <code>can_add_shortcut</code>" },
+            { code: "422", cls: "response-4xx", desc: "Unknown <code>type</code>" }
+          ])}
+          ${endpointCard("GET", "/saved_filters/{id}", "Get a Saved Filter", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Saved Filter ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Saved Filter, with <code>shortcut_views</code> (each <code>key</code>, <code>label</code>, <code>group</code>) and <code>shortcut_projects</code> (each <code>id</code>, <code>name</code>; empty when <code>can_add_shortcut</code> is false)" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one you can see" }
+          ])}
+          ${endpointCard("POST", "/saved_filters/{id}/shortcuts", "Add a Saved Filter to a Project's toolbar", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Saved Filter ID" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The shortcut, first on the Project's toolbar" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Admin or a Project Editor in the filter's Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one you can see" },
+            { code: "422", cls: "response-4xx", desc: "A Project outside the filter's criteria, an unknown view, a name already used on that toolbar, or a filter whose criteria name no Project" }
+          ], "Body: <code>project_id</code> (one of the filter's <code>shortcut_projects</code>), <code>view_key</code> (one of its <code>shortcut_views</code>), and optionally <code>name</code>, the shortcut's label, which defaults to the filter's name. Move the shortcut afterwards with Adjust toolbar.")}
         </div>
       </section>
 
