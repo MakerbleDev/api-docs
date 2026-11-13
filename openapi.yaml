@@ -163,6 +163,8 @@ tags:
     description: The primary organisational unit — every Story and Case belongs to a Project
   - name: Welcome Tours
     description: Guided tours of Makerble's own pages for new colleagues; Organisation Admins choose each team's stops, wording and how strict they are, and see who has finished
+  - name: Staff Unavailability
+    description: When colleagues can't work for an Organisation (leave, sickness, training), as on the Staff availability page
   - name: Training Materials
     description: An Organisation's links to its own training documents and videos, each shown to the whole Organisation or to chosen Teams and Workspaces
   - name: Announcements
@@ -1286,6 +1288,163 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /users/{user_id}/unavailabilities:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        description: The colleague (User) whose unavailability this is
+        schema:
+          type: integer
+      - name: charity_id
+        in: query
+        required: true
+        description: The Organisation (Charity). A colleague in several Organisations has separate unavailability in each.
+        schema:
+          type: integer
+    get:
+      tags: [Staff Unavailability]
+      summary: List a colleague's unavailability
+      description: |
+        The dates and times a colleague can't work for an Organisation (annual leave, sick leave, training or other),
+        as on their Unavailability page, oldest first. Anyone can list their own. Team Leaders can list the colleagues
+        in their Team, Project Editors the colleagues in their Project, and Charity Editors everyone in the Organisation;
+        anyone else gets 403. `private_note` is returned only to the colleague themselves and to Charity Editors.
+      operationId: listUserUnavailabilities
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of unavailability ranges, oldest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Unavailability' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Staff Unavailability]
+      summary: Record when a colleague is unavailable
+      description: |
+        Records one range when the colleague can't work: whole days (`all_day`, the default) from `from_date` to
+        `to_date`, or part of a day with `from_time` and `to_time`, in the Organisation's timezone. Makerble won't then
+        assign them to events automatically at those times. The same people as for listing may do this.
+
+        If the colleague is already an Event Worker on upcoming events during the range, they are listed in
+        `conflicting_events`. To take the colleague off some of them in the same call, send their ids in
+        `unassign_event_ids`; only events the caller may edit (`editable`) are changed. Each affected event's Event
+        Managers are emailed either way, saying whether the colleague was unassigned.
+      operationId: createUserUnavailability
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnavailabilityInput'
+            example:
+              from_date: '2026-12-03'
+              to_date: '2026-12-03'
+              all_day: false
+              from_time: '13:00'
+              to_time: '17:30'
+              reason_type: training
+              private_note: Safeguarding refresher
+              unassign_event_ids: [5012]
+      responses:
+        "201":
+          description: The range recorded, with the events it clashes with
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnavailabilityWithConflicts'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /users/{user_id}/unavailabilities/{id}:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: id
+        in: path
+        required: true
+        description: The unavailability range
+        schema:
+          type: integer
+      - name: charity_id
+        in: query
+        required: true
+        description: The Organisation (Charity)
+        schema:
+          type: integer
+    patch:
+      tags: [Staff Unavailability]
+      summary: Change when a colleague is unavailable
+      description: |
+        Changes only the fields sent. If the dates or times change, events the colleague is already working during the
+        new range are returned in `conflicting_events`, and `unassign_event_ids` works as when recording a range. A Team
+        Leader or Project Editor can't see or change the private note.
+      operationId: updateUserUnavailability
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnavailabilityInput'
+            example:
+              to_date: '2026-12-05'
+      responses:
+        "200":
+          description: The range, with the events it clashes with
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnavailabilityWithConflicts'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+    delete:
+      tags: [Staff Unavailability]
+      summary: Remove a range of unavailability
+      description: Removes the range. Events the colleague was taken off are not changed back.
+      operationId: deleteUserUnavailability
+      security: [{tokenAuth: []}]
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /organisations/{organisation_id}/training_materials:
     parameters:
       - name: organisation_id
@@ -16231,6 +16390,67 @@ components:
         owner_id:
           type: integer
           description: The person to ask about it. An Organisation Admin of the Organisation, or the caller.
+    Unavailability:
+      type: object
+      description: A range when a colleague can't work for an Organisation (Staff availability page)
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        charity_id: { type: integer }
+        starts_at: { type: string, format: date-time }
+        ends_at:
+          type: string
+          format: date-time
+          description: For an all-day range, the end of `to_date` in the Organisation's timezone
+        all_day: { type: boolean }
+        from_date: { type: string, format: date, description: In the Organisation's timezone }
+        to_date: { type: string, format: date }
+        from_time: { type: string, nullable: true, description: 'HH:MM, or null for an all-day range' }
+        to_time: { type: string, nullable: true }
+        timezone: { type: string, example: Europe/London }
+        reason_type: { type: string, enum: [annual_leave, sick_leave, training, other] }
+        reason_label: { type: string, example: Annual leave }
+        summary: { type: string, example: '3/12/2026 13:00–17:30 · Training' }
+        private_note:
+          type: string
+          nullable: true
+          description: Only returned to the colleague themselves and to Charity Editors
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    UnavailabilityInput:
+      type: object
+      properties:
+        from_date: { type: string, format: date }
+        to_date: { type: string, format: date }
+        all_day: { type: boolean, default: true }
+        from_time: { type: string, description: 'HH:MM, for a part day' }
+        to_time: { type: string, description: 'HH:MM, for a part day' }
+        reason_type: { type: string, enum: [annual_leave, sick_leave, training, other] }
+        private_note: { type: string, maxLength: 150 }
+        unassign_event_ids:
+          type: array
+          items: { type: integer }
+          description: Events from `conflicting_events` to take the colleague off in the same call
+    UnavailabilityWithConflicts:
+      allOf:
+        - $ref: '#/components/schemas/Unavailability'
+        - type: object
+          properties:
+            conflicting_events:
+              type: array
+              description: Upcoming events the colleague is an Event Worker on during this range
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  start_datetime: { type: string, format: date-time }
+                  end_datetime: { type: string, format: date-time }
+                  event_category_name: { type: string, nullable: true, description: The Event Format }
+                  project_id: { type: integer }
+                  project_name: { type: string, nullable: true }
+                  editable: { type: boolean, description: Whether the caller may edit the event, and so unassign the colleague }
+                  unassigned: { type: boolean, description: Whether this call took the colleague off the event }
     TrainingMaterial:
       type: object
       description: A link to one of an Organisation's own training documents or videos, and who it is for
