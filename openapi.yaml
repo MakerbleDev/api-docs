@@ -9193,6 +9193,39 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /impact_frameworks/{id}/copy:
+    post:
+      tags: [Library]
+      summary: Copy an Impact Framework
+      operationId: copyImpactFramework
+      description: |
+        Copies an Impact Framework (Template), as **Copy** on the Manage Impact Frameworks page does.
+        The copy is named `Copy of <name>` and keeps the original's stages, metrics (Activity and
+        Attendance trackers, Outcomes and the trackers placed on it), causes, description and colour,
+        but none of its projects: it is not added to any project. It is yours, private and unapproved,
+        in the original's organisation if you belong to it, otherwise among your own Impact Frameworks.
+
+        You may copy your own Impact Frameworks, any of an organisation you belong to, the Theory of
+        Change of a project you edit, and approved ImpactStore frameworks. Any other id answers `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the Impact Framework (Template) to copy
+          schema:
+            type: integer
+          example: 7174
+      responses:
+        "201":
+          $ref: '#/components/responses/LibraryItemCreated'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /referral_submissions:
     post:
       tags: [Signup Pages]

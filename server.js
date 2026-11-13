@@ -2493,6 +2493,14 @@ function buildDocsPage() {
             { code: "409", cls: "response-4xx", desc: "Nothing created: <code>duplicates</code> lists items you can reuse instead of the new ones, each with its <code>entry</code>" },
             { code: "422", cls: "response-4xx", desc: "Invalid input (e.g. an Outcome in an Activity stage); nothing is created and the error names the entry" }
           ], "An Impact Framework (Template). Reuse trackers and Outcomes by id, and define only what's missing.")}
+          ${endpointCard("POST", "/impact_frameworks/{id}/copy", "Copy an Impact Framework", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Impact Framework (Template) to copy: your own, one of an organisation you belong to, the Theory of Change of a project you edit, or an approved ImpactStore framework" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created: <code>data</code> is the copy, named <code>Copy of &lt;name&gt;</code>, as Get a library item shows it, plus <code>approved</code> (always <code>false</code>)" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "404", cls: "response-4xx", desc: "No Impact Framework with that id that you may copy" },
+            { code: "422", cls: "response-4xx", desc: "The copy could not be saved; the error says why. Nothing is created" }
+          ], "The same as Copy on the Manage Impact Frameworks page: the stages and metrics are copied, the projects are not.")}
         </div>
       </section>
 
