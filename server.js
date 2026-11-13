@@ -1893,8 +1893,15 @@ function buildDocsPage() {
           ${endpointCard("GET", "/cases", "List all Cases", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" },
-            { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list of Cases" }])}
+            { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" },
+            { name: "custom_field_definition_hash", type: "object", required: false, desc: "Filter by answers to Case Form questions, keyed by question ID, e.g. <code>custom_field_definition_hash[71]=theft</code>. Each question's <code>filter_format</code> from <code>GET /cases/filter_fields</code> gives the value's shape." }
+          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list of Cases" }],
+          "Filter formats: <code>text</code> (contains), <code>number_range</code> (<code>[min]</code>/<code>[max]</code>), <code>date_range</code>, <code>time_range</code> and <code>datetime_range</code> (<code>[from]</code>/<code>[to]</code>, both included), <code>choice_ids</code> (<code>[]=</code> choice IDs), <code>yes_no</code> (<code>[]=yes</code> or <code>[]=no</code>), <code>has_files_no_files</code> (<code>[]=has_files</code> or <code>[]=no_files</code>) and <code>album_ids</code>. A Case must match every question given.")}
+          ${endpointCard("GET", "/cases/filter_fields", "List the Case Form questions Cases can be filtered by", true, [
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [{ code: "200", cls: "response-2xx", desc: "Paginated questions with <code>id</code>, <code>name</code>, <code>field_type</code>, <code>filter_format</code> and, for select questions, <code>choices</code>" }],
+          "The questions on the Case Forms of the organisations whose Cases you can see, each once, alphabetically. These are the custom filters on the Manage Cases page.")}
           ${endpointCard("POST", "/cases", "Create a Case", true, [], [
             { code: "200", cls: "response-2xx", desc: "Case created" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
