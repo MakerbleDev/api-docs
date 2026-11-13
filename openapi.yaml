@@ -872,6 +872,9 @@ paths:
         who have already seen it. To end one early, set `ends_on` to today. An announcement never
         moves to another place: `scope_type` and `scope_id` are ignored here. System Access users can
         change any; anyone else only one for a place where they hold the role now, or 403.
+
+        To schedule one of Makerble's own on the next free days (people see at most one Makerble
+        announcement a day), send `schedule_on_next_free_days: true`.
       operationId: updateAnnouncement
       security: [{tokenAuth: []}]
       requestBody:
@@ -16152,6 +16155,15 @@ components:
           type: string
           enum: [draft, scheduled]
           description: On create, defaults to `draft`. On update, defaults to the current status.
+        schedule_on_next_free_days:
+          type: boolean
+          description: |
+            Makerble's own only (422 for an Organisation's, Workspace's or Team's). Schedules the
+            announcement from the first day, from today, on which no other Makerble announcement starts,
+            keeping its own length (14 days if it has no dates yet). Any `status`, `starts_on` and `ends_on`
+            sent are replaced. People see at most one Makerble announcement a day, so this keeps
+            announcements from queuing behind each other. Use it to schedule a feature's announcement
+            once the feature is live on production.
     Announcement:
       type: object
       properties:

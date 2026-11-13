@@ -4186,7 +4186,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not one the user may change" },
             { code: "404", cls: "response-4xx", desc: "Not found" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. 4 name changes" }
-          ], "Same body as create; only the fields sent change. Without <code>status</code>, a draft stays a draft and a scheduled announcement stays scheduled. Editing a live announcement doesn't show it again to people who have already seen it. An announcement never moves to another place, so <code>scope_type</code> and <code>scope_id</code> are ignored.")}
+          ], "Same body as create; only the fields sent change. Without <code>status</code>, a draft stays a draft and a scheduled announcement stays scheduled. Editing a live announcement doesn't show it again to people who have already seen it. An announcement never moves to another place, so <code>scope_type</code> and <code>scope_id</code> are ignored. For one of Makerble's own, send <code>schedule_on_next_free_days: true</code> to schedule it from the first day, from today, on which no other Makerble announcement starts, keeping its own length (14 days if it has no dates yet); any <code>status</code>, <code>starts_on</code> and <code>ends_on</code> sent are replaced. People see at most one Makerble announcement a day, so overlapping ones take turns. For a place's announcement this returns <code>422</code>.")}
         </div>
       </section>
 
