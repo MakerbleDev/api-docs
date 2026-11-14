@@ -6830,7 +6830,183 @@ paths:
               example:
                 error: "Only an Organisation Admin can list Event Formats."
 
+    post:
+      tags: [Event Formats]
+      summary: Create an Event Format
+      operationId: createEventFormat
+      description: |
+        Creates an Event Format (Event Category in the API), as **Create Event Format** on the
+        Manage Event Formats page does. Only an **Organisation Admin** of `charity_id` may create one.
+        Send `guest_status_ids` (the Guest Statuses its events use, in order).
+
+        **Appointment settings** (all optional):
+        - `appointment_type`: `one_to_one`, `group`, or `null` for "Not an appointment" (the default).
+          One-to-one appointments have one guest.
+        - `default_length_minutes`: how long an event of this format usually lasts, in 5-minute
+          steps up to 1440, or `null`.
+        - `preparation_minutes` and `debrief_minutes`: time a colleague needs before and after
+          each appointment, 0 to 1440 (default 0). A colleague won't be offered another
+          appointment in this time.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/EventFormatInput'
+                - type: object
+                  required: [charity_id, name]
+                  properties:
+                    charity_id:
+                      type: integer
+                      description: The Organisation (Charity) the Event Format belongs to
+            example:
+              charity_id: 123
+              name: "Therapy session"
+              guest_status_ids: [55, 56]
+              appointment_type: one_to_one
+              default_length_minutes: 60
+              preparation_minutes: 30
+              debrief_minutes: 30
+      responses:
+        "201":
+          description: The Event Format was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are not an Organisation Admin of `charity_id`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an Organisation Admin can manage Event Formats."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /event_categories/{id}:
+    get:
+      tags: [Event Formats]
+      summary: Get an Event Format
+      operationId: getEventFormat
+      description: |
+        Returns one Event Format (Event Category in the API) with its settings, Guest Statuses,
+        projects and appointment settings. Only an **Organisation Admin** of its organisation may
+        read it; an Event Format of an organisation you are not in returns `404`.
+
+        **Appointment settings** (all optional):
+        - `appointment_type`: `one_to_one`, `group`, or `null` for "Not an appointment" (the default).
+          One-to-one appointments have one guest.
+        - `default_length_minutes`: how long an event of this format usually lasts, in 5-minute
+          steps up to 1440, or `null`.
+        - `preparation_minutes` and `debrief_minutes`: time a colleague needs before and after
+          each appointment, 0 to 1440 (default 0). A colleague won't be offered another
+          appointment in this time.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Event Format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatDetail'
+              example:
+                id: 4521
+                name: "Therapy session"
+                is_default: false
+                charity_id: 123
+                attendance_form_id: null
+                survey_kiosk_enabled: false
+                survey_kiosk_registration_enabled: false
+                enable_guest_fields: false
+                enable_guest_booking_form: false
+                assign_guests_to_workers_setting: "default"
+                suggest_shortened_address: false
+                apply_shortened_address: false
+                enable_event_roles: false
+                event_role_ids_for_event_managers_and_workers: []
+                event_role_ids_for_guests: []
+                appointment_type: one_to_one
+                default_length_minutes: 60
+                preparation_minutes: 30
+                debrief_minutes: 30
+                guest_statuses:
+                  - { id: 55, name: "Invited" }
+                project_ids: [987]
+                created_at: "2026-11-14T08:00:00.000Z"
+                updated_at: "2026-11-14T08:00:00.000Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are not an Organisation Admin of the organisation that owns this Event Format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an Organisation Admin can manage Event Formats."
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Event Formats]
+      summary: Edit an Event Format
+      operationId: updateEventFormat
+      description: |
+        Changes an Event Format's settings, as **Edit** on the Manage Event Formats page does. Only
+        the settings you send change. Only an **Organisation Admin** of its organisation may edit it.
+
+        **Appointment settings** (all optional):
+        - `appointment_type`: `one_to_one`, `group`, or `null` for "Not an appointment" (the default).
+          One-to-one appointments have one guest.
+        - `default_length_minutes`: how long an event of this format usually lasts, in 5-minute
+          steps up to 1440, or `null`.
+        - `preparation_minutes` and `debrief_minutes`: time a colleague needs before and after
+          each appointment, 0 to 1440 (default 0). A colleague won't be offered another
+          appointment in this time.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventFormatInput'
+            example:
+              appointment_type: group
+              default_length_minutes: 90
+              preparation_minutes: 15
+              debrief_minutes: 15
+      responses:
+        "200":
+          description: The edited Event Format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are not an Organisation Admin of the organisation that owns this Event Format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an Organisation Admin can manage Event Formats."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
     delete:
       tags: [Event Formats]
       summary: Delete an Event Format
@@ -23423,6 +23599,99 @@ components:
           type: string
           nullable: true
           description: Why it can't be deleted yet, or null
+
+    EventFormatInput:
+      type: object
+      description: Settings for creating or editing an Event Format. Only the settings you send change.
+      properties:
+        name:
+          type: string
+        guest_status_ids:
+          type: array
+          items:
+            type: integer
+          description: The organisation's Guest Statuses its events use, in order
+        attendance_form_id:
+          type: integer
+          nullable: true
+          description: The Survey (Story Category) used to record attendance
+        appointment_type:
+          type: string
+          nullable: true
+          enum: [one_to_one, group, null]
+          description: One-to-one or Group appointment, or null for "Not an appointment". One-to-one appointments have one guest.
+        default_length_minutes:
+          type: integer
+          nullable: true
+          minimum: 5
+          maximum: 1440
+          description: How long an event of this format usually lasts, in 5-minute steps. The Create Event page sets the end time from it.
+        preparation_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          description: Preparation time a colleague needs before each appointment. Default 0.
+        debrief_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          description: Debrief time a colleague needs after each appointment. Default 0.
+
+    EventFormatDetail:
+      type: object
+      description: One Event Format (Event Category in the API) with its settings.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        is_default:
+          type: boolean
+        charity_id:
+          type: integer
+        attendance_form_id:
+          type: integer
+          nullable: true
+        appointment_type:
+          type: string
+          nullable: true
+          enum: [one_to_one, group, null]
+          description: One-to-one or Group appointment, or null for "Not an appointment". One-to-one appointments have one guest.
+        default_length_minutes:
+          type: integer
+          nullable: true
+          minimum: 5
+          maximum: 1440
+          description: How long an event of this format usually lasts, in 5-minute steps. The Create Event page sets the end time from it.
+        preparation_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          description: Preparation time a colleague needs before each appointment. Default 0.
+        debrief_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          description: Debrief time a colleague needs after each appointment. Default 0.
+        guest_statuses:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+        project_ids:
+          type: array
+          items:
+            type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     PaginatedEventFormats:
       allOf:

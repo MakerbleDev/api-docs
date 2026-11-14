@@ -3847,7 +3847,8 @@ function buildDocsPage() {
         <div class="section-eyebrow">Events</div>
         <h2 class="section-title">Event Formats</h2>
         <div class="section-desc">
-          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin can list an organisation's Event Formats or delete one. An Event Format can be deleted only once it has no events and is not added to any project; the list says which ones can be deleted and why not. Default formats can be deleted under the same rules.</p>
+          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin can list, read, create, edit or delete an organisation's Event Formats. An Event Format can be deleted only once it has no events and is not added to any project; the list says which ones can be deleted and why not. Default formats can be deleted under the same rules.</p>
+          <p><strong>Appointments:</strong> an Event Format can be a One-to-one or Group appointment (<code>appointment_type</code> <code>one_to_one</code> or <code>group</code>; <code>null</code> means "Not an appointment"). <code>default_length_minutes</code> (5-minute steps) sets the end time on the Create Event page, and <code>preparation_minutes</code> and <code>debrief_minutes</code> are the time a colleague needs either side of each appointment.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/event_categories", "List Event Formats", true, [
@@ -3858,6 +3859,38 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list — each with events_count, projects_count, can_delete and delete_blocked_reason" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin (of charity_id, if given)" }
+          ])}
+          ${endpointCard("POST", "/event_categories", "Create an Event Format", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation the Event Format belongs to" },
+            { name: "name", in: "body", type: "string", required: true, desc: "Name, e.g. Therapy session" },
+            { name: "guest_status_ids", in: "body", type: "integer[]", required: false, desc: "The organisation's Guest Statuses its events use, in order" },
+            { name: "appointment_type", in: "body", type: "string", required: false, desc: "<code>one_to_one</code>, <code>group</code>, or null for Not an appointment" },
+            { name: "default_length_minutes", in: "body", type: "integer", required: false, desc: "Usual length, in 5-minute steps up to 1440, or null" },
+            { name: "preparation_minutes", in: "body", type: "integer", required: false, desc: "Preparation time before each appointment, 0–1440 (default 0)" },
+            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created — returns the Event Format with its settings" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of charity_id" },
+            { code: "422", cls: "response-4xx", desc: "A setting is invalid — errors lists each problem" }
+          ])}
+          ${endpointCard("GET", "/event_categories/{id}", "Get an Event Format", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Event Format with its settings, Guest Statuses, project_ids and appointment settings" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("PATCH", "/event_categories/{id}", "Edit an Event Format", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "appointment_type", in: "body", type: "string", required: false, desc: "<code>one_to_one</code>, <code>group</code>, or null for Not an appointment" },
+            { name: "default_length_minutes", in: "body", type: "integer", required: false, desc: "Usual length, in 5-minute steps up to 1440, or null" },
+            { name: "preparation_minutes", in: "body", type: "integer", required: false, desc: "Preparation time before each appointment, 0–1440 (default 0)" },
+            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Edited — only the settings sent change" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "A setting is invalid, e.g. a length not in 5-minute steps" }
           ])}
           ${endpointCard("DELETE", "/event_categories/{id}", "Delete an Event Format", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
