@@ -3878,6 +3878,7 @@ function buildDocsPage() {
           <p>A Guidance Panel is the Show/Hide Guidance introduction at the top of a Manage page, such as Manage Events or Manage Contact Groups: an eyebrow, a one-line headline, 2 to 5 points that each start with a short bold lead, the sentence shown to people who can't use the page's main button, a <strong>Learn more</strong> link to the page's article in the Makerble User Guide, and an optional Vimeo video. Panels are the same for every Organisation.</p>
           <p><strong>Who can use these endpoints:</strong> only Makerble staff with System Access, with their own <code>X-User-Email</code> and <code>X-User-Token</code>. Anyone else, an API key and a connected app all get <code>403</code>. The same changes can be made in Site Overview › Guidance Panels, and every change, wherever it is made, is kept as a version that can be seen and restored.</p>
           <p><strong>Rules:</strong> a headline of at most 80 characters; 2 to 5 points, each with a <code>lead</code> (up to 40 characters) and <code>text</code> (up to 200); a <code>user_guide_url</code> in the Makerble User Guide (<code>https://makerble.atlassian.net/wiki/spaces/MCPD/…</code>); and a <code>vimeo_url</code> that is empty or one of <code>https://vimeo.com/&lt;id&gt;</code>, <code>https://vimeo.com/&lt;id&gt;/&lt;hash&gt;</code> (unlisted) or <code>https://player.vimeo.com/video/&lt;id&gt;?h=&lt;hash&gt;</code>.</p>
+          <p><strong>Animation storyboard:</strong> when there is no Vimeo link, a panel can show a looping animation of Makerble building blocks, drawn in the page's module colour from its <code>storyboard</code>. A storyboard has an <code>archetype</code> (<code>assemble</code>, <code>flow</code> or <code>concept</code>), <code>loop_seconds</code> (4 to 20), <code>alt</code> (10 to 250 characters describing the animation for screen readers) and 1 to 24 <code>steps</code>. An <code>appear</code> step puts a <code>block</code> on the stage (<code>top_bar</code>, <code>sidebar_item</code>, <code>table_row</code>, <code>card</code>, <code>button</code>, <code>field</code>, <code>chip</code>, <code>avatar</code> or <code>chart_bar</code>, which needs a <code>value</code> from 0 to 100), with an optional <code>id</code> and <code>text</code> (up to 40 characters). <code>move_cursor</code>, <code>click</code>, <code>highlight</code>, <code>check</code>, <code>type</code> (into a <code>field</code>) and <code>swap</code> (new <code>text</code>) act on the block whose <code>id</code> is their <code>target</code>; <code>cut</code> clears the stage for the next scene. People who turn off motion see the last frame. The response's <code>visual</code> is <code>storyboard</code> while one is showing.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/guidance_panels", "List the Guidance Panels", true, [
@@ -3895,14 +3896,15 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "No System Access" },
             { code: "404", cls: "response-4xx", desc: "No panel with that key" }
           ])}
-          ${endpointCard("PATCH", "/guidance_panels/{key}", "Change a Guidance Panel's wording or video", true, [
+          ${endpointCard("PATCH", "/guidance_panels/{key}", "Change a Guidance Panel's wording, video or animation", true, [
             { name: "key", in: "path", type: "string", required: true, desc: "The panel's key, e.g. <code>events</code>" },
             { name: "guidance_panel[eyebrow]", in: "body", type: "string", required: false, desc: "e.g. Makerble® Events" },
             { name: "guidance_panel[headline]", in: "body", type: "string", required: false, desc: "One line, at most 80 characters" },
             { name: "guidance_panel[points]", in: "body", type: "array", required: false, desc: "2 to 5 <code>{lead, text}</code>, in order; replaces the whole list" },
             { name: "guidance_panel[staff_text]", in: "body", type: "string", required: false, desc: "Shown instead of the main action to people who can't use it" },
             { name: "guidance_panel[user_guide_url]", in: "body", type: "string", required: false, desc: "A page in the Makerble User Guide" },
-            { name: "guidance_panel[vimeo_url]", in: "body", type: "string", required: false, desc: "A Vimeo link, or empty to show the page's own image or animation" }
+            { name: "guidance_panel[vimeo_url]", in: "body", type: "string", required: false, desc: "A Vimeo link, or empty to show the page's own image or animation" },
+            { name: "guidance_panel[storyboard]", in: "body", type: "object", required: false, desc: "The animation shown when there is no Vimeo link (see above), or <code>null</code> to remove it" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The changed panel and its last 10 versions; the page shows the change from its next load" },
             { code: "403", cls: "response-4xx", desc: "No System Access" },
