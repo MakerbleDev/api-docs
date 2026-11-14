@@ -964,6 +964,7 @@ function buildDocsPage() {
         <div class="nav-section-label">Events</div>
         <a href="#events"          class="nav-link"><span class="nav-method method-GET">GET</span>Events</a>
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
+        <a href="#staff-capacity" class="nav-link"><span class="nav-method method-PATCH">PATCH</span>Staff Capacity</a>
         <a href="#staff-unavailability" class="nav-link"><span class="nav-method method-POST">POST</span>Staff Unavailability</a>
       </div>
       <div class="nav-section">
@@ -977,6 +978,7 @@ function buildDocsPage() {
         <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
         <a href="#usage"           class="nav-link"><span class="nav-method method-GET">GET</span>Usage</a>
+        <a href="#setup-guide"     class="nav-link"><span class="nav-method method-GET">GET</span>Setup guide</a>
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
         <a href="#wishlist"        class="nav-link"><span class="nav-method method-POST">POST</span>Wishlist</a>
         <a href="#welcome-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Welcome Tours</a>
@@ -1636,13 +1638,13 @@ function buildDocsPage() {
           ${endpointCard("GET", "/beneficiaries/{id}", "Get a single Contact", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Full Contact profile with all custom fields" },
+            { code: "200", cls: "response-2xx", desc: "Full Contact profile with all custom fields, and <code>weekly_availability</code>" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
-          ], "Opening a Contact this way is recorded in its <strong>Access Log</strong>, the audit trail of who has viewed it, under your name and marked as via the API (or via MCP when the Makerble MCP server sends <code>X-Makerble-Client: makerble-mcp</code>). Views less than 30 minutes apart are counted together. Use <code>GET /beneficiaries</code> when you only need to find or scan Contacts. Fields hidden from you by <strong>Field Visibility</strong> come back with <code>restricted: true</code> and a null value (custom fields), or null and named in <code>restricted_fields</code> (<code>dob</code>, <code>mobile</code>, <code>email</code>, <code>address</code>).")}
+          ], "Opening a Contact this way is recorded in its <strong>Access Log</strong>, the audit trail of who has viewed it, under your name and marked as via the API (or via MCP when the Makerble MCP server sends <code>X-Makerble-Client: makerble-mcp</code>). Views less than 30 minutes apart are counted together. Use <code>GET /beneficiaries</code> when you only need to find or scan Contacts. Fields hidden from you by <strong>Field Visibility</strong> come back with <code>restricted: true</code> and a null value (custom fields), or null and named in <code>restricted_fields</code> (<code>dob</code>, <code>mobile</code>, <code>email</code>, <code>address</code>). <code>weekly_availability</code> is the Contact's <strong>Weekly availability</strong>: the most recently saved answer to a Weekly availability field on their Contact Forms, as <code>times</code> (<code>[{day, from, to}]</code>, in the organisation's timezone) with <code>source_form_id</code>, <code>source_field_id</code> and <code>answered_at</code>, or null. When Field Visibility hides that field from you, <code>times</code> is null and <code>restricted</code> is true.")}
           ${endpointCard("POST", "/beneficiaries", "Create a Contact", true, [], [
             { code: "200", cls: "response-2xx", desc: "Contact created" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required), or a field hidden from you by Field Visibility was sent" }
-          ], "Required fields: <code>beneficiary.name</code>, <code>beneficiary.owner_id</code> (User ID of the record owner). Submit custom field values as <code>custom_fields: {\"field_id\": \"value\"}</code>. Setting a field hidden from you by Field Visibility is refused with 422 and an <code>errors</code> list naming it.")}
+            { code: "422", cls: "response-4xx", desc: "Validation failed (name and owner_id are required), a field hidden from you by Field Visibility was sent, or a Weekly availability answer can't be read" }
+          ], "Required fields: <code>beneficiary.name</code>, <code>beneficiary.owner_id</code> (User ID of the record owner). Submit custom field values as <code>custom_fields: {\"field_id\": \"value\"}</code>. A Weekly availability field takes a list of days and times: <code>[{\"day\": \"monday\", \"from\": \"15:30\", \"to\": \"18:00\"}]</code>, times HH:MM in 15-minute steps with <code>to</code> after <code>from</code>; overlapping times on a day are joined. Setting a field hidden from you by Field Visibility is refused with 422 and an <code>errors</code> list naming it.")}
           ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/summary", "Get the AI summary of a Contact (SummaryMaker)", true, [
             { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "Contact ID" }
           ], [
@@ -2419,7 +2421,7 @@ function buildDocsPage() {
           ${endpointCard("POST", "/fields", "Create a Field", true, [
             { name: "organisation_id", in: "body", type: "integer", required: true, desc: "The organisation (Charity) that will own it; you must be one of its editors" },
             { name: "field_name", in: "body", type: "string", required: true, desc: "The question, e.g. <code>Date of birth</code>" },
-            { name: "field_data_type", in: "body", type: "string", required: true, desc: "<code>text</code>, <code>number</code>, <code>date</code>, <code>time</code>, <code>file</code>, <code>video</code>, <code>audio</code>, <code>picture</code>, <code>section_title</code>, <code>email_address</code>, <code>telephone</code> or <code>signature</code>. <code>video</code>, <code>audio</code> and <code>picture</code> make a Video, Audio or Picture question: an Attachment that asks for that kind of media, which people can record or take in the survey. It is returned with <code>field_type: file</code> and <code>capture_type</code>" },
+            { name: "field_data_type", in: "body", type: "string", required: true, desc: "<code>text</code>, <code>number</code>, <code>date</code>, <code>time</code>, <code>file</code>, <code>video</code>, <code>audio</code>, <code>picture</code>, <code>section_title</code>, <code>email_address</code>, <code>telephone</code> or <code>signature</code>. <code>video</code>, <code>audio</code> and <code>picture</code> make a Video, Audio or Picture question: an Attachment that asks for that kind of media, which people can record or take in the survey. It is returned with <code>field_type: file</code> and <code>capture_type</code>. A Weekly availability field can only be made as part of a Contact Form" },
             { name: "section_text", in: "body", type: "string", required: false, desc: "For a <code>section_title</code> Field only" },
             { name: "private", in: "body", type: "boolean", required: false, desc: "Only the organisation's staff may see the answers" },
             { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create it even though a near-identical one exists (see 409)" }
@@ -2508,7 +2510,7 @@ function buildDocsPage() {
             { name: "department", in: "body", type: "string", required: true, desc: "<code>Personal</code>, <code>Professional</code> or <code>Public Impact</code>" },
             { name: "contact_role", in: "body", type: "string", required: true, desc: "What the Contacts are to the organisation, e.g. <code>Participant</code>" },
             { name: "contact_type", in: "body", type: "string", required: false, desc: "<code>Person</code> (default), <code>Organisation</code>, <code>Animal</code> or <code>Object</code>" },
-            { name: "questions", in: "body", type: "array", required: true, desc: "In order, at most 50. Each has exactly one of <code>field_id</code>, <code>list_id</code> (reuse), <code>new_field</code> {field_name, field_data_type} or <code>new_list</code> {name, choices}; plus optional <code>is_mandatory</code>, <code>choice</code>, <code>layout</code>, <code>external_description</code>" },
+            { name: "questions", in: "body", type: "array", required: true, desc: "In order, at most 50. Each has exactly one of <code>field_id</code>, <code>list_id</code> (reuse), <code>new_field</code> {field_name, field_data_type} or <code>new_list</code> {name, choices}; plus optional <code>is_mandatory</code>, <code>choice</code>, <code>layout</code>, <code>external_description</code>. A <code>new_field</code> may be a <code>weekly_availability</code> field, which asks for the days and times a Contact can usually attend: only Contact Forms can have one" },
             { name: "approved", in: "body", type: "boolean", required: false, desc: "Makerble staff only: let every organisation use the form" },
             { name: "force", in: "body", type: "boolean", required: false, desc: "<code>true</code> to create new items even though near-identical ones exist (see 409)" }
           ], [
@@ -2636,7 +2638,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/framework_sets/{id}", "Get a Framework Set", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The set, with <code>frameworks</code> in order and <code>financial_values</code>" },
+            { code: "200", cls: "response-2xx", desc: "The set, with <code>frameworks</code> in order and <code>financial_values</code>. Each financial value gives its <code>financial_value_name</code>, <code>amount</code> and <code>currency</code> as well as its ids" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" }
           ])}
           ${endpointCard("POST", "/framework_sets", "Create a Framework Set", true, [], [
@@ -3843,6 +3845,38 @@ function buildDocsPage() {
       </section>
 
       <!-- Event Formats -->
+      <section class="section" id="staff-capacity">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Staff Capacity</h2>
+        <div class="section-desc">
+          <p>How much a colleague can take on in an Organisation: maximum appointments a day and a week, and maximum ongoing one-to-one Contacts (Contacts with an upcoming one-to-one appointment with them). A blank (<code>null</code>) cap means no limit. It appears in the Capacity column of the Staff availability page.</p>
+          <p>An appointment is an event whose Event Format has an <code>appointment_type</code>, where the colleague is an Event Worker. <code>usage</code> counts today's and this week's appointments, Monday to Sunday in the Organisation's timezone, and the colleague's ongoing one-to-one Contacts.</p>
+          <p>Anyone who sees the colleague on Staff availability can read their capacity: the colleague themselves, their Team Leaders, Project Editors of their Projects and Organisation Admins. Only Organisation Admins, and Team Leaders of a Team the colleague is in, can change it, and nobody can change their own.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/users/{user_id}/capacity", "Get a colleague's capacity", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "max_per_day, max_per_week, max_one_to_one_contacts, can_edit and usage" },
+            { code: "403", cls: "response-4xx", desc: "You can't see this colleague on Staff availability" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Organisation you are not in" }
+          ])}
+          ${endpointCard("PATCH", "/users/{user_id}/capacity", "Set a colleague's capacity", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation" },
+            { name: "max_per_day", in: "body", type: "integer", required: false, desc: "Maximum appointments a day, or null for no limit" },
+            { name: "max_per_week", in: "body", type: "integer", required: false, desc: "Maximum appointments a week, or null for no limit" },
+            { name: "max_one_to_one_contacts", in: "body", type: "integer", required: false, desc: "Maximum ongoing one-to-one Contacts, or null for no limit" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Saved — returns the caps and usage" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin or a Team Leader of the colleague, or your own capacity" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "A cap is not a whole number from 0 to 1000" }
+          ])}
+        </div>
+      </section>
+
       <section class="section" id="staff-unavailability">
         <div class="section-eyebrow">Events</div>
         <h2 class="section-title">Staff Unavailability</h2>
@@ -3897,7 +3931,8 @@ function buildDocsPage() {
         <div class="section-eyebrow">Events</div>
         <h2 class="section-title">Event Formats</h2>
         <div class="section-desc">
-          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin can list an organisation's Event Formats or delete one. An Event Format can be deleted only once it has no events and is not added to any project; the list says which ones can be deleted and why not. Default formats can be deleted under the same rules.</p>
+          <p>Event Formats (Event Categories in the API) are the templates an organisation's events are created from, such as Workshops, Classes or Meetings. Only an Organisation Admin can list, read, create, edit or delete an organisation's Event Formats. An Event Format can be deleted only once it has no events and is not added to any project; the list says which ones can be deleted and why not. Default formats can be deleted under the same rules.</p>
+          <p><strong>Appointments:</strong> an Event Format can be a One-to-one or Group appointment (<code>appointment_type</code> <code>one_to_one</code> or <code>group</code>; <code>null</code> means "Not an appointment"). <code>default_length_minutes</code> (5-minute steps) sets the end time on the Create Event page, and <code>preparation_minutes</code> and <code>debrief_minutes</code> are the time a colleague needs either side of each appointment.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/event_categories", "List Event Formats", true, [
@@ -3908,6 +3943,38 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list — each with events_count, projects_count, can_delete and delete_blocked_reason" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin (of charity_id, if given)" }
+          ])}
+          ${endpointCard("POST", "/event_categories", "Create an Event Format", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation the Event Format belongs to" },
+            { name: "name", in: "body", type: "string", required: true, desc: "Name, e.g. Therapy session" },
+            { name: "guest_status_ids", in: "body", type: "integer[]", required: false, desc: "The organisation's Guest Statuses its events use, in order" },
+            { name: "appointment_type", in: "body", type: "string", required: false, desc: "<code>one_to_one</code>, <code>group</code>, or null for Not an appointment" },
+            { name: "default_length_minutes", in: "body", type: "integer", required: false, desc: "Usual length, in 5-minute steps up to 1440, or null" },
+            { name: "preparation_minutes", in: "body", type: "integer", required: false, desc: "Preparation time before each appointment, 0–1440 (default 0)" },
+            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created — returns the Event Format with its settings" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of charity_id" },
+            { code: "422", cls: "response-4xx", desc: "A setting is invalid — errors lists each problem" }
+          ])}
+          ${endpointCard("GET", "/event_categories/{id}", "Get an Event Format", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Event Format with its settings, Guest Statuses, project_ids and appointment settings" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("PATCH", "/event_categories/{id}", "Edit an Event Format", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "appointment_type", in: "body", type: "string", required: false, desc: "<code>one_to_one</code>, <code>group</code>, or null for Not an appointment" },
+            { name: "default_length_minutes", in: "body", type: "integer", required: false, desc: "Usual length, in 5-minute steps up to 1440, or null" },
+            { name: "preparation_minutes", in: "body", type: "integer", required: false, desc: "Preparation time before each appointment, 0–1440 (default 0)" },
+            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Edited — only the settings sent change" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "A setting is invalid, e.g. a length not in 5-minute steps" }
           ])}
           ${endpointCard("DELETE", "/event_categories/{id}", "Delete an Event Format", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
@@ -3928,6 +3995,7 @@ function buildDocsPage() {
           <p>A Guidance Panel is the Show/Hide Guidance introduction at the top of a Manage page, such as Manage Events or Manage Contact Groups: an eyebrow, a one-line headline, 2 to 5 points that each start with a short bold lead, the sentence shown to people who can't use the page's main button, a <strong>Learn more</strong> link to the page's article in the Makerble User Guide, and an optional Vimeo video. Panels are the same for every Organisation.</p>
           <p><strong>Who can use these endpoints:</strong> only Makerble staff with System Access, with their own <code>X-User-Email</code> and <code>X-User-Token</code>. Anyone else, an API key and a connected app all get <code>403</code>. The same changes can be made in Site Overview › Guidance Panels, and every change, wherever it is made, is kept as a version that can be seen and restored.</p>
           <p><strong>Rules:</strong> a headline of at most 80 characters; 2 to 5 points, each with a <code>lead</code> (up to 40 characters) and <code>text</code> (up to 200); a <code>user_guide_url</code> in the Makerble User Guide (<code>https://makerble.atlassian.net/wiki/spaces/MCPD/…</code>); and a <code>vimeo_url</code> that is empty or one of <code>https://vimeo.com/&lt;id&gt;</code>, <code>https://vimeo.com/&lt;id&gt;/&lt;hash&gt;</code> (unlisted) or <code>https://player.vimeo.com/video/&lt;id&gt;?h=&lt;hash&gt;</code>.</p>
+          <p><strong>Animation storyboard:</strong> when there is no Vimeo link, a panel can show a looping animation of Makerble building blocks, drawn in the page's module colour from its <code>storyboard</code>. A storyboard has an <code>archetype</code> (<code>assemble</code>, <code>flow</code> or <code>concept</code>), <code>loop_seconds</code> (4 to 20), <code>alt</code> (10 to 250 characters describing the animation for screen readers) and 1 to 24 <code>steps</code>. An <code>appear</code> step puts a <code>block</code> on the stage (<code>top_bar</code>, <code>sidebar_item</code>, <code>table_row</code>, <code>card</code>, <code>button</code>, <code>field</code>, <code>chip</code>, <code>avatar</code> or <code>chart_bar</code>, which needs a <code>value</code> from 0 to 100), with an optional <code>id</code> and <code>text</code> (up to 40 characters). <code>move_cursor</code>, <code>click</code>, <code>highlight</code>, <code>check</code>, <code>type</code> (into a <code>field</code>) and <code>swap</code> (new <code>text</code>) act on the block whose <code>id</code> is their <code>target</code>; <code>cut</code> clears the stage for the next scene. People who turn off motion see the last frame. The response's <code>visual</code> is <code>storyboard</code> while one is showing.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/guidance_panels", "List the Guidance Panels", true, [
@@ -3945,14 +4013,15 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "No System Access" },
             { code: "404", cls: "response-4xx", desc: "No panel with that key" }
           ])}
-          ${endpointCard("PATCH", "/guidance_panels/{key}", "Change a Guidance Panel's wording or video", true, [
+          ${endpointCard("PATCH", "/guidance_panels/{key}", "Change a Guidance Panel's wording, video or animation", true, [
             { name: "key", in: "path", type: "string", required: true, desc: "The panel's key, e.g. <code>events</code>" },
             { name: "guidance_panel[eyebrow]", in: "body", type: "string", required: false, desc: "e.g. Makerble® Events" },
             { name: "guidance_panel[headline]", in: "body", type: "string", required: false, desc: "One line, at most 80 characters" },
             { name: "guidance_panel[points]", in: "body", type: "array", required: false, desc: "2 to 5 <code>{lead, text}</code>, in order; replaces the whole list" },
             { name: "guidance_panel[staff_text]", in: "body", type: "string", required: false, desc: "Shown instead of the main action to people who can't use it" },
             { name: "guidance_panel[user_guide_url]", in: "body", type: "string", required: false, desc: "A page in the Makerble User Guide" },
-            { name: "guidance_panel[vimeo_url]", in: "body", type: "string", required: false, desc: "A Vimeo link, or empty to show the page's own image or animation" }
+            { name: "guidance_panel[vimeo_url]", in: "body", type: "string", required: false, desc: "A Vimeo link, or empty to show the page's own image or animation" },
+            { name: "guidance_panel[storyboard]", in: "body", type: "object", required: false, desc: "The animation shown when there is no Vimeo link (see above), or <code>null</code> to remove it" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The changed panel and its last 10 versions; the page shows the change from its next load" },
             { code: "403", cls: "response-4xx", desc: "No System Access" },
@@ -4243,6 +4312,35 @@ function buildDocsPage() {
         </div>
       </section>
 
+      <!-- Setup guide -->
+      <section class="section" id="setup-guide">
+        <div class="section-eyebrow">Organisation</div>
+        <h2 class="section-title">Setup guide</h2>
+        <div class="section-desc">
+          <p>An Organisation's Setup guide: the main things to set up in Makerble, how far each has got and whether it is done. This is the <strong>Setup guide</strong> page, under <strong>Help › Setup guide</strong>. Makerble ticks each item off when it sees it done, and once done an item stays done; <code>progress</code> always shows the current picture in words, for example "3 of 5 workspaces".</p>
+          <p>Items (<code>key</code>): <code>teams</code> (only for Organisations with 11 or more staff), <code>workspaces</code>, <code>welcome_tour</code>, <code>checklists</code>, and under "Automate your reporting" (<code>section</code>): <code>reporting_requirements</code>, <code>demographics</code> and <code>metrics</code>. Closed Workspaces, and the one Makerble creates with the Organisation, never count. An item marked "Not relevant to us" leaves <code>total_count</code>; <code>finished</code> is <code>true</code> once every item is done or not relevant.</p>
+          <p>Only the Organisation's Organisation Admins and Makerble staff can use it, and only while the Setup guide is switched on for the Organisation (it is on for Organisations created since it was released). Anyone else gets <code>403</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/organisations/{organisation_id}/setup_guide", "Get an Organisation's Setup guide", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "organisation_id, done_count, total_count, finished, and data: each item's key, title, section, progress, done_when, done and not_relevant" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of this Organisation, or its Setup guide is switched off" },
+            { code: "404", cls: "response-4xx", desc: "No such Organisation" }
+          ])}
+          ${endpointCard("PATCH", "/organisations/{organisation_id}/setup_guide/items/{item_key}", "Mark a Setup guide item Not relevant, or undo it", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "item_key", in: "path", type: "string", required: true, desc: "The item's <code>key</code>, e.g. <code>checklists</code>" },
+            { name: "not_relevant", in: "body", type: "boolean", required: true, desc: "<code>true</code> marks it Not relevant to us (recording who and when); <code>false</code> is Undo. Whether it is done is unchanged." }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The whole Setup guide after the change" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of this Organisation, or its Setup guide is switched off" },
+            { code: "422", cls: "response-4xx", desc: "No such item, or not_relevant isn't true or false" }
+          ])}
+        </div>
+      </section>
+
       <!-- Announcements -->
       <section class="section" id="announcements">
         <div class="section-eyebrow">Integrations</div>
@@ -4251,6 +4349,7 @@ function buildDocsPage() {
           <p>An Announcement is a popup that each signed-in user in its audience sees once, between its start and end dates. There are two kinds. Makerble's own "What's new in Makerble" popups, for example "Projects are now Workspaces", are written by Makerble staff in Site Overview › Announcements; their <code>scope_type</code> is <code>null</code>. An Organisation's, Workspace's or Team's announcements are written by the people who look after it, for the colleagues there: <code>scope_type</code> is <code>Charity</code>, <code>Project</code> or <code>Team</code>, with <code>scope_id</code>.</p>
           <p>System Access users can see and change every announcement. Anyone else can see and change only those for places where they hold the role now: an Organisation Admin, for their Organisation and its Workspaces and Teams; a Workspace editor (Project Editor), for that Workspace; a Team leader, for that Team. Someone who can make announcements nowhere gets <code>403</code>.</p>
           <p><code>visual_type</code> is <code>name_change</code> (an animation of 1 to 3 <code>name_changes</code>, old name → new name), <code>vimeo</code> (a Vimeo video at <code>vimeo_url</code>) or <code>none</code>. <code>audience</code> is <code>everyone</code>, <code>colleagues</code> (everyone except Contacts with a login) or <code>administrators</code> (Organisation Admins); a place's announcement is always for its colleagues (an Organisation's colleagues, a Workspace's editors, reporters and observers, or a Team's members and leaders), can't use <code>name_change</code>, and its <code>learn_more_url</code> can be any https page. <code>status</code> stores <code>draft</code> or <code>scheduled</code>; <code>current_status</code> also says whether a scheduled one is <code>live</code> or has <code>ended</code>.</p>
+          <p>Makerble's own can be narrowed further. <code>roles</code> shows it only to people holding at least one of the listed roles, in place of <code>audience</code>: <code>organisation_admin</code>, <code>editor</code> (Workspace editor), <code>reporter</code>, <code>observer</code>, <code>team_leader</code>, <code>active_participant</code> (Contact with a login) and <code>survey_portal_user</code>; Contacts with a login and Survey Portal users are left out unless their own role is listed. <code>audience_rules</code> targets people by behaviour, as JSON over named facts, for example <code>{"all": [{"fact": "distance_travelled_not_set_up"}]}</code> for people whose organisation hasn't set up Distance Travelled. Each rule is exactly one of <code>{fact, params}</code>, <code>{all: [rules]}</code>, <code>{any: [rules]}</code> or <code>{not: rule}</code>, at most 5 deep and 10 facts. List Announcement Facts gives the facts and their params; an unknown fact or param returns <code>422</code> naming the rule. Both are for System Access users only.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -4267,6 +4366,11 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Paginated Announcements the user may see, newest first, each with <code>scope_type</code>, <code>scope_id</code>, <code>seen_count</code> and <code>learn_more_click_count</code>" },
             { code: "403", cls: "response-4xx", desc: "The user can make announcements nowhere" }
           ])}
+          ${endpointCard("GET", "/announcements/facts", "List Announcement Facts", true, [], [
+            { code: "200", cls: "response-2xx", desc: "Every fact <code>audience_rules</code> can use, on one page, each with <code>key</code>, <code>label</code>, <code>description</code> and <code>params</code> (each param's <code>values</code>, <code>default</code> and <code>description</code>)" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
+          ], "A fact about a person's organisations takes <code>across</code>: for someone in several organisations, whether it must hold for any one of them (<code>any_organisation</code>, the default), every one (<code>all_organisations</code>) or the oldest one they belong to (<code>first_organisation</code>). Facts are written in Makerble's code, so this list only changes with a release.")}
           ${endpointCard("GET", "/announcements/{id}", "Get an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
@@ -4279,7 +4383,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user doesn't hold the role on that place, or (with no place) doesn't have System Access" },
             { code: "404", cls: "response-4xx", desc: "The Organisation, Workspace or Team doesn't exist" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no headline, a headline over 90 characters, a Vimeo visual with a YouTube link, or the name change animation for a place" }
-          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>training_material_id</code> (a place's announcement only: one of its Organisation's Training materials, linked for the colleagues it is shared with), <code>button_label</code> (default \"Got it\"), <code>audience</code>, <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
+          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>training_material_id</code> (a place's announcement only: one of its Organisation's Training materials, linked for the colleagues it is shared with), <code>button_label</code> (default \"Got it\"), <code>audience</code>, <code>roles</code> and <code>audience_rules</code> (Makerble's own only; see above), <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
           ${endpointCard("PATCH", "/announcements/{id}", "Update an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
