@@ -2588,7 +2588,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/framework_sets/{id}", "Get a Framework Set", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Framework Set ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The set, with <code>frameworks</code> in order and <code>financial_values</code>" },
+            { code: "200", cls: "response-2xx", desc: "The set, with <code>frameworks</code> in order and <code>financial_values</code>. Each financial value gives its <code>financial_value_name</code>, <code>amount</code> and <code>currency</code> as well as its ids" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not available to the user" }
           ])}
           ${endpointCard("POST", "/framework_sets", "Create a Framework Set", true, [], [

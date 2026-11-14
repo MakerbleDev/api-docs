@@ -21395,6 +21395,15 @@ components:
                     description: One of the Outcome's own Indicators whose value this is; empty for the Outcome's own value
                   financial_value_id:
                     type: integer
+                  financial_value_name:
+                    type: string
+                    description: The Financial Value's name, as on the Framework Set page
+                  amount:
+                    type: number
+                    description: The Financial Value's amount, in its currency
+                  currency:
+                    type: string
+                    description: The currency's code, e.g. GBP
 
     PaginatedFrameworkSets:
       allOf:
