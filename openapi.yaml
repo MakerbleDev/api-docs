@@ -2750,6 +2750,10 @@ paths:
         Setting a field the Organisation's Field Visibility settings hide from you (a custom field, a dropdown answer
         in `sub_ratio_ids`, `date_of_birth` or `address`) is refused with `422` and an `errors` list naming each field;
         no Contact is created.
+
+        A Weekly availability field takes a list of days and times (see WeeklyAvailabilityTime). An answer whose `to`
+        isn't after its `from`, or that isn't a list of days and times, is refused with `422` and an `errors` list
+        saying why; no Contact is created.
       operationId: createBeneficiary
       security: [{tokenAuth: []}]
       requestBody:
@@ -2771,6 +2775,10 @@ paths:
               beneficiary_category_ids: [294]
               custom_fields:
                 "173": "some value"
+                "9051":
+                  - day: monday
+                    from: "15:30"
+                    to: "18:00"
       responses:
         "200":
           description: Beneficiary created
@@ -2787,7 +2795,7 @@ paths:
     get:
       tags: [Beneficiaries]
       summary: Get a single Beneficiary (Contact)
-      description: "Returns a Contact's full profile including all custom fields. Opening a Contact this way is recorded in its Access Log, the audit trail of who has viewed it, under the caller's name and marked as via the API (or via MCP when the Makerble MCP server sends `X-Makerble-Client: makerble-mcp`). Views by the same caller less than 30 minutes apart are counted together. Use the list endpoint when you only need to find or scan Contacts."
+      description: "Returns a Contact's full profile including all custom fields, and `weekly_availability`: the most recent answer to a Weekly availability field on their Contact Forms, with the Contact Form it came from and when it was saved. Opening a Contact this way is recorded in its Access Log, the audit trail of who has viewed it, under the caller's name and marked as via the API (or via MCP when the Makerble MCP server sends `X-Makerble-Client: makerble-mcp`). Views by the same caller less than 30 minutes apart are counted together. Use the list endpoint when you only need to find or scan Contacts."
       operationId: getBeneficiary
       security: [{tokenAuth: []}]
       parameters:
@@ -19298,6 +19306,60 @@ components:
                 type: string
               description: Built-in fields (`dob`, `mobile`, `email`, `address`) hidden from you by Field Visibility; each is returned as null
               example: ["mobile"]
+            weekly_availability:
+              allOf:
+                - $ref: '#/components/schemas/ContactWeeklyAvailability'
+              nullable: true
+              description: The Contact's Weekly availability, or null if they haven't answered a Weekly availability field
+
+    ContactWeeklyAvailability:
+      type: object
+      description: >-
+        The most recently saved answer to any Weekly availability field on the Contact's Contact Forms. Use it to
+        suggest appointment times the Contact can attend.
+      properties:
+        times:
+          type: array
+          nullable: true
+          description: The days and times, in the organisation's timezone. Null when `restricted` is true.
+          items:
+            $ref: '#/components/schemas/WeeklyAvailabilityTime'
+        source_form_id:
+          type: integer
+          nullable: true
+          description: The Contact Form (Beneficiary Category) the answer came from
+          example: 412
+        source_field_id:
+          type: integer
+          description: The Weekly availability custom field the answer came from
+          example: 9051
+        answered_at:
+          type: string
+          format: date-time
+          description: When the answer was saved
+          example: "2026-11-10T09:30:00.000+00:00"
+        restricted:
+          type: boolean
+          description: True when Field Visibility hides the source field from you; `times` is then null
+          example: false
+
+    WeeklyAvailabilityTime:
+      type: object
+      required: [day, from, to]
+      description: >-
+        One row of a Weekly availability answer. Times are HH:MM in 15-minute steps, in the organisation's timezone,
+        and `to` must be after `from`. Overlapping rows on the same day are joined when saved.
+      properties:
+        day:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+          example: monday
+        from:
+          type: string
+          example: "15:30"
+        to:
+          type: string
+          example: "18:00"
 
     BeneficiaryCreateRequest:
       type: object
@@ -19334,9 +19396,14 @@ components:
             type: integer
         custom_fields:
           type: object
-          additionalProperties:
-            type: string
-          description: "Dictionary of custom_field_id → value"
+          additionalProperties: {}
+          description: "Dictionary of custom_field_id → value. Most fields take a string. A Weekly availability field (`weekly_availability`) takes a list of days and times, for example `[{\"day\": \"monday\", \"from\": \"15:30\", \"to\": \"18:00\"}]` (see WeeklyAvailabilityTime); an answer that can't be read is refused with 422."
+          example:
+            "173": "Employed"
+            "9051":
+              - day: monday
+                from: "15:30"
+                to: "18:00"
 
     BeneficiaryType:
       allOf:
@@ -19475,9 +19542,9 @@ components:
         type:
           type: string
           example: "text"
-          description: "Field type: text, date, time, file, etc."
+          description: "Field type: text, date, time, file, weekly_availability, etc."
         value:
-          description: Field value (string for most types; object for file attachments). Null when `restricted` is true.
+          description: Field value (string for most types; object for file attachments; a list of {day, from, to} for weekly_availability). Null when `restricted` is true.
           example: "Employed"
         restricted:
           type: boolean
