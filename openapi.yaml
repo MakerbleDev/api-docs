@@ -316,6 +316,13 @@ tags:
       Seats per Colleague: which seat each colleague holds on each of an Organisation's current
       Contracts, and changing one. A colleague's roles decide the lowest seat (Billing Role) they
       need on Role-based Pricing. Only the Organisation's admins can change seats.
+  - name: Setup guide
+    description: |
+      An Organisation's Setup guide: the main things to set up in Makerble, how far each has got,
+      and whether it is done. Makerble ticks each item off when it sees it done; an item once done
+      stays done. An Organisation Admin can mark an item "Not relevant to us", which takes it out of
+      the total. Organisation Admins and Makerble staff can use it, while the Setup guide is switched
+      on for the Organisation (it is on for Organisations created since it was released).
   - name: Usage
     description: |
       An Organisation's usage against the allowances in its plan: Contacts, Stories (survey
@@ -14348,6 +14355,108 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /organisations/{organisation_id}/setup_guide:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+    get:
+      tags: [Setup guide]
+      summary: Get an Organisation's Setup guide
+      description: |
+        The Setup guide's items for an Organisation (Charity), in order, with how far each has got in
+        words (`progress`), what counts as done (`done_when`), and whether it is done or marked "Not
+        relevant to us". `done_count` and `total_count` leave out items marked not relevant; `finished`
+        is true once every item is done or not relevant.
+
+        Items (`key`): `teams` (Create your teams; only for Organisations with 11 or more staff),
+        `workspaces` (Add your workspaces), `welcome_tour` (Set up your team's Welcome Tour),
+        `checklists` (Set up a checklist on each workspace), and under "Automate your reporting"
+        (`section`): `reporting_requirements`, `demographics` and `metrics`. Workspaces are Projects;
+        closed ones, and the one Makerble creates with the Organisation, never count.
+
+        This is the Setup guide page, under Help › Setup guide. The guide is at most seven items, so
+        it isn't paginated.
+      operationId: getSetupGuide
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Setup guide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetupGuide'
+              example:
+                organisation_id: 42
+                done_count: 3
+                total_count: 6
+                finished: false
+                data:
+                  - key: workspaces
+                    title: Add your workspaces
+                    section: null
+                    progress: 2 of 2 workspaces
+                    done_when: Done when you've created at least 2. The one Makerble makes for you doesn't count.
+                    done: true
+                    not_relevant: false
+                  - key: checklists
+                    title: Set up a checklist on each workspace
+                    section: null
+                    progress: 4 of 18 workspaces
+                    done_when: Done when each open workspace has a checklist. Closed workspaces are left out.
+                    done: false
+                    not_relevant: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/SetupGuideForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /organisations/{organisation_id}/setup_guide/items/{item_key}:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+      - name: item_key
+        in: path
+        required: true
+        description: The item's `key`, e.g. `checklists`.
+        schema:
+          type: string
+          enum: [teams, workspaces, welcome_tour, checklists, reporting_requirements, demographics, metrics]
+    patch:
+      tags: [Setup guide]
+      summary: Mark a Setup guide item Not relevant, or undo it
+      description: |
+        "Not relevant to us" (`not_relevant: true`) takes the item out of the Organisation's total and
+        records who chose it and when; `not_relevant: false` is Undo and puts it back. Whether the item
+        is done is unchanged: Makerble ticks items, nobody ticks them by hand. Answers with the whole
+        Setup guide, as GET does.
+      operationId: updateSetupGuideItem
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [not_relevant]
+              properties:
+                not_relevant:
+                  type: boolean
+            example:
+              not_relevant: true
+      responses:
+        "200":
+          description: The Setup guide after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetupGuide'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/SetupGuideForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
   /organisations/{organisation_id}/age_bands:
     parameters:
       - $ref: '#/components/parameters/OrganisationId'
@@ -16420,6 +16529,14 @@ components:
       description: Also include Indicators or Outcomes from the public library shared by all organisations (default false)
 
   responses:
+    SetupGuideForbidden:
+      description: You aren't an Organisation Admin of this Organisation, or its Setup guide is switched off
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Only an Organisation Admin can see the Setup guide.
     LibraryItemCreated:
       description: Created. The new item as **Get a library item** shows it, and whether it is approved for the public library
       content:
@@ -16568,6 +16685,46 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    SetupGuide:
+      type: object
+      properties:
+        organisation_id:
+          type: integer
+        done_count:
+          type: integer
+          description: Items done, leaving out those marked not relevant.
+        total_count:
+          type: integer
+          description: Items shown, leaving out those marked not relevant.
+        finished:
+          type: boolean
+          description: True once every item is done or marked not relevant.
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SetupGuideItem'
+    SetupGuideItem:
+      type: object
+      properties:
+        key:
+          type: string
+          enum: [teams, workspaces, welcome_tour, checklists, reporting_requirements, demographics, metrics]
+        title:
+          type: string
+        section:
+          type: string
+          nullable: true
+          description: The heading the item sits under, e.g. "Automate your reporting", or null.
+        progress:
+          type: string
+          description: How far it has got, in words, e.g. "3 of 5 workspaces". Always the current picture, even once done.
+        done_when:
+          type: string
+        done:
+          type: boolean
+          description: True once Makerble has seen it done. It stays done.
+        not_relevant:
+          type: boolean
     AnnouncementNameChange:
       type: object
       required: [old_name, new_name]
