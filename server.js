@@ -964,6 +964,7 @@ function buildDocsPage() {
         <div class="nav-section-label">Events</div>
         <a href="#events"          class="nav-link"><span class="nav-method method-GET">GET</span>Events</a>
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
+        <a href="#staff-unavailability" class="nav-link"><span class="nav-method method-POST">POST</span>Staff Unavailability</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Site content</div>
@@ -3792,6 +3793,56 @@ function buildDocsPage() {
       </section>
 
       <!-- Event Formats -->
+      <section class="section" id="staff-unavailability">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Staff Unavailability</h2>
+        <div class="section-desc">
+          <p>Record when a colleague can't work for an Organisation: annual leave, sick leave, training or anything else, for whole days or part of a day. It appears on the Staff availability page. Makerble won't assign someone to an event automatically while they're unavailable, and warns when someone tries to assign them by hand. Dates and times are in the Organisation's timezone, and a colleague in several Organisations has separate unavailability in each, so every call takes <code>charity_id</code>.</p>
+          <p>Anyone can see and change their own. Team Leaders can see and change it for their Team, Project Editors for the colleagues in their Project, and Organisation Admins (Charity Editors) for everyone in the Organisation. Anyone else gets <code>403</code>. <code>private_note</code> is returned only to the colleague themselves and to Organisation Admins, because sick leave reasons are health information.</p>
+          <p>When a new or changed range overlaps upcoming events the colleague is already an Event Worker on, the response lists them in <code>conflicting_events</code>, each saying whether you may edit it. Send the ids you want them taken off in <code>unassign_event_ids</code> in the same call. Each affected event's Event Managers are emailed either way.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/users/{user_id}/unavailabilities", "List a colleague's unavailability", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "charity_id", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated ranges, oldest first" },
+            { code: "403", cls: "response-4xx", desc: "You can't see this colleague's unavailability" },
+            { code: "404", cls: "response-4xx", desc: "Organisation not found" }
+          ])}
+          ${endpointCard("POST", "/users/{user_id}/unavailabilities", "Record when a colleague is unavailable", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "charity_id", type: "integer", required: true, desc: "Organisation ID" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The range, with conflicting_events" },
+            { code: "403", cls: "response-4xx", desc: "You can't change this colleague's unavailability" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. To is not after From, or no type" }
+          ], "Body: <code>from_date</code>, <code>to_date</code>, <code>all_day</code> (default true), <code>from_time</code> and <code>to_time</code> (HH:MM, for part of a day), <code>reason_type</code> (<code>annual_leave</code>, <code>sick_leave</code>, <code>training</code> or <code>other</code>), <code>private_note</code> (up to 150 characters), <code>unassign_event_ids</code>.")}
+          ${endpointCard("PATCH", "/users/{user_id}/unavailabilities/{id}", "Change when a colleague is unavailable", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "The range" },
+            { name: "charity_id", type: "integer", required: true, desc: "Organisation ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The range, with conflicting_events if its dates or times changed" },
+            { code: "403", cls: "response-4xx", desc: "You can't change this colleague's unavailability" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Only the fields sent change. A Team Leader or Project Editor can't change the private note.")}
+          ${endpointCard("DELETE", "/users/{user_id}/unavailabilities/{id}", "Remove a range of unavailability", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "The range" },
+            { name: "charity_id", type: "integer", required: true, desc: "Organisation ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Removed. Events the colleague was taken off are not changed back" },
+            { code: "403", cls: "response-4xx", desc: "You can't change this colleague's unavailability" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+        </div>
+      </section>
+
       <section class="section" id="event-formats">
         <div class="section-eyebrow">Events</div>
         <h2 class="section-title">Event Formats</h2>
