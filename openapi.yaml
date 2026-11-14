@@ -169,6 +169,8 @@ tags:
     description: '"What''s new in Makerble" popups, written and scheduled by Makerble staff in Site Overview'
   - name: Wishlist
     description: The gift icon's Wishlist - your feature requests and feedback, and what Makerble is building next (Coming soon)
+  - name: Saved Filters
+    description: Saved Filters for Contacts, Events and Cases, and adding one to a project's toolbar as a shortcut
   - name: Albums
     description: Albums (Bundles; being renamed Portfolios on screen) group Projects so their results can be seen together
   - name: Age Bands
@@ -1050,6 +1052,113 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /saved_filters:
+    get:
+      tags: [Saved Filters]
+      summary: List Saved Filters
+      description: |
+        The Saved Filters for Contacts, Events and Cases that you can see: your own, and the ones colleagues
+        have shared. These are the filters listed on a project's Workflow › Saved filters tab, ready to be
+        added to a project's toolbar as a shortcut. `project_ids` are the projects named in the filter's
+        criteria; a filter can be added only to one of those projects. `can_add_shortcut` is true when you
+        can add it to at least one of them.
+      operationId: listSavedFilters
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: Only Saved Filters of this kind.
+          schema:
+            type: string
+            enum: [contacts, events, cases]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated Saved Filters, by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSavedFilters'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+  /saved_filters/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Saved Filters]
+      summary: Get a Saved Filter
+      description: |
+        One Saved Filter, with what you need to add it to a project's toolbar: `shortcut_views`, the views
+        of its app the shortcut can open (e.g. Contacts › Overview, or one of your Custom tables), and
+        `shortcut_projects`, the projects you can add it to. `shortcut_projects` is empty when
+        `can_add_shortcut` is false.
+      operationId: getSavedFilter
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Saved Filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedFilterDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /saved_filters/{id}/shortcuts:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Saved Filters]
+      summary: Add a Saved Filter to a project's toolbar
+      description: |
+        Adds the Saved Filter to a project's toolbar (its Workflow) as a shortcut, as the Saved Filter's
+        Add to workflow button does. Clicking the shortcut opens the chosen view with the filter applied.
+        The shortcut goes first on the toolbar; move it with Adjust toolbar.
+
+        Choose `project_id` from the filter's `shortcut_projects` and `view_key` from its `shortcut_views`
+        (GET /saved_filters/{id}). You need to be an Organisation Admin, or an Editor of the project.
+        Colleagues who can't see the Saved Filter don't see its shortcut.
+      operationId: createSavedFilterShortcut
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedFilterShortcutInput'
+            example:
+              project_id: 42
+              view_key: contacts_overview
+              name: Young carers
+      responses:
+        "201":
+          description: The shortcut
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedFilterShortcut'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
   /tours:
     get:
       tags: [Welcome Tours]
@@ -16073,6 +16182,114 @@ components:
             error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    SavedFilter:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [contacts, events, cases]
+          description: What the filter filters
+        organisation_id:
+          type: integer
+          nullable: true
+        shared:
+          type: boolean
+          description: Whether the owner shared it with colleagues
+        project_ids:
+          type: array
+          items:
+            type: integer
+          description: The projects named in the filter's criteria. The filter can be added only to these projects' toolbars.
+        can_add_shortcut:
+          type: boolean
+          description: Whether you can add it to a project's toolbar
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PaginatedSavedFilters:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SavedFilter'
+    SavedFilterDetail:
+      allOf:
+        - $ref: '#/components/schemas/SavedFilter'
+        - type: object
+          properties:
+            shortcut_views:
+              type: array
+              description: The views a shortcut to this filter can open
+              items:
+                type: object
+                properties:
+                  key:
+                    type: string
+                    example: contacts_overview
+                  label:
+                    type: string
+                    example: Overview
+                  group:
+                    type: string
+                    description: In-built views, or Custom tables
+            shortcut_projects:
+              type: array
+              description: The projects you can add this filter to
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+    SavedFilterShortcutInput:
+      type: object
+      required: [project_id, view_key]
+      properties:
+        project_id:
+          type: integer
+          description: One of the Saved Filter's `shortcut_projects`
+        view_key:
+          type: string
+          description: One of the Saved Filter's `shortcut_views`
+        name:
+          type: string
+          description: The shortcut's label on the toolbar. Defaults to the Saved Filter's name.
+    SavedFilterShortcut:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        project_id:
+          type: integer
+        saved_filter_id:
+          type: integer
+        view_key:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     AnnouncementNameChange:
       type: object
       required: [old_name, new_name]
