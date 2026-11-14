@@ -8734,6 +8734,7 @@ paths:
                   type: string
                   enum: [text, number, date, time, file, video, audio, picture, section_title, email_address, telephone, signature]
                   description: |
+                    A Weekly availability field can only be made as part of a Contact Form (`POST /contact_forms`), not here.
                     The kind of answer. `file` is an Attachment for any file; `video`, `audio` and
                     `picture` ask for that kind of media (see above).
                 section_text:
@@ -17573,7 +17574,8 @@ components:
               type: string
             field_data_type:
               type: string
-              enum: [text, number, date, time, file, section_title, email_address, telephone, signature]
+              enum: [text, number, date, time, file, section_title, email_address, telephone, signature, weekly_availability]
+              description: "`weekly_availability` asks for the days and times a Contact can usually attend. It can only be made on a Contact Form."
             section_text:
               type: string
             private:
