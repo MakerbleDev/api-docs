@@ -16667,6 +16667,19 @@ components:
               - fact: distance_travelled_not_set_up
                 params:
                   across: all_organisations
+        page_keys:
+          type: array
+          items:
+            type: string
+          description: |
+            Makerble's own only (System Access users). The pages it shows on, by the key of each page's
+            Show/Hide Guidance panel: for example `contacts` (Manage Contacts), `events`, `checklists` or
+            `surveys`. Someone sees it when they open one of those pages, including when they move between
+            pages without reloading. Pages without a guidance panel have no key and can't be chosen. An
+            empty list (the default) means any page. An unknown key is refused with 422, listing the keys
+            available. Sent, it replaces
+            the list.
+          example: [contacts]
         starts_on:
           type: string
           format: date
@@ -16781,6 +16794,11 @@ components:
           type: object
           additionalProperties: true
           description: Behaviour rules over named facts; `{}` for none. See Create an Announcement.
+        page_keys:
+          type: array
+          items:
+            type: string
+          description: The guidance panel keys of the pages it shows on; empty for any page. See Create an Announcement.
         starts_on:
           type: string
           format: date
