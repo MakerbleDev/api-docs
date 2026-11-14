@@ -837,6 +837,31 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /announcements/facts:
+    get:
+      tags: [Announcements]
+      summary: List Announcement Facts
+      description: |
+        The named facts an announcement's `audience_rules` can use, such as
+        `distance_travelled_not_set_up` (the person's organisation hasn't set up Distance Travelled), each
+        with what it means and the params it takes. A fact about a person's organisations takes `across`:
+        for someone in several organisations, whether it must hold for any one of them
+        (`any_organisation`, the default), every one (`all_organisations`) or the oldest one they belong
+        to (`first_organisation`). Facts are written in Makerble's code, so this list only changes with a
+        release. System Access users only; anyone else gets 403.
+      operationId: listAnnouncementFacts
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Every fact, on one page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAnnouncementFacts'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
   /announcements/{id}:
     parameters:
       - name: id
@@ -2750,6 +2775,10 @@ paths:
         Setting a field the Organisation's Field Visibility settings hide from you (a custom field, a dropdown answer
         in `sub_ratio_ids`, `date_of_birth` or `address`) is refused with `422` and an `errors` list naming each field;
         no Contact is created.
+
+        A Weekly availability field takes a list of days and times (see WeeklyAvailabilityTime). An answer whose `to`
+        isn't after its `from`, or that isn't a list of days and times, is refused with `422` and an `errors` list
+        saying why; no Contact is created.
       operationId: createBeneficiary
       security: [{tokenAuth: []}]
       requestBody:
@@ -2771,6 +2800,10 @@ paths:
               beneficiary_category_ids: [294]
               custom_fields:
                 "173": "some value"
+                "9051":
+                  - day: monday
+                    from: "15:30"
+                    to: "18:00"
       responses:
         "200":
           description: Beneficiary created
@@ -2787,7 +2820,7 @@ paths:
     get:
       tags: [Beneficiaries]
       summary: Get a single Beneficiary (Contact)
-      description: "Returns a Contact's full profile including all custom fields. Opening a Contact this way is recorded in its Access Log, the audit trail of who has viewed it, under the caller's name and marked as via the API (or via MCP when the Makerble MCP server sends `X-Makerble-Client: makerble-mcp`). Views by the same caller less than 30 minutes apart are counted together. Use the list endpoint when you only need to find or scan Contacts."
+      description: "Returns a Contact's full profile including all custom fields, and `weekly_availability`: the most recent answer to a Weekly availability field on their Contact Forms, with the Contact Form it came from and when it was saved. Opening a Contact this way is recorded in its Access Log, the audit trail of who has viewed it, under the caller's name and marked as via the API (or via MCP when the Makerble MCP server sends `X-Makerble-Client: makerble-mcp`). Views by the same caller less than 30 minutes apart are counted together. Use the list endpoint when you only need to find or scan Contacts."
       operationId: getBeneficiary
       security: [{tokenAuth: []}]
       parameters:
@@ -8877,6 +8910,7 @@ paths:
                   type: string
                   enum: [text, number, date, time, file, video, audio, picture, section_title, email_address, telephone, signature]
                   description: |
+                    A Weekly availability field can only be made as part of a Contact Form (`POST /contact_forms`), not here.
                     The kind of answer. `file` is an Attachment for any file; `video`, `audio` and
                     `picture` ask for that kind of media (see above).
                 section_text:
@@ -15010,7 +15044,11 @@ paths:
         page in the Makerble User Guide (`https://makerble.atlassian.net/wiki/spaces/MCPD/...`); and a
         `vimeo_url` that is empty or one of `https://vimeo.com/<id>`, `https://vimeo.com/<id>/<hash>`
         (unlisted videos) or `https://player.vimeo.com/video/<id>?h=<hash>`. An empty `vimeo_url` puts the
-        page back to its fallback visual. A broken rule answers `422` with every message in `errors`.
+        page back to its fallback visual.
+
+        `storyboard` is the Intro's animation, drawn from Makerble building blocks when there is no Vimeo
+        link (see `GuidancePanelStoryboard` for its rules). Send it as an object, or `null` to remove it.
+        A broken rule answers `422` with every message in `errors`.
       operationId: updateGuidancePanel
       security: [{tokenAuth: []}]
       requestBody:
@@ -16477,7 +16515,36 @@ components:
           description: |
             `everyone`: every signed-in user. `colleagues`: everyone except Contacts with a login
             (active participants). `administrators`: Organisation Admins of at least one organisation.
-            Ignored for a place's announcement, which is always for the colleagues there.
+            Ignored for a place's announcement, which is always for the colleagues there. Ignored too
+            when `roles` has any.
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [organisation_admin, editor, reporter, observer, team_leader, active_participant, survey_portal_user]
+          description: |
+            Makerble's own only (System Access users). Narrows who sees it to anyone holding at least one
+            of these roles, in place of `audience`: `organisation_admin` (Organisation Admin), `editor`
+            (Workspace editor, Project Editor), `reporter`, `observer` (of an Organisation or a
+            Workspace), `team_leader`, `active_participant` (Contact with a login) and
+            `survey_portal_user`. Contacts with a login and Survey Portal users are left out unless their
+            own role is listed, even when they hold another. An empty list (the default) leaves it to
+            `audience`. Sent, it replaces the list.
+        audience_rules:
+          type: object
+          additionalProperties: true
+          description: |
+            Makerble's own only (System Access users). Behaviour rules: a JSON expression over the named
+            facts from List Announcement Facts, saying who sees it beyond its audience or roles, e.g.
+            only people whose organisation hasn't set up Distance Travelled. Each rule is exactly one of
+            `{"fact": key, "params": {...}}` (params optional), `{"all": [rules]}`, `{"any": [rules]}`
+            or `{"not": rule}`; at most 5 deep and 10 facts. `{}` (the default) means no rules. An
+            unknown fact, param or shape is refused with 422, naming the rule.
+          example:
+            all:
+              - fact: distance_travelled_not_set_up
+                params:
+                  across: all_organisations
         starts_on:
           type: string
           format: date
@@ -16499,6 +16566,46 @@ components:
             sent are replaced. People see at most one Makerble announcement a day, so this keeps
             announcements from queuing behind each other. Use it to schedule a feature's announcement
             once the feature is live on production.
+    AnnouncementFact:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 'What a rule names, e.g. `{"fact": "distance_travelled_not_set_up"}`'
+        label:
+          type: string
+          description: Completes "people ..." in Site Overview's "Who sees this"
+        description:
+          type: string
+        params:
+          type: object
+          description: Each param by name, with the values it accepts, its default and what it means
+          additionalProperties:
+            type: object
+            properties:
+              values:
+                type: array
+                items:
+                  type: string
+              default:
+                type: string
+              description:
+                type: string
+    PaginatedAnnouncementFacts:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnnouncementFact'
     Announcement:
       type: object
       properties:
@@ -16543,6 +16650,15 @@ components:
         audience:
           type: string
           enum: [everyone, colleagues, administrators]
+        roles:
+          type: array
+          items:
+            type: string
+          description: The roles that narrow who sees it, in place of `audience`; empty for none. See Create an Announcement.
+        audience_rules:
+          type: object
+          additionalProperties: true
+          description: Behaviour rules over named facts; `{}` for none. See Create an Announcement.
         starts_on:
           type: string
           format: date
@@ -17634,7 +17750,8 @@ components:
               type: string
             field_data_type:
               type: string
-              enum: [text, number, date, time, file, section_title, email_address, telephone, signature]
+              enum: [text, number, date, time, file, section_title, email_address, telephone, signature, weekly_availability]
+              description: "`weekly_availability` asks for the days and times a Contact can usually attend. It can only be made on a Contact Form."
             section_text:
               type: string
             private:
@@ -19474,6 +19591,60 @@ components:
                 type: string
               description: Built-in fields (`dob`, `mobile`, `email`, `address`) hidden from you by Field Visibility; each is returned as null
               example: ["mobile"]
+            weekly_availability:
+              allOf:
+                - $ref: '#/components/schemas/ContactWeeklyAvailability'
+              nullable: true
+              description: The Contact's Weekly availability, or null if they haven't answered a Weekly availability field
+
+    ContactWeeklyAvailability:
+      type: object
+      description: >-
+        The most recently saved answer to any Weekly availability field on the Contact's Contact Forms. Use it to
+        suggest appointment times the Contact can attend.
+      properties:
+        times:
+          type: array
+          nullable: true
+          description: The days and times, in the organisation's timezone. Null when `restricted` is true.
+          items:
+            $ref: '#/components/schemas/WeeklyAvailabilityTime'
+        source_form_id:
+          type: integer
+          nullable: true
+          description: The Contact Form (Beneficiary Category) the answer came from
+          example: 412
+        source_field_id:
+          type: integer
+          description: The Weekly availability custom field the answer came from
+          example: 9051
+        answered_at:
+          type: string
+          format: date-time
+          description: When the answer was saved
+          example: "2026-11-10T09:30:00.000+00:00"
+        restricted:
+          type: boolean
+          description: True when Field Visibility hides the source field from you; `times` is then null
+          example: false
+
+    WeeklyAvailabilityTime:
+      type: object
+      required: [day, from, to]
+      description: >-
+        One row of a Weekly availability answer. Times are HH:MM in 15-minute steps, in the organisation's timezone,
+        and `to` must be after `from`. Overlapping rows on the same day are joined when saved.
+      properties:
+        day:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+          example: monday
+        from:
+          type: string
+          example: "15:30"
+        to:
+          type: string
+          example: "18:00"
 
     BeneficiaryCreateRequest:
       type: object
@@ -19510,9 +19681,14 @@ components:
             type: integer
         custom_fields:
           type: object
-          additionalProperties:
-            type: string
-          description: "Dictionary of custom_field_id → value"
+          additionalProperties: {}
+          description: "Dictionary of custom_field_id → value. Most fields take a string. A Weekly availability field (`weekly_availability`) takes a list of days and times, for example `[{\"day\": \"monday\", \"from\": \"15:30\", \"to\": \"18:00\"}]` (see WeeklyAvailabilityTime); an answer that can't be read is refused with 422."
+          example:
+            "173": "Employed"
+            "9051":
+              - day: monday
+                from: "15:30"
+                to: "18:00"
 
     BeneficiaryType:
       allOf:
@@ -19651,9 +19827,9 @@ components:
         type:
           type: string
           example: "text"
-          description: "Field type: text, date, time, file, etc."
+          description: "Field type: text, date, time, file, weekly_availability, etc."
         value:
-          description: Field value (string for most types; object for file attachments). Null when `restricted` is true.
+          description: Field value (string for most types; object for file attachments; a list of {day, from, to} for weekly_availability). Null when `restricted` is true.
           example: "Employed"
         restricted:
           type: boolean
@@ -24153,6 +24329,86 @@ components:
         name:
           type: string
 
+    GuidancePanelStoryboardStep:
+      type: object
+      description: |
+        One step of an Intro animation. Steps play in order, evenly spread across the loop.
+
+        - `appear` puts a building block on the stage: `block` (required), and optionally an `id` that later
+          steps target, a `text` label and, for a `chart_bar` only, a `value` from 0 to 100 (required for it).
+        - `move_cursor`, `click`, `highlight` and `check` act on the block whose `id` is `target`.
+        - `type` types `text` into the `field` whose `id` is `target`.
+        - `swap` replaces the label of the block whose `id` is `target` with `text`.
+        - `cut` clears the stage and starts a new scene; blocks from before it can't be targeted after it.
+      required: [type]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [appear, move_cursor, click, type, highlight, check, swap, cut]
+        block:
+          type: string
+          enum: [top_bar, sidebar_item, table_row, card, button, field, chip, avatar, chart_bar]
+        id:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,29}$'
+        target:
+          type: string
+          description: The `id` of a block that has appeared since the last `cut`
+        text:
+          type: string
+          maxLength: 40
+        value:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+
+    GuidancePanelStoryboard:
+      type: object
+      nullable: true
+      description: |
+        An Intro's animation: a short loop of Makerble building blocks drawn in the panel's module colour,
+        shown when there is no Vimeo link. Up to 8,000 characters of JSON.
+      required: [archetype, loop_seconds, alt, steps]
+      additionalProperties: false
+      properties:
+        archetype:
+          type: string
+          enum: [assemble, flow, concept]
+          description: >-
+            `assemble`: the parts of a page of the feature come together. `flow`: a short walkthrough of using
+            the feature. `concept`: an animated metaphor for the idea behind it.
+        loop_seconds:
+          type: integer
+          minimum: 4
+          maximum: 20
+        alt:
+          type: string
+          minLength: 10
+          maxLength: 250
+          description: What the animation shows, read out by screen readers
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 24
+          items:
+            $ref: '#/components/schemas/GuidancePanelStoryboardStep'
+      example:
+        archetype: flow
+        loop_seconds: 12
+        alt: "A coworker clicks Create a contact, types the contact's name, clicks Save and the contact appears in the list."
+        steps:
+          - { type: appear, block: button, id: create, text: "Create a contact" }
+          - { type: click, target: create }
+          - { type: cut }
+          - { type: appear, block: field, id: name, text: "Name" }
+          - { type: type, target: name, text: "Amira Patel" }
+          - { type: cut }
+          - { type: appear, block: table_row, id: amira, text: "Amira Patel" }
+          - { type: check, target: amira }
+
+
     GuidancePanel:
       type: object
       description: |
@@ -24192,14 +24448,16 @@ components:
         vimeo_url:
           type: string
           nullable: true
+        storyboard:
+          $ref: '#/components/schemas/GuidancePanelStoryboard'
         fallback_visual:
           type: string
           nullable: true
           description: The CSS animation, or the page's current image, shown when there is no Vimeo link
         visual:
           type: string
-          enum: [vimeo, animation, image, none]
-          description: What the panel shows beside its text now
+          enum: [vimeo, storyboard, animation, image, none]
+          description: What the panel shows beside its text now. A Vimeo link wins over a storyboard, and a storyboard over the fallback visual
         updated_at:
           type: string
           format: date-time
@@ -24265,6 +24523,8 @@ components:
               type: string
             vimeo_url:
               type: string
+            storyboard:
+              $ref: '#/components/schemas/GuidancePanelStoryboard'
 
     PaginatedGuidancePanels:
       allOf:
