@@ -165,6 +165,8 @@ tags:
     description: Guided tours of Makerble's own pages for new colleagues; Organisation Admins choose each team's stops, wording and how strict they are, and see who has finished
   - name: Staff Unavailability
     description: When colleagues can't work for an Organisation (leave, sickness, training), as on the Staff availability page
+  - name: Staff Capacity
+    description: How many appointments and one-to-one Contacts a colleague can take on in an Organisation, as on the Staff availability page
   - name: Training Materials
     description: An Organisation's links to its own training documents and videos, each shown to the whole Organisation or to chosen Teams and Workspaces
   - name: Announcements
@@ -1316,6 +1318,126 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /users/{user_id}/capacity:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        description: The colleague (User)
+        schema:
+          type: integer
+      - name: charity_id
+        in: query
+        required: true
+        description: The Organisation (Charity). A colleague has separate caps in each Organisation.
+        schema:
+          type: integer
+    get:
+      tags: [Staff Capacity]
+      summary: Get a colleague's capacity
+      operationId: getColleagueCapacity
+      description: |
+        A colleague's capacity caps in one Organisation, and how much they have taken on, as in the
+        **Edit capacity** popup on the Staff availability page.
+
+        - `max_per_day` and `max_per_week` cap their appointments; `max_one_to_one_contacts` caps the
+          Contacts who have an upcoming one-to-one appointment with them. `null` means no limit.
+        - An **appointment** is an event whose Event Format has an `appointment_type`, where the
+          colleague is an Event Worker. `usage` counts them for today and this week (Monday to
+          Sunday) in the Organisation's timezone, and counts their ongoing one-to-one Contacts: the
+          distinct guests of their upcoming one-to-one appointments.
+        - Anyone who sees the colleague on Staff availability can read this: the colleague themselves,
+          their Team Leaders, Project Editors of their Projects and Organisation Admins. Anyone else in
+          the Organisation gets `403`; an Organisation you aren't in returns `404`.
+        - `can_edit` says whether you may change the caps.
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The colleague's caps and usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColleagueCapacity'
+              example:
+                user_id: 812
+                charity_id: 123
+                max_per_day: 4
+                max_per_week: 15
+                max_one_to_one_contacts: 12
+                can_edit: true
+                usage:
+                  appointments_today: 2
+                  appointments_this_week: 11
+                  ongoing_one_to_one_contacts: 9
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You can't see this colleague on Staff availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "forbidden"
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Staff Capacity]
+      summary: Set a colleague's capacity
+      operationId: updateColleagueCapacity
+      description: |
+        Sets a colleague's capacity caps in one Organisation, as **Edit capacity** on the Staff
+        availability page does. Only the caps you send change; send `null` to remove a limit. Whole
+        numbers from 0 to 1000.
+
+        Only an **Organisation Admin**, or a **Team Leader** of a Team the colleague is in, may set them.
+        A colleague can't set their own (`403`).
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                max_per_day:
+                  type: integer
+                  nullable: true
+                  description: Maximum appointments a day
+                max_per_week:
+                  type: integer
+                  nullable: true
+                  description: Maximum appointments a week
+                max_one_to_one_contacts:
+                  type: integer
+                  nullable: true
+                  description: Maximum ongoing one-to-one Contacts
+            example:
+              max_per_day: 4
+              max_per_week: null
+              max_one_to_one_contacts: 12
+      responses:
+        "200":
+          description: The colleague's caps and usage, as **Get a colleague's capacity** returns them
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColleagueCapacity'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You are not an Organisation Admin or a Team Leader of a Team the colleague is in, or this is your own capacity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only a Charity Editor, or a Team Leader of a Team the colleague is in, can change their capacity."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /users/{user_id}/unavailabilities:
     parameters:
       - name: user_id
@@ -23599,6 +23721,41 @@ components:
           type: string
           nullable: true
           description: Why it can't be deleted yet, or null
+
+    ColleagueCapacity:
+      type: object
+      description: A colleague's capacity caps in one Organisation, and how much they have taken on.
+      properties:
+        user_id:
+          type: integer
+        charity_id:
+          type: integer
+        max_per_day:
+          type: integer
+          nullable: true
+          description: Maximum appointments a day, or null for no limit
+        max_per_week:
+          type: integer
+          nullable: true
+          description: Maximum appointments a week, or null for no limit
+        max_one_to_one_contacts:
+          type: integer
+          nullable: true
+          description: Maximum Contacts with an upcoming one-to-one appointment with them, or null for no limit
+        can_edit:
+          type: boolean
+          description: Whether you may change the caps
+        usage:
+          type: object
+          properties:
+            appointments_today:
+              type: integer
+            appointments_this_week:
+              type: integer
+              description: Monday to Sunday, in the Organisation's timezone
+            ongoing_one_to_one_contacts:
+              type: integer
+              description: Distinct guests of their upcoming one-to-one appointments
 
     EventFormatInput:
       type: object

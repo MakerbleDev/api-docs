@@ -964,6 +964,7 @@ function buildDocsPage() {
         <div class="nav-section-label">Events</div>
         <a href="#events"          class="nav-link"><span class="nav-method method-GET">GET</span>Events</a>
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
+        <a href="#staff-capacity" class="nav-link"><span class="nav-method method-PATCH">PATCH</span>Staff Capacity</a>
         <a href="#staff-unavailability" class="nav-link"><span class="nav-method method-POST">POST</span>Staff Unavailability</a>
       </div>
       <div class="nav-section">
@@ -3793,6 +3794,38 @@ function buildDocsPage() {
       </section>
 
       <!-- Event Formats -->
+      <section class="section" id="staff-capacity">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Staff Capacity</h2>
+        <div class="section-desc">
+          <p>How much a colleague can take on in an Organisation: maximum appointments a day and a week, and maximum ongoing one-to-one Contacts (Contacts with an upcoming one-to-one appointment with them). A blank (<code>null</code>) cap means no limit. It appears in the Capacity column of the Staff availability page.</p>
+          <p>An appointment is an event whose Event Format has an <code>appointment_type</code>, where the colleague is an Event Worker. <code>usage</code> counts today's and this week's appointments, Monday to Sunday in the Organisation's timezone, and the colleague's ongoing one-to-one Contacts.</p>
+          <p>Anyone who sees the colleague on Staff availability can read their capacity: the colleague themselves, their Team Leaders, Project Editors of their Projects and Organisation Admins. Only Organisation Admins, and Team Leaders of a Team the colleague is in, can change it, and nobody can change their own.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/users/{user_id}/capacity", "Get a colleague's capacity", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "max_per_day, max_per_week, max_one_to_one_contacts, can_edit and usage" },
+            { code: "403", cls: "response-4xx", desc: "You can't see this colleague on Staff availability" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Organisation you are not in" }
+          ])}
+          ${endpointCard("PATCH", "/users/{user_id}/capacity", "Set a colleague's capacity", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation" },
+            { name: "max_per_day", in: "body", type: "integer", required: false, desc: "Maximum appointments a day, or null for no limit" },
+            { name: "max_per_week", in: "body", type: "integer", required: false, desc: "Maximum appointments a week, or null for no limit" },
+            { name: "max_one_to_one_contacts", in: "body", type: "integer", required: false, desc: "Maximum ongoing one-to-one Contacts, or null for no limit" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Saved — returns the caps and usage" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin or a Team Leader of the colleague, or your own capacity" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "A cap is not a whole number from 0 to 1000" }
+          ])}
+        </div>
+      </section>
+
       <section class="section" id="staff-unavailability">
         <div class="section-eyebrow">Events</div>
         <h2 class="section-title">Staff Unavailability</h2>
