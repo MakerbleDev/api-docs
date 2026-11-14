@@ -837,6 +837,31 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /announcements/facts:
+    get:
+      tags: [Announcements]
+      summary: List Announcement Facts
+      description: |
+        The named facts an announcement's `audience_rules` can use, such as
+        `distance_travelled_not_set_up` (the person's organisation hasn't set up Distance Travelled), each
+        with what it means and the params it takes. A fact about a person's organisations takes `across`:
+        for someone in several organisations, whether it must hold for any one of them
+        (`any_organisation`, the default), every one (`all_organisations`) or the oldest one they belong
+        to (`first_organisation`). Facts are written in Makerble's code, so this list only changes with a
+        release. System Access users only; anyone else gets 403.
+      operationId: listAnnouncementFacts
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Every fact, on one page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAnnouncementFacts'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
   /announcements/{id}:
     parameters:
       - name: id
@@ -16301,7 +16326,36 @@ components:
           description: |
             `everyone`: every signed-in user. `colleagues`: everyone except Contacts with a login
             (active participants). `administrators`: Organisation Admins of at least one organisation.
-            Ignored for a place's announcement, which is always for the colleagues there.
+            Ignored for a place's announcement, which is always for the colleagues there. Ignored too
+            when `roles` has any.
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [organisation_admin, editor, reporter, observer, team_leader, active_participant, survey_portal_user]
+          description: |
+            Makerble's own only (System Access users). Narrows who sees it to anyone holding at least one
+            of these roles, in place of `audience`: `organisation_admin` (Organisation Admin), `editor`
+            (Workspace editor, Project Editor), `reporter`, `observer` (of an Organisation or a
+            Workspace), `team_leader`, `active_participant` (Contact with a login) and
+            `survey_portal_user`. Contacts with a login and Survey Portal users are left out unless their
+            own role is listed, even when they hold another. An empty list (the default) leaves it to
+            `audience`. Sent, it replaces the list.
+        audience_rules:
+          type: object
+          additionalProperties: true
+          description: |
+            Makerble's own only (System Access users). Behaviour rules: a JSON expression over the named
+            facts from List Announcement Facts, saying who sees it beyond its audience or roles, e.g.
+            only people whose organisation hasn't set up Distance Travelled. Each rule is exactly one of
+            `{"fact": key, "params": {...}}` (params optional), `{"all": [rules]}`, `{"any": [rules]}`
+            or `{"not": rule}`; at most 5 deep and 10 facts. `{}` (the default) means no rules. An
+            unknown fact, param or shape is refused with 422, naming the rule.
+          example:
+            all:
+              - fact: distance_travelled_not_set_up
+                params:
+                  across: all_organisations
         starts_on:
           type: string
           format: date
@@ -16323,6 +16377,46 @@ components:
             sent are replaced. People see at most one Makerble announcement a day, so this keeps
             announcements from queuing behind each other. Use it to schedule a feature's announcement
             once the feature is live on production.
+    AnnouncementFact:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 'What a rule names, e.g. `{"fact": "distance_travelled_not_set_up"}`'
+        label:
+          type: string
+          description: Completes "people ..." in Site Overview's "Who sees this"
+        description:
+          type: string
+        params:
+          type: object
+          description: Each param by name, with the values it accepts, its default and what it means
+          additionalProperties:
+            type: object
+            properties:
+              values:
+                type: array
+                items:
+                  type: string
+              default:
+                type: string
+              description:
+                type: string
+    PaginatedAnnouncementFacts:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnnouncementFact'
     Announcement:
       type: object
       properties:
@@ -16367,6 +16461,15 @@ components:
         audience:
           type: string
           enum: [everyone, colleagues, administrators]
+        roles:
+          type: array
+          items:
+            type: string
+          description: The roles that narrow who sees it, in place of `audience`; empty for none. See Create an Announcement.
+        audience_rules:
+          type: object
+          additionalProperties: true
+          description: Behaviour rules over named facts; `{}` for none. See Create an Announcement.
         starts_on:
           type: string
           format: date
