@@ -14842,7 +14842,11 @@ paths:
         page in the Makerble User Guide (`https://makerble.atlassian.net/wiki/spaces/MCPD/...`); and a
         `vimeo_url` that is empty or one of `https://vimeo.com/<id>`, `https://vimeo.com/<id>/<hash>`
         (unlisted videos) or `https://player.vimeo.com/video/<id>?h=<hash>`. An empty `vimeo_url` puts the
-        page back to its fallback visual. A broken rule answers `422` with every message in `errors`.
+        page back to its fallback visual.
+
+        `storyboard` is the Intro's animation, drawn from Makerble building blocks when there is no Vimeo
+        link (see `GuidancePanelStoryboard` for its rules). Send it as an object, or `null` to remove it.
+        A broken rule answers `422` with every message in `errors`.
       operationId: updateGuidancePanel
       security: [{tokenAuth: []}]
       requestBody:
@@ -23951,6 +23955,86 @@ components:
         name:
           type: string
 
+    GuidancePanelStoryboardStep:
+      type: object
+      description: |
+        One step of an Intro animation. Steps play in order, evenly spread across the loop.
+
+        - `appear` puts a building block on the stage: `block` (required), and optionally an `id` that later
+          steps target, a `text` label and, for a `chart_bar` only, a `value` from 0 to 100 (required for it).
+        - `move_cursor`, `click`, `highlight` and `check` act on the block whose `id` is `target`.
+        - `type` types `text` into the `field` whose `id` is `target`.
+        - `swap` replaces the label of the block whose `id` is `target` with `text`.
+        - `cut` clears the stage and starts a new scene; blocks from before it can't be targeted after it.
+      required: [type]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [appear, move_cursor, click, type, highlight, check, swap, cut]
+        block:
+          type: string
+          enum: [top_bar, sidebar_item, table_row, card, button, field, chip, avatar, chart_bar]
+        id:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,29}$'
+        target:
+          type: string
+          description: The `id` of a block that has appeared since the last `cut`
+        text:
+          type: string
+          maxLength: 40
+        value:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+
+    GuidancePanelStoryboard:
+      type: object
+      nullable: true
+      description: |
+        An Intro's animation: a short loop of Makerble building blocks drawn in the panel's module colour,
+        shown when there is no Vimeo link. Up to 8,000 characters of JSON.
+      required: [archetype, loop_seconds, alt, steps]
+      additionalProperties: false
+      properties:
+        archetype:
+          type: string
+          enum: [assemble, flow, concept]
+          description: >-
+            `assemble`: the parts of a page of the feature come together. `flow`: a short walkthrough of using
+            the feature. `concept`: an animated metaphor for the idea behind it.
+        loop_seconds:
+          type: integer
+          minimum: 4
+          maximum: 20
+        alt:
+          type: string
+          minLength: 10
+          maxLength: 250
+          description: What the animation shows, read out by screen readers
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 24
+          items:
+            $ref: '#/components/schemas/GuidancePanelStoryboardStep'
+      example:
+        archetype: flow
+        loop_seconds: 12
+        alt: "A coworker clicks Create a contact, types the contact's name, clicks Save and the contact appears in the list."
+        steps:
+          - { type: appear, block: button, id: create, text: "Create a contact" }
+          - { type: click, target: create }
+          - { type: cut }
+          - { type: appear, block: field, id: name, text: "Name" }
+          - { type: type, target: name, text: "Amira Patel" }
+          - { type: cut }
+          - { type: appear, block: table_row, id: amira, text: "Amira Patel" }
+          - { type: check, target: amira }
+
+
     GuidancePanel:
       type: object
       description: |
@@ -23990,14 +24074,16 @@ components:
         vimeo_url:
           type: string
           nullable: true
+        storyboard:
+          $ref: '#/components/schemas/GuidancePanelStoryboard'
         fallback_visual:
           type: string
           nullable: true
           description: The CSS animation, or the page's current image, shown when there is no Vimeo link
         visual:
           type: string
-          enum: [vimeo, animation, image, none]
-          description: What the panel shows beside its text now
+          enum: [vimeo, storyboard, animation, image, none]
+          description: What the panel shows beside its text now. A Vimeo link wins over a storyboard, and a storyboard over the fallback visual
         updated_at:
           type: string
           format: date-time
@@ -24063,6 +24149,8 @@ components:
               type: string
             vimeo_url:
               type: string
+            storyboard:
+              $ref: '#/components/schemas/GuidancePanelStoryboard'
 
     PaginatedGuidancePanels:
       allOf:
