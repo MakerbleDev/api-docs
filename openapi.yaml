@@ -566,6 +566,132 @@ paths:
               example:
                 error: This colleague has been sent 3 new links in the last hour. Try again later.
 
+  /users/{id}/specialisms:
+    get:
+      tags: [Users]
+      summary: List a colleague's Specialisms in an organisation
+      description: |
+        A colleague's Specialisms (Skills) in one organisation, as the Specialisms box on their
+        profile shows them. A colleague in several organisations has separate Specialisms in each.
+        Any member of the organisation can list them; `can_change` says whether you may change them.
+        The organisation must have Specialisms turned on. `charity_id` may be left out when you
+        belong to one organisation.
+      operationId: listUserSpecialisms
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: charity_id
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The colleague's Specialisms in the organisation, by name
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ColleagueSpecialisms' }
+              example:
+                user_id: 237
+                charity_id: 12
+                can_change: true
+                data:
+                  - id: 31
+                    name: Eating disorders
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Users]
+      summary: Add Specialisms to a colleague
+      description: |
+        Adds some of the organisation's Specialisms (Skills) to a colleague's. The colleague, a Team
+        Leader of one of their Teams in the organisation, or an Organisation Editor can do this.
+        Specialisms they already have are left as they are.
+      operationId: addUserSpecialisms
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skill_ids]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation. May be left out when you belong to one organisation.
+                skill_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Specialisms of that organisation, from GET /skills. Others are ignored.
+            example:
+              charity_id: 12
+              skill_ids: [31]
+      responses:
+        "201":
+          description: The colleague's Specialisms in the organisation, after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ColleagueSpecialisms' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You aren't allowed to make this change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Users]
+      summary: Remove Specialisms from a colleague
+      description: |
+        Removes some of the organisation's Specialisms (Skills) from a colleague's. The colleague, a
+        Team Leader of one of their Teams in the organisation, or an Organisation Editor can do this.
+      operationId: removeUserSpecialisms
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skill_ids]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation. May be left out when you belong to one organisation.
+                skill_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Specialisms of that organisation, from GET /skills. Others are ignored.
+            example:
+              charity_id: 12
+              skill_ids: [31]
+      responses:
+        "200":
+          description: The colleague's Specialisms in the organisation, after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ColleagueSpecialisms' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You aren't allowed to make this change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
   /users/permissions:
     get:
       tags: [Users]
@@ -3775,17 +3901,22 @@ paths:
   /beneficiaries/bulk_required_skills:
     post:
       tags: [Beneficiaries]
-      summary: Add Skills to many Contacts' Skills Required, or remove them
+      summary: Add Specialisms to many Contacts' specialist needs, or remove them
       description: |
-        Adds some of the organisation's Skills to many Contacts' (Beneficiaries') **Skills Required**
-        and removes others, in one request. This is **Add or remove › Skills Required** for the
-        Contacts selected on the Manage Contacts page. Each change is made as in the Skills Required
-        box on a Contact's profile.
+        Adds some of the organisation's Specialisms (Skills) to what many Contacts (Beneficiaries)
+        **need a specialist in** (Skills Required), and removes others, in one request. This is
+        **Add or remove › Specialist needs** for the Contacts selected on the Manage Contacts page.
+        Each change is made as in the "Needs a specialist in" box on a Contact's profile.
 
-        **Which Skills.** `add_ids` and `remove_ids` are ids from `GET /skills`. Give at least one,
-        and never the same Skill in both. A Contact who already requires a Skill being added, or
-        doesn't require one being removed, is left as they are. Anyone who can see a Contact may add
-        a Skill; only Organisation Editors may remove one.
+        **Which Specialisms.** `add_ids` and `remove_ids` are ids from `GET /skills`. Give at least
+        one, and never the same Specialism in both. A Contact who already needs one being added, or
+        doesn't need one being removed, is left as they are. Anyone who can see a Contact may add a
+        Specialism; only Organisation Editors may remove one. Needs added here are Essential unless
+        `importance` is `desirable`.
+
+        **Needs from form answers.** Only needs added by hand are added and removed here. A need a
+        Contact has because of an answer in their Contact form (see `POST /skills/{id}/linked_answers`)
+        stays until the answer changes, and a Specialism can be added by hand alongside it.
 
         **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
         `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
@@ -3811,11 +3942,16 @@ paths:
                 add_ids:
                   type: array
                   items: { type: integer }
-                  description: Skills to add to every Contact's Skills Required
+                  description: Specialisms to add to what every Contact needs a specialist in
                 remove_ids:
                   type: array
                   items: { type: integer }
-                  description: Skills to remove from every Contact's Skills Required
+                  description: Specialisms to remove from what every Contact needs a specialist in
+                importance:
+                  type: string
+                  enum: [essential, desirable]
+                  default: essential
+                  description: How much the Contacts need the Specialisms being added
                 beneficiary_ids:
                   type: array
                   maxItems: 500
@@ -3863,12 +3999,14 @@ paths:
   /skills:
     get:
       tags: [Beneficiaries]
-      summary: List the organisation's Skills
+      summary: List the organisation's Specialisms (Skills)
       description: |
-        The organisation's Skills, e.g. "First aid", as offered in the Skills Required box on a
-        Contact's profile. Use an `id` with `POST /beneficiaries/bulk_required_skills`. Any member of
-        the organisation can list them. `charity_id` may be left out when the user belongs to one
-        organisation.
+        The organisation's Specialisms (Skills), e.g. "Eating disorders", as offered in the "Needs a
+        specialist in" box on a Contact's profile and the Specialisms box on a colleague's profile.
+        Use an `id` with `POST /beneficiaries/bulk_required_skills` or `POST /users/{id}/specialisms`.
+        Each one lists its `linked_answers`: the Contact form answers that make a Contact need it
+        (see `POST /skills/{id}/linked_answers`). Any member of the organisation can list them.
+        `charity_id` may be left out when the user belongs to one organisation.
       operationId: listSkills
       security: [{tokenAuth: []}]
       parameters:
@@ -3898,6 +4036,118 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /skills/{id}/linked_answers:
+    post:
+      tags: [Beneficiaries]
+      summary: Link a Specialism to answers in the Contact forms
+      description: |
+        Links a Specialism (Skill) to answers (Sub Ratios) of one dropdown question (Ratio Set) on the
+        organisation's Contact forms (Beneficiary Categories), as **Contacts who need this specialism**
+        on the Specialism's edit page does. Every Contact whose form records one of the answers then
+        needs a specialist in it, with the given `importance`, and stops needing it when the answer
+        changes. Contacts are updated in the background, which can take a few minutes for a large
+        organisation; the user who made the change gets a notification when it's done.
+
+        `ratio_set_id` must be a question on one of the organisation's Contact forms
+        (`GET /beneficiary_categories/current_fields` lists them), and `sub_ratio_ids` its answers
+        (`GET /sub_ratios?ratio_set_ids[]=`). Linking an answer that is already linked changes its
+        importance. Only Organisation Editors can do this.
+      operationId: linkSkillToAnswers
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ratio_set_id, sub_ratio_ids]
+              properties:
+                ratio_set_id:
+                  type: integer
+                  description: The dropdown question, e.g. Presenting issue
+                sub_ratio_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Its answers to link, e.g. Anorexia
+                importance:
+                  type: string
+                  enum: [essential, desirable]
+                  default: essential
+                  description: How much Contacts matched this way need the Specialism
+            example:
+              ratio_set_id: 812
+              sub_ratio_ids: [4410, 4411]
+              importance: essential
+      responses:
+        "201":
+          description: The answers are linked; Contacts are being updated in the background
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SkillLinkedAnswers' }
+              example:
+                id: 31
+                name: Eating disorders
+                linked_answers:
+                  - ratio_set_id: 812
+                    sub_ratio_ids: [4410, 4411]
+                    importance: essential
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You aren't allowed to make this change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+    delete:
+      tags: [Beneficiaries]
+      summary: Unlink answers from a Specialism
+      description: |
+        Removes the link between a Specialism (Skill) and some answers in the Contact forms. Contacts
+        who needed it only because of those answers stop needing it; needs added by hand stay.
+        Contacts are updated in the background. Only Organisation Editors can do this.
+      operationId: unlinkSkillAnswers
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sub_ratio_ids]
+              properties:
+                sub_ratio_ids:
+                  type: array
+                  items: { type: integer }
+                  description: The answers to unlink
+            example:
+              sub_ratio_ids: [4411]
+      responses:
+        "200":
+          description: The answers are unlinked; Contacts are being updated in the background
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SkillLinkedAnswers' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You aren't allowed to make this change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: forbidden
+        "404":
+          $ref: '#/components/responses/NotFound'
   /relationship_categories:
     get:
       tags: [Beneficiaries]
@@ -19298,6 +19548,10 @@ components:
                 type: string
               description: Built-in fields (`dob`, `mobile`, `email`, `address`) hidden from you by Field Visibility; each is returned as null
               example: ["mobile"]
+            required_skills:
+              type: array
+              description: What the Contact needs a specialist in, each Essential or Desirable, added by hand or from a form answer
+              items: { $ref: '#/components/schemas/RequiredSkill' }
 
     BeneficiaryCreateRequest:
       type: object
@@ -19376,14 +19630,81 @@ components:
 
     Skill:
       type: object
-      description: A Skill of the organisation
+      description: A Specialism (Skill) of the organisation
       properties:
         id: { type: integer }
         name:
           type: string
-          description: The Skill's name, e.g. First aid
+          description: The Specialism's name, e.g. Eating disorders
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+        linked_answers:
+          type: array
+          description: The Contact form answers that make a Contact need this Specialism
+          items: { $ref: '#/components/schemas/SkillLinkedAnswer' }
+
+    SkillLinkedAnswer:
+      type: object
+      description: |
+        Answers (Sub Ratios) of one dropdown question (Ratio Set) on the organisation's Contact forms.
+        A Contact whose form records any of them needs a specialist in the Specialism, with this importance.
+      properties:
+        ratio_set_id:
+          type: integer
+          description: The dropdown question
+        sub_ratio_ids:
+          type: array
+          items: { type: integer }
+          description: Its answers that are linked
+        importance:
+          type: string
+          enum: [essential, desirable]
+
+    SkillLinkedAnswers:
+      type: object
+      description: A Specialism (Skill) and the Contact form answers linked to it
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        linked_answers:
+          type: array
+          items: { $ref: '#/components/schemas/SkillLinkedAnswer' }
+
+    RequiredSkill:
+      type: object
+      description: Something a Contact needs a specialist in (a Skill Required)
+      properties:
+        id: { type: integer }
+        skill_id:
+          type: integer
+          description: The Specialism (Skill)
+        name:
+          type: string
+          description: The Specialism's name
+        importance:
+          type: string
+          enum: [essential, desirable]
+        source:
+          type: string
+          enum: [manual, form_answer]
+          description: "`manual`: added by hand. `form_answer`: from an answer in the Contact's form; it goes when the answer changes. A Contact can have both for one Specialism."
+
+    ColleagueSpecialisms:
+      type: object
+      description: A colleague's Specialisms (Skills) in one organisation
+      properties:
+        user_id: { type: integer }
+        charity_id: { type: integer }
+        can_change:
+          type: boolean
+          description: Whether you may add or remove them
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
 
     RelationshipCategory:
       type: object
