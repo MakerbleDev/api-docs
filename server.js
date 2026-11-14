@@ -978,6 +978,7 @@ function buildDocsPage() {
         <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
         <a href="#usage"           class="nav-link"><span class="nav-method method-GET">GET</span>Usage</a>
+        <a href="#setup-guide"     class="nav-link"><span class="nav-method method-GET">GET</span>Setup guide</a>
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
         <a href="#wishlist"        class="nav-link"><span class="nav-method method-POST">POST</span>Wishlist</a>
         <a href="#welcome-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Welcome Tours</a>
@@ -4257,6 +4258,35 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "data: the 12 months before this one, newest first, each with its currency, charge and usage (quantity, allowance, charge and waived per usage type)" },
             { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Setup guide -->
+      <section class="section" id="setup-guide">
+        <div class="section-eyebrow">Organisation</div>
+        <h2 class="section-title">Setup guide</h2>
+        <div class="section-desc">
+          <p>An Organisation's Setup guide: the main things to set up in Makerble, how far each has got and whether it is done. This is the <strong>Setup guide</strong> page, under <strong>Help › Setup guide</strong>. Makerble ticks each item off when it sees it done, and once done an item stays done; <code>progress</code> always shows the current picture in words, for example "3 of 5 workspaces".</p>
+          <p>Items (<code>key</code>): <code>teams</code> (only for Organisations with 11 or more staff), <code>workspaces</code>, <code>welcome_tour</code>, <code>checklists</code>, and under "Automate your reporting" (<code>section</code>): <code>reporting_requirements</code>, <code>demographics</code> and <code>metrics</code>. Closed Workspaces, and the one Makerble creates with the Organisation, never count. An item marked "Not relevant to us" leaves <code>total_count</code>; <code>finished</code> is <code>true</code> once every item is done or not relevant.</p>
+          <p>Only the Organisation's Organisation Admins and Makerble staff can use it, and only while the Setup guide is switched on for the Organisation (it is on for Organisations created since it was released). Anyone else gets <code>403</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/organisations/{organisation_id}/setup_guide", "Get an Organisation's Setup guide", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "organisation_id, done_count, total_count, finished, and data: each item's key, title, section, progress, done_when, done and not_relevant" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of this Organisation, or its Setup guide is switched off" },
+            { code: "404", cls: "response-4xx", desc: "No such Organisation" }
+          ])}
+          ${endpointCard("PATCH", "/organisations/{organisation_id}/setup_guide/items/{item_key}", "Mark a Setup guide item Not relevant, or undo it", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "item_key", in: "path", type: "string", required: true, desc: "The item's <code>key</code>, e.g. <code>checklists</code>" },
+            { name: "not_relevant", in: "body", type: "boolean", required: true, desc: "<code>true</code> marks it Not relevant to us (recording who and when); <code>false</code> is Undo. Whether it is done is unchanged." }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The whole Setup guide after the change" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of this Organisation, or its Setup guide is switched off" },
+            { code: "422", cls: "response-4xx", desc: "No such item, or not_relevant isn't true or false" }
           ])}
         </div>
       </section>
