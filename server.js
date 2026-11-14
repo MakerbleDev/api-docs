@@ -1525,6 +1525,34 @@ function buildDocsPage() {
             { code: "422", cls: "response-4xx", desc: "They have already set their password" },
             { code: "429", cls: "response-4xx", desc: "They have been sent 3 new links in the last hour" }
           ], "Sends a new invitation to someone shown as <b>Invited, not yet accepted</b> on Manage Colleagues, as its <b>Resend invitation</b> button does. Makerble never emails a password: the invitation has a link where they set their own. The new link stops the earlier one working.")}
+          ${endpointCard("GET", "/users/{id}/specialisms", "List a colleague's Specialisms in an organisation", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The colleague's User ID" },
+            { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{user_id, charity_id, can_change, data: [{id, name}]}</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in, a colleague who isn't in it, or Specialisms turned off" }
+          ], "As the <b>Specialisms</b> box on a colleague's profile. A colleague in several organisations has separate Specialisms in each. Any member of the organisation can list them; <code>can_change</code> says whether you may change them.")}
+          ${endpointCard("POST", "/users/{id}/specialisms", "Add Specialisms to a colleague", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The colleague's User ID" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "skill_ids", in: "body", type: "integer[]", required: true, desc: "Specialisms of that organisation, from <code>GET /skills</code>. Others are ignored" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The colleague's Specialisms in the organisation, after the change" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't the colleague, a Team Leader of one of their Teams there, or an Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in, or a colleague who isn't in it" }
+          ], "The colleague, a Team Leader of one of their Teams in the organisation, or an Organisation Editor can add them.")}
+          ${endpointCard("DELETE", "/users/{id}/specialisms", "Remove Specialisms from a colleague", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The colleague's User ID" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "skill_ids", in: "body", type: "integer[]", required: true, desc: "Specialisms of that organisation to remove" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The colleague's Specialisms in the organisation, after the change" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't the colleague, a Team Leader of one of their Teams there, or an Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in, or a colleague who isn't in it" }
+          ], "The colleague, a Team Leader of one of their Teams in the organisation, or an Organisation Editor can remove them.")}
           ${endpointCard("POST", "/users", "Create a new User", false, [], [
             { code: "200", cls: "response-2xx", desc: "User created — returns id and email" },
             { code: "422", cls: "response-4xx", desc: "Validation failed (check password requirements)" }
@@ -1746,9 +1774,10 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
             { code: "422", cls: "response-4xx", desc: "Nothing to add or remove, an Audience of another organisation, a bad <code>start_date</code>, or you aren't a colleague in the organisation" }
           ], "<strong>Add or remove › Audiences</strong> for the Contacts selected on the Manage Contacts page. Ending an Audience sets its end date to today rather than deleting it, so it stays in the Contact's history. Contacts whose Audience you may not end are skipped (<code>skip_counts.not_allowed_to_end</code>).")}
-          ${endpointCard("POST", "/beneficiaries/bulk_required_skills", "Add Skills to many Contacts' Skills Required, or remove them", true, [
-            { name: "add_ids", in: "body", type: "integer[]", required: false, desc: "Skills to add, from <code>GET /skills</code>" },
-            { name: "remove_ids", in: "body", type: "integer[]", required: false, desc: "Skills to remove. Only Organisation Editors may remove one" },
+          ${endpointCard("POST", "/beneficiaries/bulk_required_skills", "Add Specialisms to many Contacts' specialist needs, or remove them", true, [
+            { name: "add_ids", in: "body", type: "integer[]", required: false, desc: "Specialisms (Skills) to add, from <code>GET /skills</code>" },
+            { name: "remove_ids", in: "body", type: "integer[]", required: false, desc: "Specialisms to remove. Only Organisation Editors may remove one" },
+            { name: "importance", in: "body", type: "string", required: false, desc: "<code>essential</code> (default) or <code>desirable</code>, for the Specialisms being added" },
             { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
             { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts to change, at most 500. Leave out to choose them with <code>filter_data</code>" },
             { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts" },
@@ -1758,18 +1787,39 @@ function buildDocsPage() {
             { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: the change runs in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
-            { code: "422", cls: "response-4xx", desc: "Nothing to add or remove, or a Skill of another organisation" }
-          ], "<strong>Add or remove › Skills Required</strong> for the Contacts selected on the Manage Contacts page, as the Skills Required box on a Contact's profile does. Anyone who can see a Contact may add a Skill; for anyone but an Organisation Editor, a removal skips the Contact (<code>skip_counts.not_allowed_to_remove</code>).")}
-          ${endpointCard("GET", "/skills", "List the organisation's Skills", true, [
+            { code: "422", cls: "response-4xx", desc: "Nothing to add or remove, a Specialism of another organisation, or an unknown <code>importance</code>" }
+          ], "<strong>Add or remove › Specialist needs</strong> for the Contacts selected on the Manage Contacts page, as the <b>Needs a specialist in</b> box on a Contact's profile does. Anyone who can see a Contact may add a Specialism; for anyone but an Organisation Editor, a removal skips the Contact (<code>skip_counts.not_allowed_to_remove</code>). Only needs added by hand are changed: a need from a Contact form answer stays until the answer changes.")}
+          ${endpointCard("GET", "/skills", "List the organisation's Specialisms (Skills)", true, [
             { name: "charity_id", in: "query", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
             { name: "page", in: "query", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", in: "query", type: "integer", required: false, desc: "Default 10, max 200" },
-            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only Skills changed since then" }
+            { name: "last_synced_datetime", in: "query", type: "string", required: false, desc: "Only Specialisms changed since then" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each Skill's <code>id</code> and <code>name</code>, by name, in the paginated envelope" },
+            { code: "200", cls: "response-2xx", desc: "<code>data</code>: each Specialism's <code>id</code>, <code>name</code> and <code>linked_answers</code> (<code>[{ratio_set_id, sub_ratio_ids, importance}]</code>), by name, in the paginated envelope" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" }
-          ], "Skills, e.g. First aid. Use an <code>id</code> with <code>POST /beneficiaries/bulk_required_skills</code>.")}
+          ], "Specialisms, e.g. Eating disorders. Use an <code>id</code> with <code>POST /beneficiaries/bulk_required_skills</code> or <code>POST /users/{id}/specialisms</code>. <code>linked_answers</code> are the Contact form answers that make a Contact need it.")}
+          ${endpointCard("POST", "/skills/{id}/linked_answers", "Link a Specialism to answers in the Contact forms", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Specialism (Skill)" },
+            { name: "ratio_set_id", in: "body", type: "integer", required: true, desc: "A dropdown question on one of the organisation's Contact forms, e.g. Presenting issue" },
+            { name: "sub_ratio_ids", in: "body", type: "integer[]", required: true, desc: "Its answers to link, e.g. Anorexia, from <code>GET /sub_ratios</code>" },
+            { name: "importance", in: "body", type: "string", required: false, desc: "<code>essential</code> (default) or <code>desirable</code>, for Contacts matched this way" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>{id, name, linked_answers}</code>. Contacts are updated in the background" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "A Specialism of an organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "A question that isn't on the organisation's Contact forms, no answers, or an unknown <code>importance</code>" }
+          ], "As <b>Contacts who need this specialism</b> on the Specialism's edit page. Every Contact whose form records one of the answers then needs a specialist in it, and stops needing it when the answer changes. Contacts are updated in the background; the user gets a notification when it's done. Linking an answer that's already linked changes its importance.")}
+          ${endpointCard("DELETE", "/skills/{id}/linked_answers", "Unlink answers from a Specialism", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Specialism (Skill)" },
+            { name: "sub_ratio_ids", in: "body", type: "integer[]", required: true, desc: "The answers to unlink" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{id, name, linked_answers}</code>. Contacts are updated in the background" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You aren't an Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "A Specialism of an organisation you aren't in" }
+          ], "Contacts who needed the Specialism only because of those answers stop needing it. Needs added by hand stay.")}
           ${endpointCard("POST", "/beneficiaries/bulk_type", "Change the Type of many Contacts", true, [
             { name: "beneficiary_type_id", in: "body", type: "integer", required: true, desc: "The Contact Type to change every Contact to, from <code>GET /beneficiary_types</code>" },
             { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
