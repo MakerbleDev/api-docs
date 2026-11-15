@@ -982,6 +982,7 @@ function buildDocsPage() {
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
         <a href="#wishlist"        class="nav-link"><span class="nav-method method-POST">POST</span>Wishlist</a>
         <a href="#welcome-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Welcome Tours</a>
+        <a href="#feature-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Feature Tours</a>
         <a href="#training-materials" class="nav-link"><span class="nav-method method-POST">POST</span>Training Materials</a>
       </div>
       <div class="nav-section">
@@ -4516,6 +4517,53 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Neither photo_skippable nor watch_skippable sent" }
           ], "Send either setting or both.")}
+        </div>
+      </section>
+
+      <!-- Feature Tours -->
+      <section class="section" id="feature-tours">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Feature Tours</h2>
+        <div class="section-desc">
+          <p>A feature tour is a short guided tour that introduces one feature to people who already use Makerble. Unlike a Welcome Tour it belongs to no Organisation: Makerble staff write it once. A <code>live</code> tour with a <code>page_key</code> is offered by "Take the tour" on that page's Intro (the Show/Hide Guidance panel at the top of a Manage page, such as <code>contacts</code>); each Intro has at most one live tour. <code>auto_prompt</code> offers it once, the first time someone opens its page.</p>
+          <p>Each stop is one of the stops Welcome Tours use, named by <code>stop_key</code>, and shows Makerble's <code>default_title</code> and <code>default_body</code> unless it has its own <code>title</code> or <code>body</code>. System Access users (Makerble staff) only; anyone else gets <code>403</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/feature_tours", "List feature tours", true, [
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated feature tours, each with its stops in order" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
+          ])}
+          ${endpointCard("GET", "/feature_tours/{id}", "Get a feature tour", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Feature tour ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The feature tour with its stops" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+          ${endpointCard("POST", "/feature_tours", "Create a feature tour", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Feature tour created (a draft unless <code>status</code> is <code>live</code>)" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. a key already taken, an unknown page_key or stop_key, or live with no stops" }
+          ], "Body: <code>key</code> (unique, lowercase words joined by underscores), <code>name</code>, <code>status</code>, <code>page_key</code>, <code>auto_prompt</code>, <code>stops: [{stop_key, position, title, body}]</code>.")}
+          ${endpointCard("PATCH", "/feature_tours/{id}", "Update a feature tour", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Feature tour ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Feature tour updated" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. live with no stops, or a second live tour on the same Intro" }
+          ], "Only the fields sent change. A stop with an <code>id</code> is changed, one without is added, and <code>_destroy: true</code> removes it. An empty <code>title</code> or <code>body</code> shows Makerble's default.")}
+          ${endpointCard("DELETE", "/feature_tours/{id}", "Delete a feature tour", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Feature tour ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Deleted, with its stops and everyone's progress through it" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
         </div>
       </section>
 

@@ -163,6 +163,8 @@ tags:
     description: The primary organisational unit — every Story and Case belongs to a Project
   - name: Welcome Tours
     description: Guided tours of Makerble's own pages for new colleagues; Organisation Admins choose each team's stops, wording and how strict they are, and see who has finished
+  - name: Feature Tours
+    description: Short tours introducing one feature to people who already use Makerble, offered from a page's Intro or an announcement; written by Makerble staff
   - name: Staff Unavailability
     description: When colleagues can't work for an Organisation (leave, sickness, training), as on the Staff availability page
   - name: Staff Capacity
@@ -1370,6 +1372,155 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /feature_tours:
+    get:
+      tags: [Feature Tours]
+      summary: List feature tours
+      description: |
+        Lists feature tours: short tours that introduce one feature to people who already use Makerble. Unlike a
+        Welcome Tour, a feature tour belongs to no Organisation. A `live` tour with a `page_key` is offered by
+        "Take the tour" on that page's Intro (the Show/Hide Guidance panel at the top of a Manage page); each Intro
+        has at most one live tour. Each stop is one of the stops Welcome Tours use, named by `stop_key`, and shows
+        Makerble's `default_title` and `default_body` unless it has its own `title` or `body`.
+
+        System Access users (Makerble staff) only. Anyone else gets 403.
+      operationId: listFeatureTours
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated feature tours
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFeatureTours'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      tags: [Feature Tours]
+      summary: Create a feature tour
+      description: |
+        Creates a feature tour, as Site Overview › Feature Tours does. It is a `draft` (offered to nobody) until
+        `status` is `live`, which needs at least one stop. `key` is lowercase words joined by underscores and must
+        be unique. `page_key`, if sent, is the key of a page's Intro, such as `contacts` or `events`. Each stop's
+        `stop_key` is one of the stops Makerble knows (the `stop_key` values a Welcome Tour's stops use).
+        System Access users only.
+      operationId: createFeatureTour
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureTourInput'
+            example:
+              key: contacts_filters
+              name: Filters on Contacts
+              page_key: contacts
+              status: draft
+              auto_prompt: false
+              stops:
+                - stop_key: contacts_table
+                  position: 1
+                - stop_key: contacts_filters
+                  position: 2
+                  body: Filters let you see just the people you need.
+      responses:
+        "201":
+          description: The created feature tour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureTour'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /feature_tours/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Feature Tours]
+      summary: Get a feature tour
+      description: One feature tour with its stops in order. System Access users only.
+      operationId: getFeatureTour
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The feature tour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureTour'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Feature Tours]
+      summary: Update a feature tour
+      description: |
+        Changes only the fields sent. A stop with `_destroy: true` is removed, a stop with an `id` is changed and a
+        stop without one is added. A stop's empty `title` or `body` shows Makerble's default. A tour can't be
+        `live` without a stop, and only one live tour can use each `page_key`. System Access users only.
+      operationId: updateFeatureTour
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureTourInput'
+            example:
+              status: live
+              stops:
+                - id: 678
+                  title: Your caseload
+                - id: 679
+                  _destroy: true
+      responses:
+        "200":
+          description: The updated feature tour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureTour'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+    delete:
+      tags: [Feature Tours]
+      summary: Delete a feature tour
+      description: Deletes a feature tour, its stops and everyone's progress through it. System Access users only.
+      operationId: deleteFeatureTour
+      security: [{tokenAuth: []}]
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /tours/{id}/progress:
     parameters:
       - name: id
@@ -17556,6 +17707,118 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Tour'
+    FeatureTour:
+      type: object
+      description: A feature tour and its stops in order
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+          description: A unique name in lowercase words joined by underscores, used by announcements and agents
+        name:
+          type: string
+        status:
+          type: string
+          enum: [draft, live]
+        page_key:
+          type: string
+          nullable: true
+          description: The page whose Intro offers the tour with "Take the tour" while it is live; null for none
+        auto_prompt:
+          type: boolean
+          description: Whether the tour is offered once, the first time someone opens its page
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        stops:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeatureTourStop'
+    FeatureTourStop:
+      type: object
+      properties:
+        id:
+          type: integer
+        position:
+          type: integer
+        stop_key:
+          type: string
+          description: One of the stops Makerble knows, the same stops Welcome Tours use
+        stop_label:
+          type: string
+          nullable: true
+          description: Which part of which page the stop focuses on
+        action:
+          type: string
+          enum: [next, click, ""]
+          description: Whether the stop waits for Next or asks the person to click something
+        title:
+          type: string
+          nullable: true
+          description: The stop's own title; null shows `default_title`
+        body:
+          type: string
+          nullable: true
+          description: The stop's own wording; null shows `default_body`
+        default_title:
+          type: string
+          nullable: true
+          description: Makerble's title for this stop
+        default_body:
+          type: string
+          nullable: true
+          description: Makerble's wording for this stop
+    FeatureTourInput:
+      type: object
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [draft, live]
+        page_key:
+          type: string
+          nullable: true
+          description: The key of a page's Intro, such as contacts. Send null or "" for none.
+        auto_prompt:
+          type: boolean
+        stops:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                description: Changes this stop; leave it out to add a stop
+              position:
+                type: integer
+              stop_key:
+                type: string
+              title:
+                type: string
+                nullable: true
+                description: Up to 120 characters; empty means Makerble's default
+              body:
+                type: string
+                nullable: true
+                description: Up to 600 characters; empty means Makerble's default
+              _destroy:
+                type: boolean
+    PaginatedFeatureTours:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeatureTour'
     PaginatedTourProgress:
       allOf:
         - $ref: '#/components/schemas/PaginationEnvelope'
