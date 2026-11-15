@@ -17156,6 +17156,13 @@ components:
           description: >-
             For an Organisation's, Workspace's or Team's announcement: one of that Organisation's Training materials
             to link to. Send null to clear it.
+        feature_tour_id:
+          type: integer
+          nullable: true
+          description: >-
+            For one of Makerble's own announcements: a feature tour (from GET /feature_tours). While the tour is live,
+            the popup's button is "Take the tour", which starts it on its first page instead of showing `button_label`.
+            Send null to clear it.
         title:
           type: string
           maxLength: 90
@@ -17321,6 +17328,11 @@ components:
           description: >-
             One of the place's Organisation's Training materials that the announcement links to (shown only to
             colleagues it is shared with), or null
+        feature_tour_id:
+          type: integer
+          nullable: true
+          description: >-
+            The feature tour the popup's button starts with "Take the tour" while the tour is live, or null
         title:
           type: string
         body:
