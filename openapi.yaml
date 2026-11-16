@@ -18532,6 +18532,10 @@ components:
           description: Who answers it
           items:
             type: string
+        contact_mode:
+          type: string
+          enum: [one_contact, several_contacts]
+          description: How the survey is shown when someone tries it on a toolkit page, About one contact (`one_contact`) or for Several or no contacts (`several_contacts`)
         repeats_at_intervals:
           type: boolean
         validated:
@@ -21304,6 +21308,10 @@ components:
             intro_message:
               type: string
               nullable: true
+            contact_mode:
+              type: string
+              enum: [one_contact, several_contacts]
+              description: How the survey is shown when someone tries it on a toolkit page, About one contact (`one_contact`) or for Several or no contacts (`several_contacts`)
             current_fields:
               type: array
               items:
