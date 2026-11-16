@@ -2018,9 +2018,9 @@ function buildDocsPage() {
           ${endpointCard("GET", "/story_categories/{id}", "Get a Survey with full field detail", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Survey with current_fields, scale_indicator_choices, and verdict_data" },
+            { code: "200", cls: "response-2xx", desc: "Survey with contact_mode, current_fields, scale_indicator_choices, and verdict_data" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
-          ], "Returns all questions in order (<code>current_fields</code>), the choice type (single/multiple) for each Scale Indicator (<code>scale_indicator_choices</code>), and scoring bands (<code>verdict_data</code>).")}
+          ], "Returns all questions in order (<code>current_fields</code>), the choice type (single/multiple) for each Scale Indicator (<code>scale_indicator_choices</code>), and scoring bands (<code>verdict_data</code>). <code>contact_mode</code> says how the survey is shown when someone tries it on a toolkit page: <code>one_contact</code> (About one contact) or <code>several_contacts</code> (Several or no contacts).")}
           ${endpointCard("GET", "/story_categories/{id}/verdicts", "Get verdict scores for a Survey Campaign", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey ID" },
             { name: "project_id", type: "integer", required: true, desc: "Project the Survey Campaign belongs to" },
@@ -2638,7 +2638,7 @@ function buildDocsPage() {
             { name: "per_page", type: "integer", required: false, desc: "Surveys per page (default 10, max 200)" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Surveys updated after this" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Surveys with <code>id</code>, <code>name</code>, <code>description</code>, <code>shared_by</code>, <code>tag</code>, <code>question_count</code>, <code>estimated_minutes</code>, <code>themes</code>, <code>audiences</code>, <code>repeats_at_intervals</code>, <code>validated</code>, <code>verdicts</code>, <code>libraries_count</code> (organisations using it), <code>yours</code> and <code>added_to_a_project</code>, plus <code>facets</code>: each filter's options with how many Surveys each would return given the other filters" }
+            { code: "200", cls: "response-2xx", desc: "Surveys with <code>id</code>, <code>name</code>, <code>description</code>, <code>shared_by</code>, <code>tag</code>, <code>question_count</code>, <code>estimated_minutes</code>, <code>themes</code>, <code>audiences</code>, <code>repeats_at_intervals</code>, <code>contact_mode</code> (<code>one_contact</code> or <code>several_contacts</code>, how its Try this survey popup on a toolkit page shows it), <code>validated</code>, <code>verdicts</code>, <code>libraries_count</code> (organisations using it), <code>yours</code> and <code>added_to_a_project</code>, plus <code>facets</code>: each filter's options with how many Surveys each would return given the other filters" }
           ])}
           ${endpointCard("GET", "/explore/surveys/{id}", "Preview an Explore Survey", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The Survey's id from Explore Surveys" }
