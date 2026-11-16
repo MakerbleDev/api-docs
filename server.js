@@ -977,6 +977,7 @@ function buildDocsPage() {
         <a href="#webhooks"        class="nav-link"><span class="nav-method method-POST">POST</span>Webhooks</a>
         <a href="#eventbrite"      class="nav-link"><span class="nav-method method-GET">GET</span>Eventbrite</a>
         <a href="#api-keys"        class="nav-link"><span class="nav-method method-POST">POST</span>API keys</a>
+        <a href="#ai-assistant-link" class="nav-link"><span class="nav-method method-POST">POST</span>AI assistant link</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
         <a href="#usage"           class="nav-link"><span class="nav-method method-GET">GET</span>Usage</a>
         <a href="#setup-guide"     class="nav-link"><span class="nav-method method-GET">GET</span>Setup guide</a>
@@ -1091,7 +1092,7 @@ function buildDocsPage() {
               </table>
               <div class="subsection-label">Responses</div>
               <div class="response-row"><span class="response-code response-2xx">200</span><span class="response-desc">Returns <code>user_id</code>, <code>email</code>, and <code>authentication_token</code></span></div>
-              <div class="response-row"><span class="response-code response-4xx">401</span><span class="response-desc">Invalid credentials</span></div>
+              <div class="response-row"><span class="response-code response-4xx">401</span><span class="response-desc">Invalid credentials (<code>invalid-credentials</code>), or <code>invitation-pending</code> with a <code>message</code> when the person hasn't accepted their invitation yet and so has no password of their own</span></div>
             </div>
           </div>
         </div>
@@ -4075,7 +4076,7 @@ function buildDocsPage() {
         <div class="section-desc">
           <p>An API key lets a custom integration call the API for one Organisation without using a person's own token. An Organisation Admin creates one in Makerble under <strong>Data In &amp; Out → Integrations → API keys</strong>, or with <code>POST /api_keys</code> below. The key itself (<code>mk_live_…</code>) is shown only once, when it is created.</p>
           <p><strong>Using a key:</strong> send <code>Authorization: Bearer mk_live_…</code> on every request. The key acts as the colleague chosen when it was created: it can see and do only what they can, in its Organisation only. It can call the same endpoints as a connected app (OAuth); any other answers <code>403</code> with <code>not_available_to_connected_apps</code>. A revoked key, or one whose colleague has left the Organisation, gets <code>401</code>. Calls made with an Organisation's API keys count towards its monthly API usage.</p>
-          <p><strong>Managing keys:</strong> only the Organisation's admins can list, create and revoke its keys, and only with their own <code>X-User-Email</code> and <code>X-User-Token</code>: an API key or a connected app can't create or revoke keys.</p>
+          <p><strong>Managing keys:</strong> only the Organisation's admins can list, create and revoke its keys, and only with their own <code>X-User-Email</code> and <code>X-User-Token</code>: an API key, an AI assistant link or a connected app can't create or revoke keys.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/api_keys", "List an Organisation's API keys", true, [
@@ -4107,6 +4108,31 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "The revoked key: it stops working at once, and this can't be undone" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not an admin of its Organisation" }
+          ])}
+        </div>
+      </section>
+
+      <!-- AI assistant link -->
+      <section class="section" id="ai-assistant-link">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">AI assistant link</h2>
+        <div class="section-desc">
+          <p>Your own link for connecting an AI assistant such as Claude or ChatGPT to Makerble through the <a href="https://mcp.makerble.com/connect">Makerble MCP</a>. In Makerble it is under <strong>User Settings → AI assistants</strong>. You choose which Organisation it is billed to: every call an assistant makes with it counts towards that Organisation's monthly API usage.</p>
+          <p><strong>What the link can do:</strong> it acts as you, with everything you can see and do in Makerble, so every MCP tool works. It can't create, list or revoke API keys, and can't change your email address or password (<code>403</code> with <code>not_available_to_ai_assistants</code>). It stops working when you turn it off, get a new one, or leave the Organisation it is billed to.</p>
+          <p>These endpoints need your own <code>X-User-Email</code> and <code>X-User-Token</code>: an API key, an AI assistant link or a connected app gets <code>403</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/ai_assistant_link", "Read your AI assistant link", true, [], [
+            { code: "200", cls: "response-2xx", desc: "Your link without its secret (or null), and the Organisations you can bill it to" }
+          ])}
+          ${endpointCard("POST", "/ai_assistant_link", "Get a new AI assistant link", true, [
+            { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation the link's API usage is billed to (one you work in)" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created — includes the link in url, shown only this once. Any earlier link stops working" },
+            { code: "422", cls: "response-4xx", desc: "Not an Organisation you work in" }
+          ])}
+          ${endpointCard("DELETE", "/ai_assistant_link", "Turn off your AI assistant link", true, [], [
+            { code: "200", cls: "response-2xx", desc: "Turned off — any assistant using it stops working at once" }
           ])}
         </div>
       </section>
