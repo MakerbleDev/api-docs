@@ -2204,7 +2204,8 @@ function buildDocsPage() {
             { name: "record_id", type: "integer", required: true, desc: "Contact (Beneficiary) ID or Story ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
-            { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 — only Versions created after this" }
+            { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 — only Versions created after this" },
+            { name: "include_fields", type: "boolean", required: false, desc: "<code>true</code> adds each Version's <code>fields</code>, compared with the Version before it, as on the Version History page" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated Versions, newest first, plus the record's name and whether it has been deleted" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
@@ -2214,7 +2215,7 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "The Version, including full_object — every field as saved at that moment" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not visible to you" }
-          ], "For a Contact, fields hidden from you by <strong>Field Visibility</strong> are null in <code>full_object</code> and named in <code>restricted_fields</code>.")}
+          ], "For a Contact, fields hidden from you by <strong>Field Visibility</strong> are null in <code>full_object</code> and named in <code>restricted_fields</code>. <code>fields</code> lists each field as the <strong>Version History</strong> page shows it: <code>{key, label, value, state, changed}</code>, where <code>state</code> is <code>value</code>, <code>blank</code>, <code>absent</code> (not a field of the record then, e.g. a survey question since removed) or <code>restricted</code>, and <code>changed</code> is true when the value differs from the Version before.")}
         </div>
       </section>
 

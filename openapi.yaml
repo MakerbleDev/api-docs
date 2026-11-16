@@ -5817,6 +5817,10 @@ paths:
         `user_name` is `System` when no signed-in user made the change (e.g. a CSV import run in the background).
         One Save can write several Versions a fraction of a second apart. Use `GET /versions/{id}` to see the full
         record as it was saved in a Version.
+
+        Pass `include_fields=true` to compare the Versions side by side, as the **Version History** page does: each
+        Version then also has `fields`, one entry per field of the record with its label, display value, state, and
+        whether it changed since the Version saved just before it.
       operationId: listVersions
       security: [{tokenAuth: []}]
       parameters:
@@ -5842,6 +5846,12 @@ paths:
             maximum: 200
           description: Records per page (default 10, max 200)
         - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: include_fields
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Add each Version's `fields`, labelled and compared with the Version before it
       responses:
         "200":
           description: Paginated list of the record's Versions
@@ -5874,6 +5884,12 @@ paths:
         media, answers}`, where each answer carries the survey question's label as it was then.
         For a Contact, fields the Organisation's Field Visibility settings hide from you are `null` in `full_object`
         and named in `restricted_fields`.
+
+        `fields` lists the record's fields as the **Version History** page shows them: the label, the display value,
+        the `state` (`value`; `blank` when the field existed but was empty; `absent` when it wasn't a field of the
+        record at that time, such as a survey question added later or since removed from the survey; `restricted`
+        when Field Visibility hides it from you, with a null value), and `changed`, true when the value differs from
+        the Version saved just before this one.
         Same permissions as `GET /versions`.
       operationId: getVersion
       security: [{tokenAuth: []}]
@@ -5886,6 +5902,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionDetail'
+              example:
+                id: 76
+                record_type: Contact
+                record_id: 185170
+                charity_id: 304
+                event: update
+                action: Edited
+                user_id: 190
+                user_name: Sam Ahmed
+                created_at: "2026-09-29T07:50:02.709Z"
+                full_object: { id: 185170, name: Bella T, mobile: null }
+                restricted_fields: [mobile]
+                fields:
+                  - { key: name, label: Name, value: Bella T, state: value, changed: true }
+                  - { key: mobile, label: Mobile, value: null, state: restricted, changed: false }
+                  - { key: country_code, label: Country code, value: null, state: blank, changed: false }
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -21782,6 +21814,33 @@ components:
                 type: string
               description: Fields of a Contact hidden from you by Field Visibility, nulled in `full_object` (column names, or custom field names)
               example: ["date_of_birth", "NHS number"]
+            fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/VersionField'
+
+    VersionField:
+      type: object
+      description: One field of a record in a Version, as the Version History page shows it
+      properties:
+        key:
+          type: string
+          description: Stable key for the field across Versions of the record (e.g. `name`, `custom_field:6807`, `answer:custom_field:501::`)
+          example: name
+        label:
+          type: string
+          example: Name
+        value:
+          type: string
+          nullable: true
+          description: The value as displayed (dates as "9 Mar 2026", Yes/No, lists joined with commas). Null unless state is `value`.
+        state:
+          type: string
+          enum: [value, blank, absent, restricted]
+          description: '`blank`: the field existed but was empty. `absent`: not a field of the record at that time. `restricted`: hidden from you by Field Visibility.'
+        changed:
+          type: boolean
+          description: True when the value differs from the Version saved just before this one
 
     PaginatedVersions:
       allOf:
