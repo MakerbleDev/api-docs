@@ -389,7 +389,22 @@ paths:
                 email: user@example.com
                 authentication_token: "sJxyz_abc123longtoken"
         "401":
-          $ref: '#/components/responses/Unauthorized'
+          description: |
+            Wrong email address or password (`invalid-credentials`), or the person hasn't accepted
+            their invitation yet and so has no password of their own (`invitation-pending`, with a
+            `message` to show them: they set their password from their invitation email).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidCredentials:
+                  value:
+                    error: invalid-credentials
+                invitationPending:
+                  value:
+                    error: invitation-pending
+                    message: "You haven't set a password yet. Open your invitation email to set one."
 
   /users:
     get:
@@ -15823,6 +15838,93 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /ai_assistant_link:
+    get:
+      tags: [AI assistants]
+      summary: Read your AI assistant link
+      description: |
+        Your own link for connecting an AI assistant such as Claude or ChatGPT to Makerble through the
+        Makerble MCP, without the link itself, which is shown only when it is made. `link` is null if
+        you have none. `organisations` are the Organisations you can choose to bill it to. Every call
+        an assistant makes with the link counts as API usage for the Organisation you chose, and acts
+        as you, with what you can see and do. The same as User Settings, then AI assistants. These
+        endpoints need your own token: an API key, an AI assistant link or a connected app gets `403`.
+      operationId: getAiAssistantLink
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Your link, if you have one, and the Organisations it can be billed to
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiAssistantLinkStatus'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+
+    post:
+      tags: [AI assistants]
+      summary: Get a new AI assistant link
+      description: |
+        Makes your link for connecting an AI assistant to Makerble, billed to `charity_id`, an
+        Organisation you work in. The response includes the link in `url`, shown only this once: paste
+        it into your AI assistant as a custom connector (in Claude, Settings then Connectors; in
+        ChatGPT, Settings then Connectors). Treat it like a password. Any link you had before stops
+        working.
+      operationId: createAiAssistantLink
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The Organisation (Charity) the link's API usage is billed to
+            example:
+              charity_id: 913
+      responses:
+        "201":
+          description: Link made
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiAssistantLinkWithUrl'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [AI assistants]
+      summary: Turn off your AI assistant link
+      description: Any AI assistant using your link stops working straight away.
+      operationId: deleteAiAssistantLink
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Link turned off
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [link]
+                properties:
+                  link:
+                    type: object
+                    nullable: true
+                    example: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+
   /api_keys:
     get:
       tags: [API keys]
@@ -25441,6 +25543,73 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    AiAssistantLink:
+      type: object
+      required: [id, organisation_id, organisation_name, created_at, last_used_at]
+      properties:
+        id:
+          type: integer
+        organisation_id:
+          type: integer
+          description: The Organisation (Charity) the link's API usage is billed to
+        organisation_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When an assistant last used the link, to within a few minutes
+
+    AiAssistantLinkStatus:
+      type: object
+      required: [link, organisations]
+      properties:
+        link:
+          type: object
+          nullable: true
+          description: Your link, without the link itself, or null if you have none
+          required: [id, organisation_id, organisation_name, created_at, last_used_at]
+          properties:
+            id:
+              type: integer
+            organisation_id:
+              type: integer
+            organisation_name:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            last_used_at:
+              type: string
+              format: date-time
+              nullable: true
+        organisations:
+          type: array
+          description: The Organisations you can bill the link to
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+
+    AiAssistantLinkWithUrl:
+      type: object
+      required: [link, url]
+      properties:
+        link:
+          $ref: '#/components/schemas/AiAssistantLink'
+        url:
+          type: string
+          format: uri
+          description: The link to paste into your AI assistant. Shown only in the response that made it.
+          example: "https://mcp.makerble.com/mcp?key=mk_live_Ab12Cd34Ef56Gh78Ij90Kl12Mn34Op56&env=production"
 
     ApiKeyWithSecret:
       allOf:
