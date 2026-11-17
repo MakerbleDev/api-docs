@@ -2027,6 +2027,21 @@ function buildDocsPage() {
             { name: "project_id", type: "integer", required: true, desc: "Project the Survey Campaign belongs to" },
             { name: "page", type: "integer", required: false, desc: "Page number" }
           ], [{ code: "200", cls: "response-2xx", desc: "Total points per Contact per submission, grouped by beneficiary" }])}
+          ${endpointCard("GET", "/story_categories/{id}/itemised_totals", "Get a Survey's itemised totals", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Survey ID" },
+            { name: "project_ids", type: "integer[]", required: false, desc: "Projects to show, a row each. Leave out for every Project you may view that uses the Survey" },
+            { name: "album_ids", type: "integer[]", required: false, desc: "Albums to show, a row each adding up its Projects. Overrides <code>project_ids</code>" },
+            { name: "date_happened_from", type: "date", required: false, desc: "YYYY-MM-DD. Also <code>date_happened_to</code>, <code>date_posted_from</code> and <code>date_posted_to</code>" },
+            { name: "label_ids", type: "integer[]", required: false, desc: "Only Stories with one of these Labels" },
+            { name: "group_ids", type: "integer[]", required: false, desc: "Only answers from Contacts in one of these Contact Groups" },
+            { name: "scope", type: "string", required: false, desc: "<code>all</code> (default), <code>earliest</code> or <code>latest</code>: which responses from each Contact count" },
+            { name: "page", type: "integer", required: false, desc: "Page number (pages run over tables)" },
+            { name: "per_page", type: "integer", required: false, desc: "Tables per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>row_type</code> (<code>project</code> or <code>album</code>), <code>rows</code>, and one table per <code>data</code> entry: <code>kind</code>, <code>title</code>, <code>columns</code>, optional <code>column_groups</code> and <code>unit</code>, and <code>rows</code> of <code>{id, name, values, percentages}</code>" },
+            { code: "404", cls: "response-4xx", desc: "Survey not found, or not used on any Project you can view" },
+            { code: "422", cls: "response-4xx", desc: "Bad ids, date, <code>scope</code> or <code>per_page</code>" }
+          ], "The Survey's Itemised totals page as data: its results side by side, with a table per tracker (Activity change, Participation change, Achievement, Choice, Numerical) and, when Verdicts are on, Verdicts, Verdicts across intervals and Change in verdicts across intervals. An answer is one Contact's response in one Story.")}
           ${endpointCard("GET", "/project_story_categories", "List Survey Campaigns", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }

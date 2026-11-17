@@ -5282,6 +5282,131 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /story_categories/{id}/itemised_totals:
+    get:
+      tags: [Story Categories]
+      summary: Get a Survey's itemised totals
+      description: |
+        A Survey's results side by side across Projects or Albums, as on its Itemised totals page: one table per tracker
+        in the Survey (in question order), plus Verdict tables when the Survey has Verdicts on, with a row per Project, or per
+        Album adding up its Projects. Only Projects that use the Survey and that you may view are included. An answer is one
+        Contact's response in one Story. Pages run over tables.
+
+        Table kinds: `activity` (Activity change amount), `engagement` (Participation change amount), `achievement` (Yes and
+        Not ticked answers with percentages), `choice` (answers per choice, with percentages), `numerical` (sum and mean
+        average, with `unit`), `verdicts`, `verdicts_across_intervals` and `change_in_verdicts_across_intervals` (grouped by
+        Shared Interval in `column_groups`). Each row's `values` line up with the table's `columns`.
+      operationId: getStoryCategoryItemisedTotals
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Survey (Story Category) ID
+        - name: project_ids
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Projects to show, a row each, as project_ids[]=1&project_ids[]=2 or a JSON array. Leave out for every Project you may view that uses the Survey.
+        - name: album_ids
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Albums to show, a row each adding up its Projects. Overrides project_ids.
+        - name: date_happened_from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Only Stories that happened on or after this date (YYYY-MM-DD).
+        - name: date_happened_to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Only Stories that happened on or before this date (YYYY-MM-DD).
+        - name: date_posted_from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Only Stories posted on or after this date (YYYY-MM-DD).
+        - name: date_posted_to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Only Stories posted on or before this date (YYYY-MM-DD).
+        - name: label_ids
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Only Stories with one of these Labels.
+        - name: group_ids
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Only answers from Contacts in one of these Contact Groups.
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, earliest, latest]
+          description: Which responses from each Contact count, by Date Posted (default all).
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The tables, one per entry in data
+          content:
+            application/json:
+              example:
+                story_category_id: 12
+                story_category_name: Wellbeing check
+                row_type: project
+                rows: [{id: 7, name: Meadow}, {id: 3, name: Orchard}]
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - key: indicator-41
+                    kind: choice
+                    description: Choice tracker (Indicator of Scale type)
+                    title: Confidence
+                    metric_id: 41
+                    unit: null
+                    column_groups: null
+                    columns: [{key: sub_ratio_5, title: Low}, {key: sub_ratio_6, title: High}]
+                    rows:
+                      - {id: 7, name: Meadow, values: [1.0, 3.0], percentages: [25, 75]}
+                      - {id: 3, name: Orchard, values: [2.0, 2.0], percentages: [50, 50]}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /project_story_categories:
     get:
       tags: [Project Story Categories]
