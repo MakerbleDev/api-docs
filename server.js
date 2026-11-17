@@ -966,6 +966,7 @@ function buildDocsPage() {
         <a href="#events"          class="nav-link"><span class="nav-method method-GET">GET</span>Events</a>
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
         <a href="#staff-capacity" class="nav-link"><span class="nav-method method-PATCH">PATCH</span>Staff Capacity</a>
+        <a href="#staff-matching" class="nav-link"><span class="nav-method method-GET">GET</span>Staff Matching</a>
         <a href="#staff-unavailability" class="nav-link"><span class="nav-method method-POST">POST</span>Staff Unavailability</a>
       </div>
       <div class="nav-section">
@@ -3934,6 +3935,42 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin or a Team Leader of the colleague, or your own capacity" },
             { code: "404", cls: "response-4xx", desc: "Not found, or an Organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "A cap is not a whole number from 0 to 1000" }
+          ])}
+        </div>
+      </section>
+
+      <section class="section" id="staff-matching">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Staff Matching</h2>
+        <div class="section-desc">
+          <p>Find when a colleague is free for an appointment, and which colleagues could take on a Contact for one-to-one appointments. A start time is free when the appointment, with its Event Format's preparation and debrief times, fits inside the colleague's availability on the Staff availability page, misses their unavailability and the events they already work on (each with its own preparation and debrief times), and keeps them within their caps. Start times fall on the quarter hour, in the Organisation's timezone.</p>
+          <p>Suggestions for a Contact come from the Project's colleagues. A colleague with 6 free weekly sessions starting in the next 8 weeks is suggested; anyone else is listed as fully booked, with the date they free up if it is within 16 weeks. Suggestions are ranked by having every Essential need as a Specialism, then Desirable needs matched, then the earliest slot inside the Contact's Weekly availability, then the lightest one-to-one load. Each one gives its reasons in words, such as "Eating disorders ✓ (essential) · Music ✗ (desirable)" and "Mondays 10:00–11:00 from 24 Nov".</p>
+          <p>Any member of the Organisation can see a colleague's free slots. Suggestions need you to see the Contact's profile and the Project's events (an Organisation Admin or an Editor of the Project). Caps and load are only shown for colleagues you see on Staff availability.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/users/{user_id}/free_slots", "Find a colleague's free slots", true, [
+            { name: "user_id", in: "path", type: "integer", required: true, desc: "The colleague (User)" },
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation" },
+            { name: "event_category_id", type: "integer", required: true, desc: "The Event Format; it needs a Default length" },
+            { name: "project_id", type: "integer", required: false, desc: "The Project the appointment is for; availability limited to other Projects is left out" },
+            { name: "from", type: "date", required: false, desc: "First date (YYYY-MM-DD), default today" },
+            { name: "to", type: "date", required: false, desc: "Last date, at most 26 weeks after from; default 8 weeks after from" },
+            { name: "weekly_sessions", type: "integer", required: false, desc: "Return weekly series of this many sessions (1 to 52), each from its first free date" },
+            { name: "page / per_page", type: "integer", required: false, desc: "Pagination (default 1 / 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The free slots or weekly series, each with a summary such as \"Mondays 10:00–11:00 from 24 Nov\"; capacity if you see the colleague on Staff availability" },
+            { code: "404", cls: "response-4xx", desc: "An Organisation you are not in, or a colleague, Event Format or Project not in it" },
+            { code: "422", cls: "response-4xx", desc: "The Event Format has no Default length, or the dates or weekly_sessions are invalid" }
+          ])}
+          ${endpointCard("GET", "/beneficiaries/{beneficiary_id}/staff_suggestions", "Suggest colleagues for a Contact", true, [
+            { name: "beneficiary_id", in: "path", type: "integer", required: true, desc: "The Contact" },
+            { name: "project_id", type: "integer", required: true, desc: "The Project the appointments are for; the Contact must be in it" },
+            { name: "event_category_id", type: "integer", required: true, desc: "A one-to-one Event Format with a Default length" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "suggestions (best fit first, with specialisms, first_slot, inside_contact_availability and load) and fully_booked (with free_from and a summary)" },
+            { code: "403", cls: "response-4xx", desc: "You can't see the Project's events" },
+            { code: "404", cls: "response-4xx", desc: "A Contact you can't see, or a Project or Event Format outside the Contact's Organisation" },
+            { code: "422", cls: "response-4xx", desc: "The Contact isn't in the Project, or the Event Format isn't one-to-one" }
           ])}
         </div>
       </section>
