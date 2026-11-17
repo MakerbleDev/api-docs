@@ -26383,6 +26383,8 @@ components:
           steps target, a `text` label, a `value` (required for a `chart_bar`, from 0 to 100, and for a
           `calendar_event`, the weekday from 1 for Monday to 5 for Friday) and a `face`, one of the five
           Makerble avatars (1 to 5), for an `avatar`, `table_row`, `card` or `timeline_item`.
+          An `icon` block also needs an `icon`: pin, map, calendar, clock, document, chart, people, home,
+          envelope, phone, star or heart. A chip, card or row shows a tick box only if a `check` step ticks it.
         - `move_cursor`, `click`, `highlight` and `check` act on the block whose `id` is `target`.
         - `type` types `text` into the `field` whose `id` is `target`.
         - `swap` replaces the label of the block whose `id` is `target` with `text`.
@@ -26400,7 +26402,7 @@ components:
           enum: [appear, move_cursor, click, type, highlight, check, swap, cut, frame, carry, zoom]
         block:
           type: string
-          enum: [top_bar, sidebar_item, table_row, card, button, field, chip, avatar, chart_bar, cell, timeline_item, calendar_event]
+          enum: [top_bar, sidebar_item, table_row, card, button, field, chip, avatar, chart_bar, cell, timeline_item, calendar_event, icon]
         id:
           type: string
           pattern: '^[a-z][a-z0-9_]{0,29}$'
@@ -26419,6 +26421,10 @@ components:
           minimum: 1
           maximum: 5
           description: One of the five Makerble avatars, so people in the animation are faces, not initials
+        icon:
+          type: string
+          enum: [pin, map, calendar, clock, document, chart, people, home, envelope, phone, star, heart]
+          description: For an `icon` block (required there, and only there), the icon it shows beside its `text`
         frame:
           type: string
           enum: [register, profile, table, web_page, calendar, compare]
