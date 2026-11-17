@@ -169,6 +169,8 @@ tags:
     description: When colleagues can't work for an Organisation (leave, sickness, training), as on the Staff availability page
   - name: Staff Capacity
     description: How many appointments and one-to-one Contacts a colleague can take on in an Organisation, as on the Staff availability page
+  - name: Staff Matching
+    description: When a colleague is free for an appointment, and which colleagues could take on a Contact for one-to-one appointments, best fit first
   - name: Training Materials
     description: An Organisation's links to its own training documents and videos, each shown to the whole Organisation or to chosen Teams and Workspaces
   - name: Announcements
@@ -1846,6 +1848,128 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /users/{user_id}/free_slots:
+    get:
+      tags: [Staff Matching]
+      summary: Find a colleague's free slots
+      operationId: getColleagueFreeSlots
+      description: |
+        When a colleague is free for an appointment of an Event Format in one Organisation. A start
+        time is free when the appointment, padded by the Event Format's preparation and debrief times:
+
+        - fits inside one of the colleague's availability times on the Staff availability page, which
+          may be limited to some Event Formats or Projects;
+        - overlaps none of their unavailability (leave, sickness, training);
+        - overlaps none of the events they are an Event Worker on, each padded by its own Event
+          Format's preparation and debrief times;
+        - is on a day, and in a week, where they are below their caps. A colleague at their limit of
+          ongoing one-to-one Contacts has no free one-to-one slots at all.
+
+        Start times fall on the quarter hour, in the Organisation's timezone. The Event Format needs a
+        Default length.
+
+        Without `weekly_sessions`, each free start time is returned. With it, each weekly time (for
+        example Mondays at 10:00) is returned once, from the first date on which every one of the
+        sessions is free: use it to plan a recurring appointment.
+
+        Any member of the Organisation can see a colleague's slot times. `capacity` is `null` unless you
+        see the colleague on Staff availability (the colleague themselves, their Team Leaders, Project
+        Editors of their Projects and Organisation Admins).
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: The colleague (User)
+          schema:
+            type: integer
+        - name: charity_id
+          in: query
+          required: true
+          description: The Organisation (Charity)
+          schema:
+            type: integer
+        - name: event_category_id
+          in: query
+          required: true
+          description: The Event Format (event category). It needs a Default length.
+          schema:
+            type: integer
+        - name: project_id
+          in: query
+          required: false
+          description: The Project the appointment is for. Availability limited to other Projects is left out.
+          schema:
+            type: integer
+        - name: from
+          in: query
+          required: false
+          description: First date (YYYY-MM-DD). Default today.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          description: Last date (YYYY-MM-DD), at most 26 weeks after `from`. Default 8 weeks after `from`.
+          schema:
+            type: string
+            format: date
+        - name: weekly_sessions
+          in: query
+          required: false
+          description: Return weekly series of this many sessions (1 to 52) instead of single slots.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 52
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The free slots, or weekly series, earliest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColleagueFreeSlots'
+              example:
+                user_id: 812
+                charity_id: 123
+                event_category_id: 41
+                project_id: null
+                time_zone: Europe/London
+                from: "2026-11-23"
+                to: "2027-01-18"
+                weekly_sessions: 6
+                length_minutes: 60
+                preparation_minutes: 30
+                debrief_minutes: 30
+                capacity:
+                  max_per_day: 4
+                  max_per_week: 15
+                  max_one_to_one_contacts: 12
+                  ongoing_one_to_one_contacts: 9
+                  at_one_to_one_limit: false
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - starts_at: "2026-11-24T10:00:00+00:00"
+                    ends_at: "2026-11-24T11:00:00+00:00"
+                    date: "2026-11-24"
+                    weekday: tuesday
+                    start_time: "10:00"
+                    end_time: "11:00"
+                    sessions: 6
+                    summary: "Tuesdays 10:00–11:00 from 24 Nov"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /users/{user_id}/unavailabilities:
     parameters:
       - name: user_id
@@ -3366,6 +3490,116 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+
+  /beneficiaries/{beneficiary_id}/staff_suggestions:
+    get:
+      tags: [Staff Matching]
+      summary: Suggest colleagues for a Contact
+      operationId: getStaffSuggestions
+      description: |
+        Which colleagues could take on a Contact for one-to-one appointments of an Event Format in a
+        Project, best fit first, and when each could start. Use it before booking a recurring
+        appointment with **Create an event**.
+
+        The candidates are the Project's colleagues. One with a free series of 6 weekly sessions
+        starting in the next 8 weeks (see **Find a colleague's free slots**) is a suggestion. One without
+        is listed in `fully_booked`, with `free_from`, the date they free up if it is within 16 weeks.
+
+        Suggestions are ranked by:
+
+        1. having every Essential need as a Specialism. Colleagues missing one still appear, lower down,
+           with the missing need shown;
+        2. the number of Desirable needs matched;
+        3. the earliest series inside the Contact's Weekly availability. If that isn't recorded, or is
+           hidden from you, any series counts and `contact_availability_note` says why;
+        4. the fewest ongoing one-to-one Contacts relative to their cap, to share the work fairly.
+
+        Each suggestion explains itself: `specialisms_summary` (for example "Eating disorders ✓
+        (essential) · Music ✗ (desirable)"), `first_slot.summary` ("Mondays 10:00–11:00 from 24 Nov"),
+        `inside_contact_availability`, and `load.summary` ("9 of 12 one-to-one Contacts"). A fully
+        booked colleague's `summary` reads, for example, "Sarah Jones: fully booked until 8 Dec".
+
+        You need to see the Contact's profile and the Project's events (as an Organisation Admin or an
+        Editor of the Project). `load` and `at_one_to_one_limit` are `null` for colleagues you don't see
+        on Staff availability. The lists are bounded by the Project's colleagues and aren't paged.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: beneficiary_id
+          in: path
+          required: true
+          description: The Contact (Beneficiary)
+          schema:
+            type: integer
+        - name: project_id
+          in: query
+          required: true
+          description: The Project the appointments are for. The Contact must be in it.
+          schema:
+            type: integer
+        - name: event_category_id
+          in: query
+          required: true
+          description: A one-to-one Event Format (event category) with a Default length
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The suggestions, best fit first, and the fully booked colleagues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffSuggestions'
+              example:
+                beneficiary_id: 5512
+                project_id: 77
+                event_category_id: 41
+                sessions: 6
+                weeks: 8
+                contact_availability_note: null
+                suggestions:
+                  - rank: 1
+                    user: { id: 812, name: Claire Hughes }
+                    has_all_essential: true
+                    specialisms:
+                      - { skill_id: 3, name: Eating disorders, importance: essential, matched: true }
+                      - { skill_id: 9, name: Music, importance: desirable, matched: false }
+                    specialisms_summary: "Eating disorders ✓ (essential) · Music ✗ (desirable)"
+                    load: { ongoing_one_to_one_contacts: 9, max_one_to_one_contacts: 12, summary: "9 of 12 one-to-one Contacts" }
+                    first_slot:
+                      starts_at: "2026-11-24T10:00:00+00:00"
+                      ends_at: "2026-11-24T11:00:00+00:00"
+                      date: "2026-11-24"
+                      weekday: tuesday
+                      start_time: "10:00"
+                      end_time: "11:00"
+                      sessions: 6
+                      summary: "Tuesdays 10:00–11:00 from 24 Nov"
+                    inside_contact_availability: true
+                fully_booked:
+                  - user: { id: 815, name: Sarah Jones }
+                    has_all_essential: true
+                    specialisms:
+                      - { skill_id: 3, name: Eating disorders, importance: essential, matched: true }
+                      - { skill_id: 9, name: Music, importance: desirable, matched: true }
+                    specialisms_summary: "Eating disorders ✓ (essential) · Music ✓ (desirable)"
+                    load: { ongoing_one_to_one_contacts: 12, max_one_to_one_contacts: 12, summary: "12 of 12 one-to-one Contacts" }
+                    free_from: "2027-01-25"
+                    summary: "Sarah Jones: fully booked until 25 Jan"
+                    at_one_to_one_limit: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You can't see the Project's events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "You can't see this Project's events. A Charity Editor of its organisation or an Editor of the Project can."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /beneficiaries/{beneficiary_id}/summary:
     parameters:
@@ -25149,6 +25383,200 @@ components:
             ongoing_one_to_one_contacts:
               type: integer
               description: Distinct guests of their upcoming one-to-one appointments
+
+    FreeSlot:
+      type: object
+      description: A free start time, or the first session of a weekly series, in the Organisation's timezone
+      properties:
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+          description: When the appointment ends, without its debrief time
+        date:
+          type: string
+          format: date
+        weekday:
+          type: string
+          example: monday
+        start_time:
+          type: string
+          example: "10:00"
+        end_time:
+          type: string
+          example: "11:00"
+        sessions:
+          type: integer
+          description: For a weekly series, how many weekly sessions are free from this date
+        summary:
+          type: string
+          description: In words, such as "Monday 23 Nov 10:00–11:00" or "Mondays 10:00–11:00 from 23 Nov"
+
+    ColleagueFreeSlots:
+      type: object
+      description: A colleague's free slots for an Event Format, in the standard paged envelope
+      properties:
+        user_id:
+          type: integer
+        charity_id:
+          type: integer
+        event_category_id:
+          type: integer
+        project_id:
+          type: integer
+          nullable: true
+        time_zone:
+          type: string
+          description: The Organisation's timezone, which every time is in
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        weekly_sessions:
+          type: integer
+          nullable: true
+        length_minutes:
+          type: integer
+          description: The Event Format's Default length
+        preparation_minutes:
+          type: integer
+        debrief_minutes:
+          type: integer
+        capacity:
+          type: object
+          nullable: true
+          description: Only if you see the colleague on Staff availability
+          properties:
+            max_per_day:
+              type: integer
+              nullable: true
+            max_per_week:
+              type: integer
+              nullable: true
+            max_one_to_one_contacts:
+              type: integer
+              nullable: true
+            ongoing_one_to_one_contacts:
+              type: integer
+            at_one_to_one_limit:
+              type: boolean
+              description: True when a one-to-one Event Format has no free slots because the colleague is at their limit
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FreeSlot'
+
+    SuggestedColleague:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        has_all_essential:
+          type: boolean
+          description: Whether the colleague has every Essential need as a Specialism
+        specialisms:
+          type: array
+          description: Each of the Contact's needs, Essential first, and whether the colleague has it as a Specialism
+          items:
+            type: object
+            properties:
+              skill_id:
+                type: integer
+              name:
+                type: string
+              importance:
+                type: string
+                enum: [essential, desirable]
+              matched:
+                type: boolean
+        specialisms_summary:
+          type: string
+          example: "Eating disorders ✓ (essential) · Music ✗ (desirable)"
+        load:
+          type: object
+          nullable: true
+          description: Only for colleagues you see on Staff availability
+          properties:
+            ongoing_one_to_one_contacts:
+              type: integer
+            max_one_to_one_contacts:
+              type: integer
+              nullable: true
+            summary:
+              type: string
+              example: "9 of 12 one-to-one Contacts"
+
+    StaffSuggestions:
+      type: object
+      properties:
+        beneficiary_id:
+          type: integer
+        project_id:
+          type: integer
+        event_category_id:
+          type: integer
+        sessions:
+          type: integer
+          description: How many weekly sessions a suggestion has free
+        weeks:
+          type: integer
+          description: How many weeks ahead the first session may start
+        contact_availability_note:
+          type: string
+          nullable: true
+          description: Why the Contact's Weekly availability wasn't used, if it wasn't
+          example: "Contact's availability not recorded"
+        suggestions:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/SuggestedColleague'
+              - type: object
+                properties:
+                  rank:
+                    type: integer
+                  first_slot:
+                    $ref: '#/components/schemas/FreeSlot'
+                  inside_contact_availability:
+                    type: boolean
+                    nullable: true
+                    description: Whether the first slot is inside the Contact's Weekly availability; null if that wasn't used
+        fully_booked:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/SuggestedColleague'
+              - type: object
+                properties:
+                  free_from:
+                    type: string
+                    format: date
+                    nullable: true
+                    description: When a series could first start, if within 16 weeks
+                  summary:
+                    type: string
+                    example: "Sarah Jones: fully booked until 8 Dec"
+                  at_one_to_one_limit:
+                    type: boolean
+                    nullable: true
+                    description: Only for colleagues you see on Staff availability
 
     EventFormatInput:
       type: object
