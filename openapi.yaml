@@ -25952,20 +25952,27 @@ components:
         One step of an Intro animation. Steps play in order, evenly spread across the loop.
 
         - `appear` puts a building block on the stage: `block` (required), and optionally an `id` that later
-          steps target, a `text` label and, for a `chart_bar` only, a `value` from 0 to 100 (required for it).
+          steps target, a `text` label, a `value` (required for a `chart_bar`, from 0 to 100, and for a
+          `calendar_event`, the weekday from 1 for Monday to 5 for Friday) and a `face`, one of the five
+          Makerble avatars (1 to 5), for an `avatar`, `table_row`, `card` or `timeline_item`.
         - `move_cursor`, `click`, `highlight` and `check` act on the block whose `id` is `target`.
         - `type` types `text` into the `field` whose `id` is `target`.
         - `swap` replaces the label of the block whose `id` is `target` with `text`.
         - `cut` clears the stage and starts a new scene; blocks from before it can't be targeted after it.
+        - `frame` makes the scene a simplified page, captioned with `text` (or the page's usual name):
+          `register`, `profile`, `table`, `web_page`, `calendar` or `compare`. It must be the scene's first step.
+        - `carry` lifts the block whose `id` is `target`; at the next `cut` it travels onto the block whose
+          `id` is `to` in the next scene. It is the only way a block outlives a cut.
+        - `zoom` scales the stage in on the block whose `id` is `target` for two beats, then back out.
       required: [type]
       additionalProperties: false
       properties:
         type:
           type: string
-          enum: [appear, move_cursor, click, type, highlight, check, swap, cut]
+          enum: [appear, move_cursor, click, type, highlight, check, swap, cut, frame, carry, zoom]
         block:
           type: string
-          enum: [top_bar, sidebar_item, table_row, card, button, field, chip, avatar, chart_bar]
+          enum: [top_bar, sidebar_item, table_row, card, button, field, chip, avatar, chart_bar, cell, timeline_item, calendar_event]
         id:
           type: string
           pattern: '^[a-z][a-z0-9_]{0,29}$'
@@ -25979,6 +25986,18 @@ components:
           type: integer
           minimum: 0
           maximum: 100
+        face:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: One of the five Makerble avatars, so people in the animation are faces, not initials
+        frame:
+          type: string
+          enum: [register, profile, table, web_page, calendar, compare]
+        to:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,29}$'
+          description: For `carry`, the `id` of the block the carried block lands on, which appears after the next `cut`
 
 
     GuidancePanelStoryboard:
@@ -25992,10 +26011,11 @@ components:
       properties:
         archetype:
           type: string
-          enum: [assemble, flow, concept]
+          enum: [assemble, flow, journey, concept]
           description: >-
             `assemble`: the parts of a page of the feature come together. `flow`: a short walkthrough of using
-            the feature. `concept`: an animated metaphor for the idea behind it.
+            the feature. `journey`: one piece of data travels from page to page by itself (with `frame`, `carry`
+            and `zoom` steps). `concept`: an animated metaphor for the idea behind it.
         loop_seconds:
           type: integer
           minimum: 4
