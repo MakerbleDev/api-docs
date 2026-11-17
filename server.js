@@ -924,6 +924,7 @@ function buildDocsPage() {
         <a href="#projects"        class="nav-link"><span class="nav-method method-GET">GET</span>Projects</a>
         <a href="#saved-filters"   class="nav-link"><span class="nav-method method-POST">POST</span>Saved Filters</a>
         <a href="#albums"          class="nav-link"><span class="nav-method method-GET">GET</span>Albums (Portfolios)</a>
+        <a href="#progress-boards" class="nav-link"><span class="nav-method method-POST">POST</span>Progress Boards</a>
         <a href="#signup-pages"    class="nav-link"><span class="nav-method method-POST">POST</span>Signup Pages</a>
         <a href="#users"           class="nav-link"><span class="nav-method method-POST">POST</span>Users</a>
         <a href="#teams"           class="nav-link"><span class="nav-method method-PATCH">PATCH</span>Teams</a>
@@ -1379,6 +1380,33 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or not one you can see" },
             { code: "422", cls: "response-4xx", desc: "A Project outside the filter's criteria, an unknown view, a name already used on that toolbar, or a filter whose criteria name no Project" }
           ], "Body: <code>project_id</code> (one of the filter's <code>shortcut_projects</code>), <code>view_key</code> (one of its <code>shortcut_views</code>), and optionally <code>name</code>, the shortcut's label, which defaults to the filter's name. Move the shortcut afterwards with Adjust toolbar.")}
+        </div>
+      </section>
+
+      <!-- Progress Boards -->
+      <section class="section" id="progress-boards">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Progress Boards</h2>
+        <div class="section-desc">
+          <p>A Progress Board is a page of charts and cards showing results. Projects can create one automatically for each Survey added to them ("&lt;Survey&gt; on &lt;Project&gt;", <code>automated_by: Project</code>); deactivating that Survey Campaign archives it. Archiving hides a board from its members until it is reopened.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/progress_boards", "List Progress Boards", true, [
+            { name: "status", type: "string", required: false, desc: "<code>open</code>, <code>archived</code> or <code>all</code> (default)" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "Only boards changed since this time" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated boards, each with <code>archived</code>, <code>automated_by</code>, <code>can_archive</code> and <code>can_delete</code>" },
+            { code: "422", cls: "response-4xx", desc: "Unknown <code>status</code>" }
+          ], "The boards the Manage Progress Boards page lists for the user: ones they made, are a Board Admin or Colleague of, or were granted.")}
+          ${endpointCard("POST", "/progress_boards/bulk_action", "Archive, reopen or delete several Progress Boards", true, [
+            { name: "bulk_action", in: "body", type: "string", required: true, desc: "<code>archive</code>, <code>reopen</code> or <code>delete</code>" },
+            { name: "progress_board_ids", in: "body", type: "array", required: true, desc: "Up to 100 board IDs" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>action</code>, <code>updated_ids</code>, <code>skipped</code> (<code>{id, name, reason}</code>) and <code>message</code>" },
+            { code: "422", cls: "response-4xx", desc: "Unknown action, no boards, or more than 100" }
+          ], "As the Archive, Reopen and Delete buttons for the boards ticked in the Rows view of Manage Progress Boards. Archive and reopen need a Board Admin or the board's creator; delete needs a Board Admin who is an Organisation Editor, and is permanent. Boards the user may not change are skipped, not refused.")}
         </div>
       </section>
 
@@ -2063,6 +2091,14 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Survey Campaign not found, or another organisation's" },
             { code: "422", cls: "response-4xx", desc: "<code>force_interval</code> missing or not true/false" }
           ], "New Survey Campaigns have <code>force_interval: true</code>; existing ones were left at <code>false</code>.")}
+          ${endpointCard("DELETE", "/project_story_categories/{id}", "Remove a Survey from a Project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{id, project_id, story_category_id, removed: true}</code>" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Editor or Organisation Editor" },
+            { code: "404", cls: "response-4xx", desc: "Survey Campaign not found, or another organisation's" },
+            { code: "422", cls: "response-4xx", desc: "Something in the Project still depends on it; <code>error</code> says what" }
+          ], "As Remove from project on a Survey Campaign page. The Survey stays in the library and its automatically created Progress Board for that Project is deleted. Refused while the Project has survey responses, draft responses, Events or Survey Invitations for it, or it is the Project's default survey: deactivate it instead.")}
           ${endpointCard("GET", "/project_story_categories/{id}/survey_waves", "List the Waves of a Survey Campaign", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
