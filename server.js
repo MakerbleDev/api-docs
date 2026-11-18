@@ -1499,6 +1499,18 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" },
             { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. a metric or tracker that isn't on the Album; nothing is saved" }
           ], "Saves what the Album's <b>Set Targets</b> page saves. Only metrics and trackers already on the Album can be given a target. Metric, tracker and deadline targets are only saved while the Album uses manual targets.")}
+          ${endpointCard("GET", "/albums/{id}/project_contributions", "See each Project's contribution to an Album", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>all_time</code> (default), <code>period</code> (between two of the Album's Target Deadlines) or <code>annual</code> (one year from its Year Start)" },
+            { name: "end_date", type: "string", required: false, desc: "YYYY-MM-DD: the last day of a period or year listed in <code>timeframes</code>. Without it, the current one" },
+            { name: "page", type: "integer", required: false, desc: "Page of metrics" },
+            { name: "per_page", type: "integer", required: false, desc: "Metrics per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>timeframes</code> to choose from, the <code>selected_timeframe</code>, the Album's <code>projects</code> with their colours, and in <code>data</code> each metric's <code>total</code>, <code>target</code> and <code>percentage</code> with each Project's <code>subtotal</code> and <code>contribution_percentage</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or an Album you can't see" },
+            { code: "422", cls: "response-4xx", desc: "<code>{error}</code>: an unknown <code>timeframe</code>, an <code>end_date</code> that isn't a date, or <code>per_page</code> over 200" }
+          ], "What the Album page's <b>Project Contributions</b> views show: how much of the progress towards each Activity and Outcome metric came from each of the Album's open Projects. Over all time, each Project's own target is given too, or <code>target_unavailable</code> when the Project sets that metric's targets by deadline.")}
         </div>
       </section>
 
