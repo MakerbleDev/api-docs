@@ -1501,7 +1501,7 @@ function buildDocsPage() {
           ], "Saves what the Album's <b>Set Targets</b> page saves. Only metrics and trackers already on the Album can be given a target. Metric, tracker and deadline targets are only saved while the Album uses manual targets.")}
           ${endpointCard("GET", "/albums/{id}/project_contributions", "See each Project's contribution to an Album", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Album ID" },
-            { name: "timeframe", type: "string", required: false, desc: "<code>all_time</code> (default), <code>period</code> (between two of the Album's Target Deadlines) or <code>annual</code> (one year from its Year Start)" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>all_time</code> (default), <code>period</code> (between two of the Album's Target Deadlines) or <code>year_to_date</code> (one year from its Year Start)" },
             { name: "end_date", type: "string", required: false, desc: "YYYY-MM-DD: the last day of a period or year listed in <code>timeframes</code>. Without it, the current one" },
             { name: "page", type: "integer", required: false, desc: "Page of metrics" },
             { name: "per_page", type: "integer", required: false, desc: "Metrics per page (default 10, max 200)" }

@@ -2793,8 +2793,8 @@ paths:
           deadline instead.
         - `period`: progress between two of the Album's Target Deadlines, against the target for that
           deadline. Empty when the Album has no deadline targets.
-        - `annual`: progress over one year from the Album's Year Start (1 January without one), against
-          the deadline targets falling in that year.
+        - `year_to_date`: progress over one year from the Album's Year Start (1 January without one),
+          against the deadline targets falling in that year, as the Year to date option does.
 
         `timeframes` lists the periods or years to choose from; send one's `end_date` to see it. Without
         `end_date`, the current period or year is shown. Stories count by their date, on every open
@@ -2808,7 +2808,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [all_time, period, annual]
+            enum: [all_time, period, year_to_date]
             default: all_time
         - name: end_date
           in: query
@@ -20835,7 +20835,7 @@ components:
           type: integer
         timeframe:
           type: string
-          enum: [all_time, period, annual]
+          enum: [all_time, period, year_to_date]
         timeframes:
           type: array
           items:
