@@ -217,6 +217,8 @@ tags:
     description: Surveys — form templates used to create Stories
   - name: Project Story Categories
     description: Survey Campaigns — a Survey assigned to a specific Project
+  - name: Progress Boards
+    description: Progress Boards — pages of charts and cards showing a Project's, Album's or Survey's results
   - name: Story Metrics
     description: Per-story metric records (Story Changes, Story Indicators, Story Beneficiaries)
   - name: Changes
@@ -5641,6 +5643,122 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /progress_boards:
+    get:
+      tags: [Progress Boards]
+      summary: List Progress Boards
+      description: |
+        The Progress Boards the Manage Progress Boards page lists for the user: boards they made, are a
+        Board Admin or Colleague of, or were granted. `archived` boards are hidden from their members
+        until reopened. `automated_by: Project` marks the boards generated for each Survey on a Project
+        ("<Survey> on <Project>"). `can_archive` says whether the user may archive or reopen the board
+        (its Board Admins and the person who made it); `can_delete` whether they may delete it (Board
+        Admins who are Organisation Editors).
+      operationId: listProgressBoards
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: status
+          in: query
+          required: false
+          schema: {type: string, enum: [open, archived, all], default: all}
+          description: Which boards to list
+      responses:
+        "200":
+          description: Paginated list of Progress Boards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: {type: integer}
+                  page_size: {type: integer}
+                  page_count: {type: integer}
+                  total_count: {type: integer}
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: integer}
+                        name: {type: string}
+                        slug: {type: string}
+                        charity_id: {type: integer}
+                        board_type: {type: string}
+                        automated_by: {type: string, nullable: true}
+                        automated_by_id: {type: integer, nullable: true}
+                        archived: {type: boolean}
+                        can_archive: {type: boolean}
+                        can_delete: {type: boolean}
+                        created_at: {type: string, format: date-time}
+                        updated_at: {type: string, format: date-time}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /progress_boards/bulk_action:
+    post:
+      tags: [Progress Boards]
+      summary: Archive, reopen or delete several Progress Boards
+      description: |
+        Archives, reopens or deletes several Progress Boards at once, as the Archive, Reopen and Delete
+        buttons do for the boards ticked in the Rows view of the Manage Progress Boards page. Archiving
+        hides a board until it is reopened, and keeps it archived if its Project is later reopened.
+        Delete is permanent.
+
+        Each board is changed only if the user may: archive and reopen need a Board Admin or the board's
+        creator; delete needs a Board Admin who is an Organisation Editor. Boards the user may not
+        change, or can't see, are listed in `skipped` with the reason; the rest still change. At most
+        100 boards at a time.
+      operationId: bulkActionProgressBoards
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bulk_action, progress_board_ids]
+              properties:
+                bulk_action: {type: string, enum: [archive, reopen, delete]}
+                progress_board_ids:
+                  type: array
+                  items: {type: integer}
+                  minItems: 1
+                  maxItems: 100
+            example: {bulk_action: archive, progress_board_ids: [301, 302]}
+      responses:
+        "200":
+          description: What changed and what was skipped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action: {type: string}
+                  updated_ids: {type: array, items: {type: integer}}
+                  skipped:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: integer}
+                        name: {type: string, nullable: true}
+                        reason: {type: string}
+                  message: {type: string}
+              example:
+                action: archive
+                updated_ids: [301]
+                skipped: [{id: 302, name: "Youth outcomes", reason: "Only its admins can archive or reopen it"}]
+                message: "1 Progress Board archived. 1 skipped, as you can't archive it."
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /project_story_categories:
     get:
       tags: [Project Story Categories]
@@ -5705,6 +5823,52 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Project Story Categories]
+      summary: Remove a Survey from a Project
+      description: |
+        Removes a Survey from a Project by deleting its Survey Campaign, as Remove from project does in
+        the Actions menu of a Survey Campaign page. The Survey stays in the Organisation's library and
+        can be added to the Project again. The Progress Board created automatically for that Survey on
+        that Project is deleted too.
+
+        Refused with 422 and the reason while anything in the Project depends on the campaign: survey
+        responses recorded with it in that Project, saved draft responses, Events in the Project that
+        use it, Survey Invitations sent for it, or it being the Project's default survey. It can then
+        only be deactivated. Requires Project Editor (Project Manager) or Organisation Editor
+        (Organisation Admin) access.
+      operationId: deleteProjectStoryCategory
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Survey Campaign was removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+                  project_id: {type: integer}
+                  story_category_id: {type: integer}
+                  removed: {type: boolean}
+              example: {id: 812, project_id: 101, story_category_id: 55, removed: true}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user may not remove this Survey from the Project
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: Something in the Project still depends on the Survey Campaign
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+              example:
+                error: "This survey can't be removed from Youth Club because survey responses have been recorded with it in this project. You can deactivate it instead."
 
   /project_story_categories/{id}/survey_links:
     parameters:
