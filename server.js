@@ -2672,6 +2672,18 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
             { code: "404", cls: "response-4xx", desc: "No Impact Framework with that id" }
           ], "Only Projects and frameworks of your organisations, and frameworks you made, are listed.")}
+          ${endpointCard("GET", "/impact_frameworks/{id}/missing_metrics", "List an Impact Framework's metrics a Results Canvas can't show", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Impact Framework (Template): one the Results Canvas's Metrics dropdown offers you" },
+            { name: "project_id", in: "query", type: "integer", required: false, desc: "The project whose Results Canvas to check (give this or album_id)" },
+            { name: "album_id", in: "query", type: "integer", required: false, desc: "The album whose Results Canvas to check, instead of a project" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Metrics per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code> lists the framework's Activity and Attendance trackers (<code>Change</code>) and Outcomes not used on the project, or on some of the album's open projects, each with its <code>stage</code> and the <code>projects</code> without it (<code>can_add</code> says whether you may add it there)" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "404", cls: "response-4xx", desc: "A project or album you can't see, or an Impact Framework its canvas doesn't offer you" },
+            { code: "422", cls: "response-4xx", desc: "Neither project_id nor album_id was given" }
+          ], "The list behind the Results Canvas's \"metrics aren't shown\" popup. Add a metric with Add a metric to a destination (destination <code>projects</code>).")}
         </div>
       </section>
 
@@ -4551,6 +4563,11 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
           ], "A fact about a person's organisations takes <code>across</code>: for someone in several organisations, whether it must hold for any one of them (<code>any_organisation</code>, the default), every one (<code>all_organisations</code>) or the oldest one they belong to (<code>first_organisation</code>). Facts are written in Makerble's code, so this list only changes with a release.")}
+          ${endpointCard("GET", "/deep_links", "List Deep Links", true, [], [
+            { code: "200", cls: "response-2xx", desc: "Every deep link, on one page, each with <code>name</code>, <code>label</code>, <code>group</code>, <code>role</code> (<code>user</code>, <code>member</code> or <code>editor</code>) and <code>record</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
+          ], "The pages a link can open in the person's own organisation, such as Manage Checklists (<code>checklists</code>), the same links the User Guide uses as <code>/deeplink/&lt;name&gt;</code>. Use a <code>name</code> as an announcement's <code>button_deep_link</code>. The list only changes with a release.")}
           ${endpointCard("GET", "/announcements/{id}", "Get an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
@@ -4563,7 +4580,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user doesn't hold the role on that place, or (with no place) doesn't have System Access" },
             { code: "404", cls: "response-4xx", desc: "The Organisation, Workspace or Team doesn't exist" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no headline, a headline over 90 characters, a Vimeo visual with a YouTube link, an image without alt text, an <code>intro_key</code> whose Intro has no animation, a storyboard that breaks the rules, a file that isn't a PNG, JPG, GIF or WebP image or is over 5 MB, or the name change animation for a place" }
-          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>image</code> and <code>image_alt</code> (for <code>image</code>: a PNG, JPG, GIF or WebP file of up to 5 MB, sent as a file in a <code>multipart/form-data</code> request or in JSON as <code>{filename, data}</code> with the data in base64, and its alt text, up to 250 characters, both required), <code>intro_key</code> (for <code>intro_animation</code>), <code>storyboard</code> (for <code>storyboard</code>), <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>training_material_id</code> (a place's announcement only: one of its Organisation's Training materials, linked for the colleagues it is shared with), <code>button_label</code> (default \"Got it\"), <code>feature_tour_id</code> (Makerble's own only: a feature tour; while it is live the button says \"Take the tour\" and starts it), <code>audience</code>, <code>roles</code>, <code>audience_rules</code> and <code>page_keys</code> (Makerble's own only; see above), <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
+          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>image</code> and <code>image_alt</code> (for <code>image</code>: a PNG, JPG, GIF or WebP file of up to 5 MB, sent as a file in a <code>multipart/form-data</code> request or in JSON as <code>{filename, data}</code> with the data in base64, and its alt text, up to 250 characters, both required), <code>intro_key</code> (for <code>intro_animation</code>), <code>storyboard</code> (for <code>storyboard</code>), <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>training_material_id</code> (a place's announcement only: one of its Organisation's Training materials, linked for the colleagues it is shared with), <code>button_label</code> (default \"Got it\"), <code>button_deep_link</code> (Makerble's own only: a deep link name from List Deep Links; the button then opens that page in the person's own organisation and closes the popup), <code>feature_tour_id</code> (Makerble's own only: a feature tour; while it is live the button says \"Take the tour\" and starts it), <code>audience</code>, <code>roles</code>, <code>audience_rules</code> and <code>page_keys</code> (Makerble's own only; see above), <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
           ${endpointCard("PATCH", "/announcements/{id}", "Update an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
