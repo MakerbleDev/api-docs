@@ -179,6 +179,8 @@ tags:
     description: The gift icon's Wishlist - your feature requests and feedback, and what Makerble is building next (Coming soon)
   - name: Saved Filters
     description: Saved Filters for Contacts, Events and Cases, and adding one to a project's toolbar as a shortcut
+  - name: Toolkits
+    description: Toolkits (Collections) are ready-made sets of Surveys, Contact Forms, Impact Frameworks, metrics and tips on Explore Toolkits
   - name: Albums
     description: Albums (Bundles; being renamed Portfolios on screen) group Projects so their results can be seen together
   - name: Age Bands
@@ -2533,6 +2535,134 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Team'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /toolkits:
+    get:
+      tags: [Toolkits]
+      summary: List Toolkits
+      description: |
+        The Toolkits on Explore Toolkits: ready-made sets of Surveys, Contact Forms, Impact Frameworks,
+        metrics and tips an organisation can add to its Projects in one go (Collections in the
+        database). A user with Marketing or Admin system access also sees listed Toolkits still
+        awaiting approval, as Site Overview › Manage Toolkits shows them.
+      operationId: listToolkits
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Toolkits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolkitList'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /toolkits/{id}:
+    get:
+      tags: [Toolkits]
+      summary: Get a Toolkit
+      description: |
+        One Toolkit, if the user can see its page: a Toolkit on Explore Toolkits, or one the user can
+        edit. Any other returns 404.
+      operationId: getToolkit
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Toolkit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Toolkit'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Toolkits]
+      summary: Update a Toolkit's number and image settings
+      description: |
+        Sets the Toolkit number and whether the thumbnail (on Explore Toolkits) and the cover image (on
+        the Toolkit's page) are darkened, as the Create/Edit Collection page does. Only the fields sent
+        change. The user must be able to edit the Toolkit: its owner, an editor of its Organisation, or
+        a user with Marketing or Admin system access.
+      operationId: updateToolkit
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolkitUpdateRequest'
+            example:
+              toolkit_number: "T14"
+              darken_cover_image: true
+      responses:
+        "200":
+          description: The Toolkit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Toolkit'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /toolkits/{id}/image:
+    patch:
+      tags: [Toolkits]
+      summary: Replace a Toolkit's thumbnail or cover image
+      description: |
+        Uploads a new thumbnail (`kind: thumbnail`, shown on Explore Toolkits) or cover image
+        (`kind: cover`, shown on the Toolkit's page), as Replace does on Site Overview › Manage
+        Toolkits. Send it as `multipart/form-data`. The image must be a JPEG or PNG. Needs Marketing or
+        Admin system access.
+      operationId: replaceToolkitImage
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [kind, image]
+              properties:
+                kind:
+                  type: string
+                  enum: [thumbnail, cover]
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: The Toolkit, with its new image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Toolkit'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -20921,6 +21051,81 @@ components:
                   name:
                     type: string
                     example: "Enrolled"
+
+    Toolkit:
+      type: object
+      description: A Toolkit (Collection in the database) on Explore Toolkits.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+          nullable: true
+        toolkit_number:
+          type: string
+          nullable: true
+          description: The Toolkit's number, e.g. "T14", shown on Site Overview › Manage Toolkits
+        strapline:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        approved:
+          type: boolean
+          description: Whether Makerble has approved the Toolkit for Explore Toolkits
+        thumbnail_image_url:
+          type: string
+          nullable: true
+          description: The image on the Toolkit's Explore Toolkits card; when null, the card uses the cover image
+        cover_image_url:
+          type: string
+          nullable: true
+          description: The image at the top of the Toolkit's page
+        darken_thumbnail_image:
+          type: boolean
+          description: Whether a dark translucent layer covers the thumbnail on Explore Toolkits
+        darken_cover_image:
+          type: boolean
+          description: Whether a dark translucent layer covers the cover image on the Toolkit's page
+        url:
+          type: string
+          description: The Toolkit's page in Makerble
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ToolkitList:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Toolkit'
+
+    ToolkitUpdateRequest:
+      type: object
+      properties:
+        toolkit_number:
+          type: string
+          nullable: true
+        darken_thumbnail_image:
+          type: boolean
+        darken_cover_image:
+          type: boolean
 
     Album:
       type: object
