@@ -924,6 +924,7 @@ function buildDocsPage() {
         <a href="#projects"        class="nav-link"><span class="nav-method method-GET">GET</span>Projects</a>
         <a href="#saved-filters"   class="nav-link"><span class="nav-method method-POST">POST</span>Saved Filters</a>
         <a href="#albums"          class="nav-link"><span class="nav-method method-GET">GET</span>Albums (Portfolios)</a>
+        <a href="#toolkits"        class="nav-link"><span class="nav-method method-GET">GET</span>Toolkits</a>
         <a href="#progress-boards" class="nav-link"><span class="nav-method method-POST">POST</span>Progress Boards</a>
         <a href="#signup-pages"    class="nav-link"><span class="nav-method method-POST">POST</span>Signup Pages</a>
         <a href="#users"           class="nav-link"><span class="nav-method method-POST">POST</span>Users</a>
@@ -1407,6 +1408,55 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "<code>action</code>, <code>updated_ids</code>, <code>skipped</code> (<code>{id, name, reason}</code>) and <code>message</code>" },
             { code: "422", cls: "response-4xx", desc: "Unknown action, no boards, or more than 100" }
           ], "As the Archive, Reopen and Delete buttons for the boards ticked in the Rows view of Manage Progress Boards. Archive and reopen need a Board Admin or the board's creator; delete needs a Board Admin who is an Organisation Editor, and is permanent. Boards the user may not change are skipped, not refused.")}
+        </div>
+      </section>
+
+      <!-- Toolkits -->
+      <section class="section" id="toolkits">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Toolkits</h2>
+        <div class="section-desc">
+          <p>A Toolkit is a ready-made set of Surveys, Contact Forms, Impact Frameworks, metrics and tips on <strong>Explore Toolkits</strong> that an Organisation can add to its Projects in one go. The database calls them Collections; the API uses <code>toolkits</code>. Each has a <strong>Toolkit number</strong> (e.g. <code>T14</code>), a thumbnail for its Explore Toolkits card, a cover image for its page, and a setting for each image that lays a dark translucent layer over it.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/toolkits", "List Toolkits", true, [
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — return only Toolkits updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Toolkits" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" }
+          ], "The Toolkits on Explore Toolkits. With Marketing or Admin system access you also see listed Toolkits awaiting approval, as Site Overview › Manage Toolkits shows them.")}
+          ${endpointCard("GET", "/toolkits/{id}", "Get a Toolkit", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Toolkit ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Toolkit: <code>toolkit_number</code>, <code>thumbnail_image_url</code>, <code>cover_image_url</code>, <code>darken_thumbnail_image</code>, <code>darken_cover_image</code> and its page <code>url</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Toolkit you can't see" }
+          ])}
+          ${endpointCard("PATCH", "/toolkits/{id}", "Change a Toolkit's number and image darkening", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Toolkit ID" },
+            { name: "toolkit_number", type: "string", required: false, desc: "The Toolkit's number, e.g. <code>T14</code>; <code>null</code> clears it" },
+            { name: "darken_thumbnail_image", type: "boolean", required: false, desc: "Darken the thumbnail on Explore Toolkits" },
+            { name: "darken_cover_image", type: "boolean", required: false, desc: "Darken the cover image on the Toolkit's page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Toolkit" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You can see the Toolkit but not edit it" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Toolkit you can't see" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>" }
+          ], "As the <b>Create/Edit Collection</b> page does. Only the fields sent change. You must be able to edit the Toolkit: its owner, an editor of its Organisation, or a user with Marketing or Admin system access.")}
+          ${endpointCard("PATCH", "/toolkits/{id}/image", "Replace a Toolkit's thumbnail or cover image", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Toolkit ID" },
+            { name: "kind", type: "string", required: true, desc: "<code>thumbnail</code> (Explore Toolkits card) or <code>cover</code> (top of the Toolkit's page)" },
+            { name: "image", type: "file", required: true, desc: "A JPEG or PNG, sent as <code>multipart/form-data</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Toolkit, with its new image URL" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Needs Marketing or Admin system access" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or a Toolkit you can't see" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. an unknown <code>kind</code> or a file that isn't an image" }
+          ], "As <b>Replace</b> does on Site Overview › Manage Toolkits.")}
         </div>
       </section>
 
