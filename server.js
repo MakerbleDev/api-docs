@@ -2652,6 +2652,26 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "No Impact Framework with that id that you may copy" },
             { code: "422", cls: "response-4xx", desc: "The copy could not be saved; the error says why. Nothing is created" }
           ], "The same as Copy on the Manage Impact Frameworks page: the stages and metrics are copied, the projects are not.")}
+          ${endpointCard("POST", "/impact_frameworks/{id}/additions", "Add an Impact Framework to projects or frameworks", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Impact Framework (Template) whose metrics to add" },
+            { name: "project_ids", in: "body", type: "array", required: false, desc: "Projects to add the metrics to, in each Project's own Theory of Change" },
+            { name: "framework_ids", in: "body", type: "array", required: false, desc: "Other Impact Frameworks (Templates) to add the metrics to. Give <code>project_ids</code>, <code>framework_ids</code> or both" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>data</code>: <code>impact_framework_id</code>, <code>added</code> (each with <code>receiving_framework_id</code> and <code>project_id</code>) and <code>refused</code> (each with <code>project_id</code> or <code>framework_id</code> and <code>error</code>: <code>forbidden</code>, <code>not-found</code> or <code>same_framework</code>)" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "404", cls: "response-4xx", desc: "No Impact Framework with that id" },
+            { code: "422", cls: "response-4xx", desc: "Neither <code>project_ids</code> nor <code>framework_ids</code> given" }
+          ], "The same as Add to projects and Add metrics from another project or framework on Edit metrics: the metrics are added stage by stage, ones already there are skipped, and the addition is recorded. Projects and frameworks you can't edit are refused, the rest are added.")}
+          ${endpointCard("GET", "/impact_frameworks/{id}/additions", "List where an Impact Framework has been added", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Impact Framework (Template)" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Results per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only additions changed after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Each with <code>id</code>, <code>impact_framework_id</code>, <code>receiving_framework</code> {id, name}, <code>project</code> {id, name} (null for a framework that isn't a Project's), <code>added_by</code> {id, name} (null before Makerble recorded it), <code>added_at</code> and <code>updated_at</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "404", cls: "response-4xx", desc: "No Impact Framework with that id" }
+          ], "Only Projects and frameworks of your organisations, and frameworks you made, are listed.")}
         </div>
       </section>
 
