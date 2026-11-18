@@ -2652,6 +2652,18 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "No Impact Framework with that id that you may copy" },
             { code: "422", cls: "response-4xx", desc: "The copy could not be saved; the error says why. Nothing is created" }
           ], "The same as Copy on the Manage Impact Frameworks page: the stages and metrics are copied, the projects are not.")}
+          ${endpointCard("GET", "/impact_frameworks/{id}/missing_metrics", "List an Impact Framework's metrics a Results Canvas can't show", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Impact Framework (Template): one the Results Canvas's Metrics dropdown offers you" },
+            { name: "project_id", in: "query", type: "integer", required: false, desc: "The project whose Results Canvas to check (give this or album_id)" },
+            { name: "album_id", in: "query", type: "integer", required: false, desc: "The album whose Results Canvas to check, instead of a project" },
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Metrics per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>data</code> lists the framework's Activity and Attendance trackers (<code>Change</code>) and Outcomes not used on the project, or on some of the album's open projects, each with its <code>stage</code> and the <code>projects</code> without it (<code>can_add</code> says whether you may add it there)" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "404", cls: "response-4xx", desc: "A project or album you can't see, or an Impact Framework its canvas doesn't offer you" },
+            { code: "422", cls: "response-4xx", desc: "Neither project_id nor album_id was given" }
+          ], "The list behind the Results Canvas's \"metrics aren't shown\" popup. Add a metric with Add a metric to a destination (destination <code>projects</code>).")}
         </div>
       </section>
 
