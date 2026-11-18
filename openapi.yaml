@@ -951,6 +951,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AnnouncementInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AnnouncementInput'
             examples:
               makerble:
                 summary: One of Makerble's own (System Access users)
@@ -980,6 +983,18 @@ paths:
                   starts_on: "2026-12-01"
                   ends_on: "2026-12-08"
                   status: scheduled
+              image:
+                summary: With an image, sent as base64
+                value:
+                  title: Surveys now have a Duplicate button
+                  body: Copy a Survey, with its questions, in one click.
+                  visual_type: image
+                  image:
+                    filename: duplicate-survey.png
+                    data: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==
+                  image_alt: The Duplicate button at the top of a Survey
+                  learn_more_url: https://makerble.atlassian.net/wiki/spaces/MCPD/pages/123/Surveys
+                  status: draft
       responses:
         "201":
           description: The created Announcement
@@ -1066,6 +1081,9 @@ paths:
         required: true
         content:
           application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementInput'
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/AnnouncementInput'
             example:
@@ -18078,6 +18096,17 @@ components:
           type: string
           maxLength: 40
           example: Workspaces
+    AnnouncementImageUpload:
+      type: object
+      required: [filename, data]
+      properties:
+        filename:
+          type: string
+          example: workspaces.png
+        data:
+          type: string
+          format: byte
+          description: The file's contents in base64.
     AnnouncementInput:
       type: object
       properties:
@@ -18113,8 +18142,10 @@ components:
           description: The message. Required.
         visual_type:
           type: string
-          enum: [name_change, vimeo, none]
-          description: The name-change animation (Makerble's own only), a Vimeo video, or nothing.
+          enum: [name_change, vimeo, image, none]
+          description: >-
+            The name-change animation (Makerble's own only), a Vimeo video, an uploaded image (with `image` and
+            `image_alt`), or nothing. Changing it from `image` removes the image and its alt text.
         name_changes:
           type: array
           minItems: 1
@@ -18125,6 +18156,20 @@ components:
         vimeo_url:
           type: string
           description: For `vimeo`, https://vimeo.com/<id>, https://vimeo.com/<id>/<hash> or https://player.vimeo.com/video/<id>?h=<hash>. Ignored for the other visuals.
+        image:
+          description: |
+            For `image`: a screenshot or illustration shown whole (never cropped) in the popup. A PNG, JPG, GIF or
+            WebP file of up to 5 MB; the type is read from the file itself. Send it as a file in a
+            `multipart/form-data` request, or in JSON as `{ "filename": "workspaces.png", "data": "<base64>" }`.
+            Required when creating an `image` announcement; leave it out on update to keep the saved image.
+          oneOf:
+            - type: string
+              format: binary
+            - $ref: '#/components/schemas/AnnouncementImageUpload'
+        image_alt:
+          type: string
+          maxLength: 250
+          description: For `image`, required. What the image shows, read out by screen readers.
         learn_more_url:
           type: string
           nullable: true
@@ -18279,7 +18324,7 @@ components:
           type: string
         visual_type:
           type: string
-          enum: [name_change, vimeo, none]
+          enum: [name_change, vimeo, image, none]
         name_changes:
           type: array
           items:
@@ -18309,6 +18354,14 @@ components:
           items:
             type: string
           description: The guidance panel keys of the pages it shows on; empty for any page. See Create an Announcement.
+        image_url:
+          type: string
+          nullable: true
+          description: For the `image` visual, a link to the uploaded image; null otherwise.
+        image_alt:
+          type: string
+          nullable: true
+          description: For the `image` visual, the image's alt text; null otherwise.
         starts_on:
           type: string
           format: date
