@@ -10891,6 +10891,108 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /impact_frameworks/{id}/missing_metrics:
+    get:
+      tags: [Library]
+      summary: List an Impact Framework's metrics a Results Canvas can't show
+      operationId: listMissingFrameworkMetrics
+      description: |
+        When a project's or an album's Results Canvas is viewed through an Impact Framework (its **Metrics**
+        dropdown), it shows only the framework's metrics that are already used on the project. This lists
+        the rest: the framework's Activity and Attendance trackers (`Change`) and Outcomes (`Outcome`) that
+        aren't used on the project, or aren't used on one or more of the album's open projects. It is the
+        list the canvas's "metrics aren't shown" popup shows.
+
+        Each metric names the projects without it, and `can_add` says whether you may add it there. Add a
+        metric with [Add metric to](#add-metric-to): `POST
+        /metrics/{change|outcome}/{metric_id}/destinations/projects/{project_id}`.
+
+        Give `project_id` or `album_id`. The project must be one you can open, the album one you can view,
+        and the Impact Framework one the canvas's Metrics dropdown offers you (your organisation's or your
+        own). Anything else answers `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the Impact Framework (Template)
+          schema:
+            type: integer
+          example: 7174
+        - name: project_id
+          in: query
+          description: The project whose Results Canvas to check
+          schema:
+            type: integer
+          example: 2210
+        - name: album_id
+          in: query
+          description: The album (Bundle) whose Results Canvas to check, instead of a project
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The missing metrics, in the framework's column order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  impact_framework:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                  project_id: { type: integer, nullable: true }
+                  album_id: { type: integer, nullable: true }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  page_count: { type: integer }
+                  total_count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metric_type: { type: string, enum: [Change, Outcome] }
+                        metric_id: { type: integer }
+                        name: { type: string }
+                        stage: { type: string, description: The Impact Scorecard column the framework puts it in }
+                        stage_id: { type: integer }
+                        projects:
+                          type: array
+                          description: The projects that don't use the metric yet
+                          items:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              name: { type: string }
+                              can_add: { type: boolean, description: Whether you may add the metric to this project }
+              example:
+                impact_framework: { id: 7174, name: Bambanani ECD Logic Model }
+                project_id: null
+                album_id: 381
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - metric_type: Outcome
+                    metric_id: 5521
+                    name: Improved school readiness
+                    stage: Short-term outcomes
+                    stage_id: 3
+                    projects:
+                      - { id: 2210, name: Bambanani 2026, can_add: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /referral_submissions:
     post:
       tags: [Signup Pages]
