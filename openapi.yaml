@@ -1035,6 +1035,32 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "403":
           $ref: '#/components/responses/ForbiddenError'
+  /deep_links:
+    get:
+      tags: [Announcements]
+      summary: List Deep Links
+      description: |
+        The pages a link can open in the signed-in person's own organisation, such as Manage Checklists
+        (`checklists`) or Create a contact (`create_contact`): every link in Makerble's deep links catalogue, the
+        same links the User Guide uses as https://www.makerble.com/deeplink/<name>. Each has its `name`, a readable
+        `label` in on-screen words, the `group` it belongs to (Contacts, Events, Surveys, ...) and the `role` the
+        person needs: `user` (anyone signed in), `member` (an Editor, Reporter or Observer of the organisation or one
+        of its Workspaces) or `editor` (an Editor of the organisation). A `record` link opens one record, such as the
+        first Contact the person can see. Use a `name` as an announcement's `button_deep_link`. The list only changes
+        with a release, so it comes on one page. System Access users only; anyone else gets 403.
+      operationId: listDeepLinks
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Every deep link, on one page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDeepLinks'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
   /announcements/{id}:
     parameters:
       - name: id
@@ -18292,6 +18318,41 @@ components:
                 type: string
               description:
                 type: string
+    DeepLink:
+      type: object
+      properties:
+        name:
+          type: string
+          example: checklists
+          description: The link's name. Never changes, since User Guide articles link to it.
+        label:
+          type: string
+          example: Checklists
+        group:
+          type: string
+          example: Checklists
+        role:
+          type: string
+          enum: [user, member, editor]
+          description: The role the person needs in their organisation to open the page.
+        record:
+          type: boolean
+          description: True when the link opens one record (the first the person can see), falling back to a page.
+    PaginatedDeepLinks:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeepLink'
     PaginatedAnnouncementFacts:
       type: object
       properties:

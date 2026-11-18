@@ -4531,6 +4531,11 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
           ], "A fact about a person's organisations takes <code>across</code>: for someone in several organisations, whether it must hold for any one of them (<code>any_organisation</code>, the default), every one (<code>all_organisations</code>) or the oldest one they belong to (<code>first_organisation</code>). Facts are written in Makerble's code, so this list only changes with a release.")}
+          ${endpointCard("GET", "/deep_links", "List Deep Links", true, [], [
+            { code: "200", cls: "response-2xx", desc: "Every deep link, on one page, each with <code>name</code>, <code>label</code>, <code>group</code>, <code>role</code> (<code>user</code>, <code>member</code> or <code>editor</code>) and <code>record</code>" },
+            { code: "401", cls: "response-4xx", desc: "Missing or invalid token" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
+          ], "The pages a link can open in the person's own organisation, such as Manage Checklists (<code>checklists</code>), the same links the User Guide uses as <code>/deeplink/&lt;name&gt;</code>. Use a <code>name</code> as an announcement's <code>button_deep_link</code>. The list only changes with a release.")}
           ${endpointCard("GET", "/announcements/{id}", "Get an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
