@@ -18223,6 +18223,14 @@ components:
           type: string
           maxLength: 24
           description: Defaults to "Got it".
+        button_deep_link:
+          type: string
+          nullable: true
+          description: |
+            Makerble's own only. Where the button goes: the `name` of a deep link from List Deep Links, such as
+            `checklists`. The button then opens that page in the person's own organisation and closes the popup; give it a
+            label that says where it goes ("Explore Checklists"). For someone who can't open the page, it only closes the
+            popup. A live `feature_tour_id` takes priority. Send null to clear it.
         audience:
           type: string
           enum: [everyone, colleagues, administrators]
@@ -18470,6 +18478,13 @@ components:
         learn_more_click_count:
           type: integer
           description: People who clicked its "Learn more" link.
+        button_deep_link:
+          type: string
+          nullable: true
+          description: The deep link the button opens, or null when it only closes the popup.
+        button_click_count:
+          type: integer
+          description: People who clicked the button through to its page.
         created_by_id:
           type: integer
           nullable: true
