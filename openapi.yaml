@@ -2799,6 +2799,91 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /albums/{id}/project_contributions:
+    get:
+      tags: [Albums]
+      summary: See how much each Project contributed to an Album's (Portfolio's) results
+      description: |
+        What the Album's Project Contributions views show. For each metric on the Album (an Activity
+        or Outcome metric: a Change or an Indicator), the progress across the Album, the Album's
+        target and the percentage of it reached, then each Project's sub-total and its share of the
+        Album's progress (`contribution_percentage`). Projects are the Album's open Projects, in
+        natural order of name ("2. Pear" before "10. Rice"), each with the colour set on its Edit
+        Project page.
+
+        `timeframe` chooses the timeframe, as the Album page's Period, Year to date and All-time
+        options do:
+        - `all_time` (default): all progress. The Album target is its deadline targets added up, or its
+          one-off target when it has no deadlines for the metric. Each Project's own all-time target is
+          given too; `target_unavailable` is true when the Project sets that metric's targets by
+          deadline instead.
+        - `period`: progress between two of the Album's Target Deadlines, against the target for that
+          deadline. Empty when the Album has no deadline targets.
+        - `year_to_date`: progress over one year from the Album's Year Start (1 January without one),
+          against the deadline targets falling in that year, as the Year to date option does.
+
+        `timeframes` lists the periods or years to choose from; send one's `end_date` to see it. Without
+        `end_date`, the current period or year is shown. Stories count by their date, on every open
+        Project in the Album. The metrics are paged; the projects list is not. Requires access to view
+        the Album.
+      operationId: getAlbumProjectContributions
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: timeframe
+          in: query
+          schema:
+            type: string
+            enum: [all_time, period, year_to_date]
+            default: all_time
+        - name: end_date
+          in: query
+          description: The last day of the period or year to show, as listed in `timeframes`
+          schema:
+            type: string
+            format: date
+          example: "2026-06-30"
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Each metric's progress, split by Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlbumProjectContributions'
+              example:
+                album_id: 12
+                timeframe: all_time
+                timeframes: []
+                selected_timeframe: null
+                projects:
+                  - { project_id: 31, name: "1. Breakfast club", colour: "#225f85" }
+                  - { project_id: 30, name: "2. Homework club", colour: "#e82a92" }
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - metric_type: Change
+                    metric_id: 55
+                    name: Children rehomed
+                    outcome_id: null
+                    outcome_name: null
+                    stage: Activities
+                    total: 40
+                    target: 80
+                    percentage: 50.0
+                    projects:
+                      - { project_id: 31, subtotal: 10, contribution_percentage: 25.0, target: 12, target_unavailable: false }
+                      - { project_id: 30, subtotal: 30, contribution_percentage: 75.0, target: null, target_unavailable: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /projects:
     get:
       tags: [Projects]
@@ -21073,6 +21158,115 @@ components:
           items:
             type: integer
 
+    AlbumContributionTimeframe:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date
+          nullable: true
+          description: First day; null for the first period, which runs from the start
+        end_date:
+          type: string
+          format: date
+        label:
+          type: string
+          example: From 31 Mar 2026 to 30 Jun 2026
+    AlbumProjectContributions:
+      type: object
+      properties:
+        album_id:
+          type: integer
+        timeframe:
+          type: string
+          enum: [all_time, period, year_to_date]
+        timeframes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlbumContributionTimeframe'
+        selected_timeframe:
+          type: object
+          nullable: true
+          description: The period or year shown; null over all time, or when the Album has no periods
+          properties:
+            start_date:
+              type: string
+              format: date
+              nullable: true
+            end_date:
+              type: string
+              format: date
+            label:
+              type: string
+        projects:
+          type: array
+          items:
+            type: object
+            properties:
+              project_id:
+                type: integer
+              name:
+                type: string
+              colour:
+                type: string
+                example: "#225f85"
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              metric_type:
+                type: string
+                enum: [Change, Indicator]
+              metric_id:
+                type: integer
+              name:
+                type: string
+              outcome_id:
+                type: integer
+                nullable: true
+                description: The Outcome an Indicator sits under; null for a Change
+              outcome_name:
+                type: string
+                nullable: true
+              stage:
+                type: string
+                nullable: true
+              total:
+                type: integer
+                description: Progress across the Album in the timeframe
+              target:
+                type: integer
+                nullable: true
+              percentage:
+                type: number
+                description: total as a percentage of target; 0 when there is no target
+              projects:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    project_id:
+                      type: integer
+                    subtotal:
+                      type: integer
+                    contribution_percentage:
+                      type: number
+                      description: subtotal as a percentage of total; 0 when total is 0
+                    target:
+                      type: integer
+                      nullable: true
+                      description: The Project's own all-time target; only given for timeframe all_time
+                    target_unavailable:
+                      type: boolean
     AlbumTargets:
       type: object
       properties:
