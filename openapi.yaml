@@ -18142,10 +18142,12 @@ components:
           description: The message. Required.
         visual_type:
           type: string
-          enum: [name_change, vimeo, image, none]
+          enum: [name_change, vimeo, image, intro_animation, storyboard, none]
           description: >-
             The name-change animation (Makerble's own only), a Vimeo video, an uploaded image (with `image` and
-            `image_alt`), or nothing. Changing it from `image` removes the image and its alt text.
+            `image_alt`), a feature's Intro animation (`intro_animation`, with `intro_key`; Makerble's own only), an
+            animation of its own (`storyboard`; Makerble's own only), or nothing. Changing it from `image` removes the
+            image and its alt text.
         name_changes:
           type: array
           minItems: 1
@@ -18170,6 +18172,20 @@ components:
           type: string
           maxLength: 250
           description: For `image`, required. What the image shows, read out by screen readers.
+        intro_key:
+          type: string
+          description: |
+            For `intro_animation`: the key of the Intro (guidance panel) whose animation the popup plays, such as
+            `checklists`. It must have a storyboard. The popup plays the Intro's storyboard as it is when shown, so a
+            later change to the Intro's animation changes the announcement's too; if the Intro loses its animation, the
+            popup shows no visual. The usual choice for a feature's announcement.
+        storyboard:
+          type: object
+          additionalProperties: true
+          description: |
+            For `storyboard`: an animation of the announcement's own, for when the Intro's doesn't fit (for example when
+            only one part of a feature is new). The same format and rules as an Intro's storyboard (`archetype`,
+            `loop_seconds`, `alt`, `steps`); one that breaks them is refused with 422, naming the problem.
         learn_more_url:
           type: string
           nullable: true
@@ -18324,7 +18340,7 @@ components:
           type: string
         visual_type:
           type: string
-          enum: [name_change, vimeo, image, none]
+          enum: [name_change, vimeo, image, intro_animation, storyboard, none]
         name_changes:
           type: array
           items:
@@ -18362,6 +18378,15 @@ components:
           type: string
           nullable: true
           description: For the `image` visual, the image's alt text; null otherwise.
+        intro_key:
+          type: string
+          nullable: true
+          description: For `intro_animation`, the key of the Intro whose animation it plays; null otherwise.
+        storyboard:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: For `storyboard`, the announcement's own animation storyboard; null otherwise.
         starts_on:
           type: string
           format: date
