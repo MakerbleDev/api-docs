@@ -11019,6 +11019,172 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /impact_frameworks/{id}/additions:
+    get:
+      tags: [Library]
+      summary: List where an Impact Framework has been added
+      operationId: listImpactFrameworkAdditions
+      description: |
+        The Projects and other Impact Frameworks this Impact Framework (Template) has been added to, by
+        whom and when, as recorded by **Add to projects** and by **Add metrics from another project or
+        framework** on Edit metrics. Only Projects and frameworks of your organisations, and frameworks
+        you made, are listed.
+
+        `project` is null when the receiving framework isn't a Project's Theory of Change. `added_by` is
+        null for additions made before Makerble recorded who added them.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the Impact Framework (Template)
+          schema:
+            type: integer
+          example: 7174
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Where the framework has been added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: {type: integer}
+                  page_size: {type: integer}
+                  page_count: {type: integer}
+                  total_count: {type: integer}
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: integer}
+                        impact_framework_id: {type: integer}
+                        receiving_framework:
+                          type: object
+                          properties:
+                            id: {type: integer}
+                            name: {type: string}
+                        project:
+                          type: object
+                          nullable: true
+                          properties:
+                            id: {type: integer}
+                            name: {type: string}
+                        added_by:
+                          type: object
+                          nullable: true
+                          properties:
+                            id: {type: integer}
+                            name: {type: string}
+                        added_at: {type: string, format: date-time}
+                        updated_at: {type: string, format: date-time}
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 31
+                    impact_framework_id: 7174
+                    receiving_framework: {id: 5549, name: Youth Club Theory of Change}
+                    project: {id: 5427, name: Youth Club}
+                    added_by: {id: 812, name: Sam Patel}
+                    added_at: "2026-11-18T09:12:44.000Z"
+                    updated_at: "2026-11-18T09:12:44.000Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Library]
+      summary: Add an Impact Framework to projects or frameworks
+      operationId: addImpactFramework
+      description: |
+        Adds an Impact Framework's (Template's) metrics to Projects and to other Impact Frameworks, as the
+        **Add to projects** page and the **Add metrics from another project or framework** box on Edit
+        metrics do. Adding to a Project adds the metrics to that Project's own Theory of Change.
+
+        The framework isn't copied: each metric goes into the same stage, a metric already there in that
+        stage is skipped, and the addition is recorded (see List where an Impact Framework has been added).
+        Adding the same framework again only adds metrics it has gained since.
+
+        You must be able to edit each Project's or framework's metrics. One you can't edit, or that doesn't
+        exist, is listed in `refused` and the rest are still added. Give `project_ids`, `framework_ids` or both.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the Impact Framework (Template) whose metrics to add
+          schema:
+            type: integer
+          example: 7174
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project_ids:
+                  type: array
+                  items: {type: integer}
+                  description: Projects to add the metrics to
+                framework_ids:
+                  type: array
+                  items: {type: integer}
+                  description: Other Impact Frameworks (Templates) to add the metrics to
+            example:
+              project_ids: [5427, 5428]
+              framework_ids: [1460]
+      responses:
+        "201":
+          description: What was added and what was refused
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      impact_framework_id: {type: integer}
+                      added:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            receiving_framework_id: {type: integer}
+                            project_id: {type: integer, nullable: true}
+                      refused:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            project_id: {type: integer}
+                            framework_id: {type: integer}
+                            error:
+                              type: string
+                              enum: [forbidden, not-found, same_framework, not_saved]
+              example:
+                data:
+                  impact_framework_id: 7174
+                  added:
+                    - {receiving_framework_id: 5549, project_id: 5427}
+                    - {receiving_framework_id: 1460, project_id: null}
+                  refused:
+                    - {project_id: 5428, error: forbidden}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /referral_submissions:
     post:
       tags: [Signup Pages]
