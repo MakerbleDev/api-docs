@@ -987,6 +987,7 @@ function buildDocsPage() {
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
         <a href="#wishlist"        class="nav-link"><span class="nav-method method-POST">POST</span>Wishlist</a>
         <a href="#welcome-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Welcome Tours</a>
+        <a href="#feature-launches" class="nav-link"><span class="nav-method method-POST">POST</span>Feature Launches</a>
         <a href="#feature-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Feature Tours</a>
         <a href="#training-materials" class="nav-link"><span class="nav-method method-POST">POST</span>Training Materials</a>
       </div>
@@ -4644,7 +4645,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user doesn't hold the role on that place, or (with no place) doesn't have System Access" },
             { code: "404", cls: "response-4xx", desc: "The Organisation, Workspace or Team doesn't exist" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. no headline, a headline over 90 characters, a Vimeo visual with a YouTube link, an image without alt text, an <code>intro_key</code> whose Intro has no animation, a storyboard that breaks the rules, a file that isn't a PNG, JPG, GIF or WebP image or is over 5 MB, or the name change animation for a place" }
-          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>image</code> and <code>image_alt</code> (for <code>image</code>: a PNG, JPG, GIF or WebP file of up to 5 MB, sent as a file in a <code>multipart/form-data</code> request or in JSON as <code>{filename, data}</code> with the data in base64, and its alt text, up to 250 characters, both required), <code>intro_key</code> (for <code>intro_animation</code>), <code>storyboard</code> (for <code>storyboard</code>), <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>training_material_id</code> (a place's announcement only: one of its Organisation's Training materials, linked for the colleagues it is shared with), <code>button_label</code> (default \"Got it\"), <code>button_deep_link</code> (Makerble's own only: a deep link name from List Deep Links; the button then opens that page in the person's own organisation and closes the popup), <code>feature_tour_id</code> (Makerble's own only: a feature tour; while it is live the button says \"Take the tour\" and starts it), <code>audience</code>, <code>roles</code>, <code>audience_rules</code> and <code>page_keys</code> (Makerble's own only; see above), <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
+          ], "Body: <code>scope_type</code> and <code>scope_id</code> (whose announcement; leave out for one of Makerble's own), <code>title</code> (headline, up to 90), <code>body</code> (message, up to 280), <code>visual_type</code>, <code>name_changes: [{old_name, new_name}]</code> (1 to 3), <code>vimeo_url</code>, <code>image</code> and <code>image_alt</code> (for <code>image</code>: a PNG, JPG, GIF or WebP file of up to 5 MB, sent as a file in a <code>multipart/form-data</code> request or in JSON as <code>{filename, data}</code> with the data in base64, and its alt text, up to 250 characters, both required), <code>intro_key</code> (for <code>intro_animation</code>), <code>storyboard</code> (for <code>storyboard</code>), <code>learn_more_url</code> (a Makerble User Guide page for Makerble's own; any https page for a place's), <code>training_material_id</code> (a place's announcement only: one of its Organisation's Training materials, linked for the colleagues it is shared with), <code>button_label</code> (default \"Got it\"), <code>button_deep_link</code> (Makerble's own only: a deep link name from List Deep Links; the button then opens that page in the person's own organisation and closes the popup), <code>feature_tour_id</code> (Makerble's own only: a feature tour; while it is live the button says \"Take the tour\" and starts it), <code>feature_launch_id</code> (Makerble's own only: the feature launch it announces; wherever <code>body</code>, <code>learn_more_url</code>, <code>button_deep_link</code> or <code>feature_tour_id</code> is empty the launch's own is used, so <code>body</code> may be left empty while the launch has a short description), <code>audience</code>, <code>roles</code>, <code>audience_rules</code> and <code>page_keys</code> (Makerble's own only; see above), <code>starts_on</code>, <code>ends_on</code>, <code>status</code>.")}
           ${endpointCard("PATCH", "/announcements/{id}", "Update an Announcement", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Announcement ID" }
           ], [
@@ -4776,6 +4777,47 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Neither photo_skippable nor watch_skippable sent" }
           ], "Send either setting or both.")}
+        </div>
+      </section>
+
+      <!-- Feature Launches -->
+      <section class="section" id="feature-launches">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Feature Launches</h2>
+        <div class="section-desc">
+          <p>A feature launch is one record per Makerble feature holding its launch content: the feature's <code>name</code> as people see it in Makerble (such as Registers), its <code>tier</code> (<code>minor</code>, <code>standard</code> or <code>major</code>), the <code>short_description</code> its announcements show, a longer <code>email_description</code> for the feature launch emails, its links (<code>user_guide_url</code>, <code>blog_url</code>, <code>deep_link</code>, <code>feature_tour_id</code>, <code>intro_key</code>), its email visual (<code>gif</code>, <code>still_frame</code>, <code>image</code> or <code>none</code>) and which of its links the email shows (<code>email_primary_link</code> as the main button and up to two <code>email_text_links</code>).</p>
+          <p>An announcement for a launch (<code>feature_launch_id</code> on the announcement) shows the launch's short description, User Guide link, deep link and feature tour wherever it has none of its own. System Access users (Makerble staff) only; anyone else gets <code>403</code>.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/feature_launches", "List feature launches", true, [
+            { name: "search", type: "string", required: false, desc: "Only launches whose name contains this text, ignoring case" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated feature launches, each with the ids of the announcements for it" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
+          ])}
+          ${endpointCard("GET", "/feature_launches/{id}", "Get a feature launch", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Feature launch ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The feature launch, with its uploaded image's, GIF's and still frame's addresses once there are any" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+          ${endpointCard("POST", "/feature_launches", "Create a feature launch", true, [], [
+            { code: "201", cls: "response-2xx", desc: "Feature launch created" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. a name already taken, a User Guide link outside the Makerble User Guide, or a main button whose link the launch doesn't have" }
+          ], "Body: <code>name</code> (required, unique), <code>tier</code>, <code>short_description</code> (up to 280), <code>email_description</code> (2 to 4 sentences, up to 600), <code>user_guide_url</code> (a Makerble User Guide page), <code>blog_url</code> (https), <code>deep_link</code> (a name from List Deep Links), <code>feature_tour_id</code>, <code>intro_key</code>, <code>email_visual</code>, <code>email_visual_alt</code> (required unless the visual is <code>none</code>), <code>email_image</code> (for <code>image</code>: a file in a <code>multipart/form-data</code> request, or <code>{filename, data}</code> in base64), <code>email_primary_link</code> and <code>email_text_links</code> (each <code>deep_link</code>, <code>tour</code>, <code>user_guide</code> or <code>blog</code>, one the launch has), <code>jira_keys</code>, <code>released_on</code>.")}
+          ${endpointCard("PATCH", "/feature_launches/{id}", "Update a feature launch", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Feature launch ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Feature launch updated" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed" }
+          ], "Only the fields sent change; null or an empty string clears one. <code>jira_keys</code> and <code>email_text_links</code> replace the whole list. A new <code>email_image</code> replaces the saved one, and changing <code>email_visual</code> away from <code>image</code> removes it.")}
         </div>
       </section>
 

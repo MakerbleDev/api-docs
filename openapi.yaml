@@ -163,6 +163,8 @@ tags:
     description: The primary organisational unit — every Story and Case belongs to a Project
   - name: Welcome Tours
     description: Guided tours of Makerble's own pages for new colleagues; Organisation Admins choose each team's stops, wording and how strict they are, and see who has finished
+  - name: Feature Launches
+    description: One record per Makerble feature holding its launch content, used by announcements and the feature launch emails; written by Makerble staff
   - name: Feature Tours
     description: Short tours introducing one feature to people who already use Makerble, offered from a page's Intro or an announcement; written by Makerble staff
   - name: Staff Unavailability
@@ -1538,6 +1540,151 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Tour'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /feature_launches:
+    get:
+      tags: [Feature Launches]
+      summary: List feature launches
+      description: |
+        Lists feature launches: one record per Makerble feature holding its launch content. A launch has the feature's
+        name as people see it in Makerble (such as "Registers"), its tier, the short description its announcements
+        show, the longer email description the feature launch emails use, its links (User Guide page, blog post, deep
+        link, feature tour and Intro), its email visual and which of its links the email shows.
+
+        An announcement for a launch (`feature_launch_id` on the announcement) shows the launch's short description,
+        User Guide link, deep link and feature tour wherever it has none of its own.
+
+        Send `search` to find launches by name. System Access users (Makerble staff) only. Anyone else gets 403.
+      operationId: listFeatureLaunches
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+        - name: search
+          in: query
+          required: false
+          description: Only launches whose name contains this text, ignoring case.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated feature launches
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFeatureLaunches'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      tags: [Feature Launches]
+      summary: Create a feature launch
+      description: |
+        Creates a feature launch, as Site Overview › Feature launches does. Only `name` is required, and it must be
+        unique. To link an announcement to it, send its `id` as the announcement's `feature_launch_id`.
+        System Access users only.
+      operationId: createFeatureLaunch
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureLaunchInput'
+            example:
+              name: Registers
+              tier: major
+              short_description: Take a register at every session and see who came at a glance.
+              email_description: >-
+                Registers show who came to each session. Tick people off as they arrive, and the numbers flow into your
+                reports. Open Events to take your first one.
+              user_guide_url: https://makerble.atlassian.net/wiki/spaces/MCPD/pages/123/Registers
+              deep_link: registers
+              email_visual: gif
+              email_visual_alt: A register being ticked off as people arrive
+              email_primary_link: deep_link
+              email_text_links: [user_guide]
+              jira_keys: [CP-9271]
+              released_on: '2026-12-01'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FeatureLaunchInput'
+      responses:
+        "201":
+          description: The created feature launch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureLaunch'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /feature_launches/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Feature Launches]
+      summary: Get a feature launch
+      description: One feature launch, with the ids of the announcements for it. System Access users only.
+      operationId: getFeatureLaunch
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The feature launch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureLaunch'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Feature Launches]
+      summary: Update a feature launch
+      description: |
+        Changes only the fields sent; send null or an empty string to clear one. `jira_keys` and `email_text_links`
+        replace the whole list when sent. An `email_image` sent replaces the saved one, and changing `email_visual`
+        away from `image` removes it. System Access users only.
+      operationId: updateFeatureLaunch
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureLaunchInput'
+            example:
+              blog_url: https://www.makerble.com/blog/registers
+              email_text_links: [user_guide, blog]
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FeatureLaunchInput'
+      responses:
+        "200":
+          description: The updated feature launch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureLaunch'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -18792,14 +18939,25 @@ components:
             For one of Makerble's own announcements: a feature tour (from GET /feature_tours). While the tour is live,
             the popup's button is "Take the tour", which starts it on its first page instead of showing `button_label`.
             Send null to clear it.
+        feature_launch_id:
+          type: integer
+          nullable: true
+          description: >-
+            For one of Makerble's own announcements: the feature launch it announces (from GET /feature_launches).
+            Wherever the announcement leaves `body`, `learn_more_url`, `button_deep_link` or `feature_tour_id` empty,
+            the popup and What's new use the launch's `short_description`, `user_guide_url`, `deep_link` and
+            `feature_tour_id`. Send null to clear it.
         title:
           type: string
           maxLength: 90
           description: The headline, in sentence case. Required.
         body:
           type: string
+          nullable: true
           maxLength: 280
-          description: The message. Required.
+          description: >-
+            The message. Required, unless the announcement is for a feature launch (`feature_launch_id`) that has a
+            `short_description`, which is shown instead while this is empty.
         visual_type:
           type: string
           enum: [name_change, vimeo, image, intro_animation, storyboard, none]
@@ -19037,10 +19195,18 @@ components:
           nullable: true
           description: >-
             The feature tour the popup's button starts with "Take the tour" while the tour is live, or null
+        feature_launch_id:
+          type: integer
+          nullable: true
+          description: >-
+            The feature launch the announcement is for, or null. Its message, User Guide link, deep link and feature tour
+            are shown wherever the announcement's own are empty.
         title:
           type: string
         body:
           type: string
+          nullable: true
+          description: The announcement's own message; null when it shows its feature launch's short description
         visual_type:
           type: string
           enum: [name_change, vimeo, image, intro_animation, storyboard, none]
@@ -19497,6 +19663,219 @@ components:
                 type: integer
               skipped_by_system:
                 type: integer
+    FeatureLaunch:
+      type: object
+      description: A feature launch and its launch content
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          maxLength: 80
+          description: The feature's name as people see it in Makerble, such as Registers. Unique, ignoring case.
+        tier:
+          type: string
+          enum: [minor, standard, major]
+          description: How big the launch is. Major is a new feature or a substantial new capability.
+        short_description:
+          type: string
+          nullable: true
+          maxLength: 280
+          description: The announcement message. An announcement for the launch shows it when its own `body` is empty.
+        email_description:
+          type: string
+          nullable: true
+          maxLength: 600
+          description: >-
+            2 to 4 sentences for the feature launch emails, in the words people see in Makerble: what it is, why it
+            matters and how to start.
+        user_guide_url:
+          type: string
+          nullable: true
+          maxLength: 2048
+          description: A page in the Makerble User Guide (https://makerble.atlassian.net/wiki/spaces/MCPD/...).
+        blog_url:
+          type: string
+          nullable: true
+          maxLength: 2048
+          description: The blog post about the feature, a web address starting https://.
+        deep_link:
+          type: string
+          nullable: true
+          description: The name of a deep link (from GET /deep_links) that opens the feature in the person's own organisation.
+        feature_tour_id:
+          type: integer
+          nullable: true
+          description: The feature tour (from GET /feature_tours) that introduces it.
+        intro_key:
+          type: string
+          nullable: true
+          description: The key of the feature's Intro (from GET /guidance_panels).
+        email_visual:
+          type: string
+          enum: [gif, still_frame, image, none]
+          description: >-
+            What the email shows: a GIF or a still frame made from the feature's animation, an uploaded image
+            (`email_image`), or nothing.
+        email_visual_alt:
+          type: string
+          nullable: true
+          maxLength: 250
+          description: What the visual shows, for screen readers. Required unless `email_visual` is `none`.
+        email_primary_link:
+          type: string
+          nullable: true
+          enum: [deep_link, tour, user_guide, blog, null]
+          description: >-
+            Which link the email's main button uses: the deep link, Take the tour, the User Guide page or the blog
+            post. The launch must have that link.
+        email_text_links:
+          type: array
+          maxItems: 2
+          items:
+            type: string
+            enum: [deep_link, tour, user_guide, blog]
+          description: Up to two more links the email shows as text, each one the launch has and not the main button.
+        jira_keys:
+          type: array
+          items:
+            type: string
+            example: CP-9271
+          description: The Jira issues that built the feature.
+        released_on:
+          type: string
+          format: date
+          nullable: true
+          description: The day the feature reached production.
+        email_image_url:
+          type: string
+          nullable: true
+          description: The uploaded image for an `image` visual, or null
+        email_gif_url:
+          type: string
+          nullable: true
+          description: The GIF made from the feature's animation, or null until it is made
+        email_still_frame_url:
+          type: string
+          nullable: true
+          description: The still frame made from the feature's animation, or null until it is made
+        announcement_ids:
+          type: array
+          items:
+            type: integer
+          description: The announcements for this launch
+        created_by_id:
+          type: integer
+          nullable: true
+        updated_by_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    FeatureLaunchInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+          description: >-
+            The feature's name as people see it in Makerble, such as Registers. Unique, ignoring case. Required on
+            create.
+        tier:
+          type: string
+          enum: [minor, standard, major]
+          description: How big the launch is. Major is a new feature or a substantial new capability.
+        short_description:
+          type: string
+          nullable: true
+          maxLength: 280
+          description: The announcement message. An announcement for the launch shows it when its own `body` is empty.
+        email_description:
+          type: string
+          nullable: true
+          maxLength: 600
+          description: >-
+            2 to 4 sentences for the feature launch emails, in the words people see in Makerble: what it is, why it
+            matters and how to start.
+        user_guide_url:
+          type: string
+          nullable: true
+          maxLength: 2048
+          description: A page in the Makerble User Guide (https://makerble.atlassian.net/wiki/spaces/MCPD/...).
+        blog_url:
+          type: string
+          nullable: true
+          maxLength: 2048
+          description: The blog post about the feature, a web address starting https://.
+        deep_link:
+          type: string
+          nullable: true
+          description: The name of a deep link (from GET /deep_links) that opens the feature in the person's own organisation.
+        feature_tour_id:
+          type: integer
+          nullable: true
+          description: The feature tour (from GET /feature_tours) that introduces it.
+        intro_key:
+          type: string
+          nullable: true
+          description: The key of the feature's Intro (from GET /guidance_panels).
+        email_visual:
+          type: string
+          enum: [gif, still_frame, image, none]
+          description: >-
+            What the email shows: a GIF or a still frame made from the feature's animation, an uploaded image
+            (`email_image`), or nothing.
+        email_visual_alt:
+          type: string
+          nullable: true
+          maxLength: 250
+          description: What the visual shows, for screen readers. Required unless `email_visual` is `none`.
+        email_primary_link:
+          type: string
+          nullable: true
+          enum: [deep_link, tour, user_guide, blog, null]
+          description: >-
+            Which link the email's main button uses: the deep link, Take the tour, the User Guide page or the blog
+            post. The launch must have that link.
+        email_text_links:
+          type: array
+          maxItems: 2
+          items:
+            type: string
+            enum: [deep_link, tour, user_guide, blog]
+          description: Up to two more links the email shows as text, each one the launch has and not the main button.
+        jira_keys:
+          type: array
+          items:
+            type: string
+            example: CP-9271
+          description: The Jira issues that built the feature.
+        released_on:
+          type: string
+          format: date
+          nullable: true
+          description: The day the feature reached production.
+        email_image:
+          description: >-
+            For an `image` visual: a PNG, JPG, GIF or WebP file of up to 5 MB, as a multipart file or as base64 data
+            with a filename.
+          oneOf:
+            - type: string
+              format: binary
+            - $ref: '#/components/schemas/AnnouncementImageUpload'
+    PaginatedFeatureLaunches:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeatureLaunch'
     FeatureTour:
       type: object
       description: A feature tour and its stops in order
