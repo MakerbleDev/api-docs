@@ -1617,6 +1617,64 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /tour_stops:
+    get:
+      tags: [Feature Tours]
+      summary: List the stops a tour can use
+      description: |
+        Lists every stop Makerble knows: the stops Welcome Tours and feature tours are built from. Each one focuses
+        on one part of one page, such as the Filters button on Contacts. Use a stop's `key` as the `stop_key` of a
+        feature tour's or a Welcome Tour's stop.
+
+        Stops come in registry order, grouped by feature (`group_name`, such as Contacts, Checklists, Registers or
+        Results Canvas; "Other" for a stop with no group). Each says which page it opens (`page`), whether it waits
+        for Next or for a click, Makerble's default wording, the wording it shows instead when the person has
+        nothing on that page yet (`empty`), and who it is shown to (`shown_to`). A stop the person can't use is
+        skipped when the tour runs.
+
+        Send `group_name` to list one feature's stops. The list is the same for everyone: it changes only when
+        Makerble releases new stops.
+
+        System Access users (Makerble staff) only. Anyone else gets 403.
+      operationId: listTourStops
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: group_name
+          in: query
+          required: false
+          description: Only the stops in this feature group, e.g. `Registers`
+          schema:
+            type: string
+          example: Registers
+      responses:
+        "200":
+          description: Paginated stops
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTourStopDefinitions'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 36
+                total_count: 36
+                data:
+                  - key: contacts_filters
+                    label: 'Contacts: Filters'
+                    group_name: Contacts
+                    page: Contacts (contacts)
+                    action: click
+                    action_label: Waits for a click
+                    default_title: Narrow the list down
+                    default_body: Filters let you see just the people you need, such as one year group.
+                    empty: null
+                    shown_to: Skipped for someone who is not a member of the organisation
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
   /feature_tours/{id}:
     parameters:
       - name: id
@@ -19342,6 +19400,10 @@ components:
           type: string
           nullable: true
           description: Which part of which page the stop focuses on
+        group_name:
+          type: string
+          nullable: true
+          description: The feature the stop belongs to, such as Contacts or Registers; "Other" when it has none, null for a stop Makerble no longer knows
         action:
           type: string
           enum: [next, click, ""]
@@ -19400,6 +19462,62 @@ components:
                 description: Up to 600 characters; empty means Makerble's default
               _destroy:
                 type: boolean
+    TourStopDefinition:
+      type: object
+      description: One of the stops Makerble knows, for building a Welcome Tour or a feature tour
+      properties:
+        key:
+          type: string
+          description: The stop's key, sent as `stop_key` when adding it to a tour
+        label:
+          type: string
+          description: Which part of which page the stop focuses on
+        group_name:
+          type: string
+          description: The feature the stop belongs to, such as Contacts or Registers; "Other" when it has none
+        page:
+          type: string
+          description: The page the stop opens, as a page name and its key, a path, or in words when it is worked out for each person
+        action:
+          type: string
+          enum: [next, click]
+          description: Whether the stop waits for Next or asks the person to click something
+        action_label:
+          type: string
+          description: '`action` in words: "Next button" or "Waits for a click"'
+        default_title:
+          type: string
+          nullable: true
+          description: Makerble's title for the stop
+        default_body:
+          type: string
+          nullable: true
+          description: Makerble's wording for the stop
+        empty:
+          type: object
+          nullable: true
+          description: What the stop shows someone who can open its page but has nothing on it yet; null when it is skipped instead
+          properties:
+            title:
+              type: string
+            body:
+              type: string
+            page:
+              type: string
+              nullable: true
+              description: The page the empty variant opens, when it isn't the stop's own page
+        shown_to:
+          type: string
+          description: Who sees the stop, e.g. "Only for Organisation Editors" or "Skipped for someone without a Checklist"
+    PaginatedTourStopDefinitions:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/TourStopDefinition'
     PaginatedFeatureTours:
       allOf:
         - $ref: '#/components/schemas/PaginationEnvelope'
