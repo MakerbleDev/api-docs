@@ -4800,9 +4800,17 @@ function buildDocsPage() {
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated stops in registry order, each with its <code>key</code> (a tour stop's <code>stop_key</code>), <code>label</code>, <code>group_name</code>, <code>page</code>, <code>action</code>, default wording, <code>empty</code> variant and <code>shown_to</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated stops in registry order, each with its <code>key</code> (a tour stop's <code>stop_key</code>), <code>label</code>, <code>group_name</code>, <code>page</code>, <code>action</code>, default wording, <code>empty</code> variant, <code>shown_to</code>, and how many feature tours and Welcome Tours use it" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" }
           ], "The stops Welcome Tours and feature tours are built from. The list is the same for everyone and changes only when Makerble releases new stops.")}
+          ${endpointCard("PATCH", "/tour_stops/{key}", "Change a stop's default wording", true, [
+            { name: "key", in: "path", type: "string", required: true, desc: "The stop's key, from <code>GET /tour_stops</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The stop with its new default wording" },
+            { code: "403", cls: "response-4xx", desc: "The user isn't a Marketing or Admin user" },
+            { code: "404", cls: "response-4xx", desc: "No stop has this key" },
+            { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. a title over 120 characters" }
+          ], "Body: <code>default_title</code>, <code>default_body</code>. Only the fields sent change; an empty one goes back to Makerble's original. Every tour stop without its own wording shows the new default.")}
           ${endpointCard("GET", "/feature_tours/{id}", "Get a feature tour", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Feature tour ID" }
           ], [

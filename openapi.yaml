@@ -1632,8 +1632,9 @@ paths:
         nothing on that page yet (`empty`), and who it is shown to (`shown_to`). A stop the person can't use is
         skipped when the tour runs.
 
-        Send `group_name` to list one feature's stops. The list is the same for everyone: it changes only when
-        Makerble releases new stops.
+        Each stop also says how many feature tours and Welcome Tours use it. Send `group_name` to list one
+        feature's stops. Marketing and Admin users can change a stop's default title and text with
+        `PATCH /tour_stops/{key}`.
 
         System Access users (Makerble staff) only. Anyone else gets 403.
       operationId: listTourStops
@@ -1671,10 +1672,57 @@ paths:
                     default_body: Filters let you see just the people you need, such as one year group.
                     empty: null
                     shown_to: Skipped for someone who is not a member of the organisation
+                    feature_tour_count: 1
+                    welcome_tour_count: 0
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
           $ref: '#/components/responses/ForbiddenError'
+  /tour_stops/{key}:
+    patch:
+      tags: [Feature Tours]
+      summary: Change a stop's default wording
+      description: |
+        Changes Makerble's default title and text for one stop, as Site Overview › Tour Stops does. Every
+        Welcome Tour and feature tour stop that has no wording of its own shows the new default straight away.
+
+        Only the fields sent change. A field sent empty, or the same as Makerble's original wording, goes back to
+        the original. Returns the stop as `GET /tour_stops` lists it.
+
+        Marketing and Admin users (Makerble staff) only. Support users and anyone else get 403.
+      operationId: updateTourStop
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: The stop's key, from `GET /tour_stops`
+          schema:
+            type: string
+          example: contacts_table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TourStopWordingInput'
+            example:
+              default_title: Your contacts
+      responses:
+        "200":
+          description: The stop with its new default wording
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TourStopDefinition'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /feature_tours/{id}:
     parameters:
       - name: id
@@ -19509,6 +19557,23 @@ components:
         shown_to:
           type: string
           description: Who sees the stop, e.g. "Only for Organisation Editors" or "Skipped for someone without a Checklist"
+        feature_tour_count:
+          type: integer
+          description: How many feature tours use the stop
+        welcome_tour_count:
+          type: integer
+          description: How many Welcome Tours use the stop
+    TourStopWordingInput:
+      type: object
+      properties:
+        default_title:
+          type: string
+          maxLength: 120
+          description: Makerble's title for the stop; empty goes back to the original
+        default_body:
+          type: string
+          maxLength: 600
+          description: Makerble's text for the stop; empty goes back to the original
     PaginatedTourStopDefinitions:
       allOf:
         - $ref: '#/components/schemas/PaginationEnvelope'
