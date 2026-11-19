@@ -2596,8 +2596,8 @@ paths:
       tags: [Toolkits]
       summary: Update a Toolkit's number and image settings
       description: |
-        Sets the Toolkit number and whether the thumbnail (on Explore Toolkits) and the cover image (on
-        the Toolkit's page) are darkened, as the Create/Edit Collection page does. Only the fields sent
+        Sets the Toolkit number, the cover image's alt text, and whether the thumbnail (on Explore
+        Toolkits) and the cover image (on the Toolkit's page) are darkened, as the Create/Edit Collection page does. Only the fields sent
         change. The user must be able to edit the Toolkit: its owner, an editor of its Organisation, or
         a user with Marketing or Admin system access.
       operationId: updateToolkit
@@ -2613,6 +2613,7 @@ paths:
             example:
               toolkit_number: "T14"
               darken_cover_image: true
+              cover_image_alt: "Volunteers sorting food parcels"
       responses:
         "200":
           description: The Toolkit
@@ -21084,6 +21085,10 @@ components:
           type: string
           nullable: true
           description: The image at the top of the Toolkit's page
+        cover_image_alt:
+          type: string
+          nullable: true
+          description: The cover image's alt text, read out by screen readers; when null, the image is treated as decoration
         darken_thumbnail_image:
           type: boolean
           description: Whether a dark translucent layer covers the thumbnail on Explore Toolkits
@@ -21122,6 +21127,11 @@ components:
         toolkit_number:
           type: string
           nullable: true
+        cover_image_alt:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: The cover image's alt text, as on the Create/Edit Collection page; send null or "" for a decorative image
         darken_thumbnail_image:
           type: boolean
         darken_cover_image:

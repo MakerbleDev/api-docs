@@ -1430,15 +1430,16 @@ function buildDocsPage() {
           ${endpointCard("GET", "/toolkits/{id}", "Get a Toolkit", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Toolkit ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Toolkit: <code>toolkit_number</code>, <code>thumbnail_image_url</code>, <code>cover_image_url</code>, <code>darken_thumbnail_image</code>, <code>darken_cover_image</code> and its page <code>url</code>" },
+            { code: "200", cls: "response-2xx", desc: "The Toolkit: <code>toolkit_number</code>, <code>thumbnail_image_url</code>, <code>cover_image_url</code>, <code>cover_image_alt</code>, <code>darken_thumbnail_image</code>, <code>darken_cover_image</code> and its page <code>url</code>" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found, or a Toolkit you can't see" }
           ])}
-          ${endpointCard("PATCH", "/toolkits/{id}", "Change a Toolkit's number and image darkening", true, [
+          ${endpointCard("PATCH", "/toolkits/{id}", "Change a Toolkit's number, cover image alt text and image darkening", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Toolkit ID" },
             { name: "toolkit_number", type: "string", required: false, desc: "The Toolkit's number, e.g. <code>T14</code>; <code>null</code> clears it" },
             { name: "darken_thumbnail_image", type: "boolean", required: false, desc: "Darken the thumbnail on Explore Toolkits" },
-            { name: "darken_cover_image", type: "boolean", required: false, desc: "Darken the cover image on the Toolkit's page" }
+            { name: "darken_cover_image", type: "boolean", required: false, desc: "Darken the cover image on the Toolkit's page" },
+            { name: "cover_image_alt", type: "string", required: false, desc: "The cover image's alt text for screen readers, up to 255 characters; <code>null</code> or empty marks the image as decoration" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The Toolkit" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
