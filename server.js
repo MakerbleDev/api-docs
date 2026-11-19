@@ -4819,6 +4819,13 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
+          ${endpointCard("GET", "/feature_tours/{id}/funnel", "Get a feature tour's funnel", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Feature tour ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The tour's <code>totals</code> (<code>started</code>, <code>completed</code>, <code>in_progress</code>, <code>ended_early</code>) and, for each stop in order, how many people <code>reached</code>, <code>completed</code>, <code>skipped_by_user</code> and <code>skipped_by_system</code> it" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ], "The same numbers as the tour's Funnel page in Site Overview › Feature Tours, counting each person once per stop and event. Stop counts start on <code>counts_since</code>, the day they were first recorded; the totals cover everyone who has taken the tour.")}
           ${endpointCard("POST", "/feature_tours", "Create a feature tour", true, [], [
             { code: "201", cls: "response-2xx", desc: "Feature tour created (a draft unless <code>status</code> is <code>live</code>)" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
