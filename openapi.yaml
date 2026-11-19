@@ -27766,7 +27766,7 @@ components:
                 $ref: '#/components/schemas/GuidancePanelVersion'
             notices:
               type: array
-              description: Only after a change. Says which feature tour is no longer offered on this Intro, e.g. "Checklists is no longer offered here."
+              description: After a change, names any feature tour no longer offered on this Intro, e.g. "Checklists is no longer offered here."; otherwise empty
               items:
                 type: string
 
