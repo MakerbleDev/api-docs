@@ -1133,6 +1133,45 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /whats_new:
+    get:
+      tags: [Announcements]
+      summary: List What's new for the signed-in user
+      description: |
+        Lists the announcements in the signed-in user's Wishlist › What's new: Makerble's own "What's
+        new in Makerble" announcements that have gone live (live now, or ended) for an audience the
+        user is in, newest first. Scheduled ones still to start are listed too, by their start date,
+        when the popup would show them to the user (its audience or roles, and its behaviour rules),
+        so they can be read early; reading one early means the popup skips it on its day. An
+        Organisation's, Workspace's or Team's own announcements are not listed. Each says whether the user has seen it, in the popup or by opening it in What's new,
+        and which section it is in: `new_since_joined` (it started on or after the day the user's
+        account was made) or `before_joined`.
+
+        Listing them records nothing; the user still sees an unseen one in the popup.
+      operationId: listWhatsNew
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: section
+          in: query
+          required: false
+          description: Only this section. Without it, both sections together.
+          schema:
+            type: string
+            enum: [new_since_joined, before_joined]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated What's new announcements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWhatsNew'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
   /wishes:
     get:
       tags: [Wishlist]
@@ -19275,6 +19314,17 @@ components:
         seen_count:
           type: integer
           description: People who have closed it.
+        seen_counts_by_source:
+          type: object
+          description: >-
+            Of those who have seen it, how many first saw it in the popup and how many by opening it in
+            Wishlist › What's new.
+          properties:
+            popup:
+              type: integer
+            whats_new:
+              type: integer
+          required: [popup, whats_new]
         learn_more_click_count:
           type: integer
           description: People who clicked its "Learn more" link.
@@ -20161,6 +20211,74 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Announcement'
+    WhatsNewItem:
+      type: object
+      description: An announcement in the signed-in user's Wishlist › What's new, with whether they have seen it
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          description: The headline.
+        body:
+          type: string
+        starts_on:
+          type: string
+          format: date
+        ends_on:
+          type: string
+          format: date
+        section:
+          type: string
+          enum: [new_since_joined, before_joined]
+        visual_type:
+          type: string
+          enum: [name_change, vimeo, image, intro_animation, storyboard, none]
+        image_url:
+          type: string
+          nullable: true
+        image_alt:
+          type: string
+          nullable: true
+        vimeo_url:
+          type: string
+          nullable: true
+        learn_more_url:
+          type: string
+          nullable: true
+          description: A page in the Makerble User Guide.
+        button_label:
+          type: string
+        includes_tour:
+          type: boolean
+          description: Whether its button starts a feature tour, which it does while the tour is live.
+        feature_tour_id:
+          type: integer
+          nullable: true
+          description: The live feature tour its button starts, or null.
+        asked_for:
+          type: boolean
+          description: Whether it answered one of the user's requests in Wishlist › Your wishlist.
+        seen:
+          type: boolean
+          description: Whether the user has seen it, in the popup or by opening it in What's new.
+        seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, title, body, starts_on, section, visual_type, includes_tour, asked_for, seen, seen_at]
+    PaginatedWhatsNew:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/WhatsNewItem'
     Wish:
       type: object
       description: A feature request or feedback from Wishlist › Your wishlist

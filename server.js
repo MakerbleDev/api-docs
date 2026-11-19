@@ -4620,7 +4620,7 @@ function buildDocsPage() {
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated Announcements the user may see, newest first, each with <code>scope_type</code>, <code>scope_id</code>, <code>seen_count</code> and <code>learn_more_click_count</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated Announcements the user may see, newest first, each with <code>scope_type</code>, <code>scope_id</code>, <code>seen_count</code>, <code>seen_counts_by_source</code> (<code>popup</code> and <code>whats_new</code>: where people first saw it) and <code>learn_more_click_count</code>" },
             { code: "403", cls: "response-4xx", desc: "The user can make announcements nowhere" }
           ])}
           ${endpointCard("GET", "/announcements/facts", "List Announcement Facts", true, [], [
@@ -4663,13 +4663,22 @@ function buildDocsPage() {
         <h2 class="section-title">Wishlist</h2>
         <div class="section-desc">
           <p>Wishlist is the page behind the gift icon. <strong>Your wishlist</strong> holds the feature requests and feedback a person has sent, and where each one is; you only ever see your own, never a colleague's. A feature request also goes to Makerble's Helpdesk, and its <code>status</code> follows it: "Received", "We are looking at this", "Estimate sent to your bill payer", "Being built", "Shipped" and so on. Feedback stays in Makerble and reads "Read by the Makerble team".</p>
-          <p><strong>Coming soon</strong> (Roadmap items) is what Makerble has committed to building, under <code>building_now</code> and <code>up_next</code>, with no dates. Everyone can read the published items. Makerble staff (System Access) also see unpublished ones, can create and change them, and see <code>stale</code> on any unchanged for 60 days. Anyone else gets <code>403</code> when writing. What's new is <a href="#announcements">Announcements</a>.</p>
+          <p><strong>Coming soon</strong> (Roadmap items) is what Makerble has committed to building, under <code>building_now</code> and <code>up_next</code>, with no dates. Everyone can read the published items. Makerble staff (System Access) also see unpublished ones, can create and change them, and see <code>stale</code> on any unchanged for 60 days. Anyone else gets <code>403</code> when writing. <strong>What's new</strong> lists Makerble's <a href="#announcements">Announcements</a> that have gone live for you, as tiles that open each one; <code>GET /whats_new</code> gives the same list.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
           <span><strong>Before you send a request:</strong> don't include details of people you support. If a feature request needs custom work, Makerble sends an estimate to the organisation's bill payer, not to the person who asked.</span>
         </div>
         <div class="endpoint-list">
+          ${endpointCard("GET", "/whats_new", "List your What's new", true, [
+            { name: "section", type: "string", required: false, desc: "Only <code>new_since_joined</code> or <code>before_joined</code>; leave out for both" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated What's new announcements for you, newest first: Makerble's own that have gone live for an audience you're in, and scheduled ones still to start that you can read early. Each has its <code>section</code>, <code>includes_tour</code>, <code>asked_for</code> (it answered one of your requests), <code>seen</code> and <code>seen_at</code>" },
+            { code: "422", cls: "response-4xx", desc: "An unknown <code>section</code>" }
+          ], "Listing them doesn't mark them seen: you still get an unseen one in the popup. Opening one in Wishlist › What's new marks it seen there.")}
           ${endpointCard("GET", "/wishes", "List your Wishlist", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
