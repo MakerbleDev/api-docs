@@ -1140,8 +1140,10 @@ paths:
       description: |
         Lists the announcements in the signed-in user's Wishlist › What's new: Makerble's own "What's
         new in Makerble" announcements that have gone live (live now, or ended) for an audience the
-        user is in, newest first. An Organisation's, Workspace's or Team's own announcements are not
-        listed. Each says whether the user has seen it, in the popup or by opening it in What's new,
+        user is in, newest first. Scheduled ones still to start are listed too, by their start date,
+        when the popup would show them to the user (its audience or roles, and its behaviour rules),
+        so they can be read early; reading one early means the popup skips it on its day. An
+        Organisation's, Workspace's or Team's own announcements are not listed. Each says whether the user has seen it, in the popup or by opening it in What's new,
         and which section it is in: `new_since_joined` (it started on or after the day the user's
         account was made) or `before_joined`.
 
