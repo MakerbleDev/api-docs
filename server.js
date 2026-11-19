@@ -4818,6 +4818,16 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
           ], "Only the fields sent change; null or an empty string clears one. <code>jira_keys</code> and <code>email_text_links</code> replace the whole list. A new <code>email_image</code> replaces the saved one, and changing <code>email_visual</code> away from <code>image</code> removes it.")}
+          ${endpointCard("POST", "/feature_launches/email_preview", "Preview the feature launch email", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>subject</code>, <code>to</code>, and the <code>html</code> and plain-text (<code>text</code>) versions. Nothing is sent" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "422", cls: "response-4xx", desc: "No feature launches, more than 10, one that doesn't exist, or no user with that email address" }
+          ], "The feature launch email (the email that tells people about new features) for up to 10 launches, as one person gets it. Body: <code>feature_launch_ids</code> (required, in the order to show them), <code>user_email</code> (see it as that Makerble user; leave it out for someone without an account), <code>intro</code> (an opening paragraph), <code>subject</code> (leave it out to name the features). Links into Makerble, such as Open Registers and Take the tour, show only for a user whose account can open them; everyone else gets the User Guide and blog links.")}
+          ${endpointCard("POST", "/feature_launches/email_test", "Send yourself a test of the feature launch email", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>message</code> and <code>to</code>: the test is on its way to you" },
+            { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
+            { code: "422", cls: "response-4xx", desc: "As for the preview" }
+          ], "Sends the email from Preview the feature launch email to you and no one else, with a subject starting [Test]. Takes the same body.")}
         </div>
       </section>
 
