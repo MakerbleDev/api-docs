@@ -1801,6 +1801,45 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         "404":
           $ref: '#/components/responses/NotFound'
+  /feature_tours/{id}/funnel:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Feature Tours]
+      summary: Get a feature tour's funnel
+      description: |
+        How people get on with a feature tour, the same numbers as its Funnel page in Site Overview › Feature Tours:
+        for each stop, how many people reached it, completed it, skipped it themselves or had it skipped because they
+        couldn't use it (each person counted once per stop and event); and the tour's totals from everyone's progress.
+        Stop-by-stop counts start on `counts_since`, the day they were first recorded; the totals cover everyone.
+        System Access users only.
+      operationId: getFeatureTourFunnel
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The feature tour's funnel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureTourFunnel'
+              example:
+                id: 12
+                name: Filters on Contacts
+                status: live
+                counts_since: "2026-12-04"
+                totals: { started: 40, completed: 31, in_progress: 4, ended_early: 5 }
+                stops:
+                  - { id: 101, position: 1, stop_key: contacts_table, title: Where all the records live, reached: 40, completed: 38, skipped_by_user: 0, skipped_by_system: 2 }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /tours/{id}/progress:
     parameters:
       - name: id
@@ -17059,7 +17098,12 @@ paths:
 
         `storyboard` is the Intro's animation, drawn from Makerble building blocks when there is no Vimeo
         link (see `GuidancePanelStoryboard` for its rules). Send it as an object, or `null` to remove it.
-        A broken rule answers `422` with every message in `errors`.
+
+        `feature_tour_id` chooses the feature tour the Intro offers with "Take the tour" (`null` for none).
+        It sets that tour's `page_key` to this Intro and unlinks any other tour that pointed here, naming it in
+        `notices`. It is refused when the chosen tour is live and another live tour is already on this Intro:
+        choose `null` first to take that one off.
+        A broken rule answers `422` with every message in `errors`, and nothing is changed.
       operationId: updateGuidancePanel
       security: [{tokenAuth: []}]
       requestBody:
@@ -19403,6 +19447,56 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Tour'
+    FeatureTourFunnel:
+      type: object
+      description: A feature tour's funnel
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+          enum: [draft, amends_needed, live]
+        counts_since:
+          type: string
+          format: date
+          nullable: true
+          description: The day stop-by-stop counts were first recorded; null until anyone has taken a step
+        totals:
+          type: object
+          properties:
+            started:
+              type: integer
+              description: Everyone who has taken the tour
+            completed:
+              type: integer
+            in_progress:
+              type: integer
+            ended_early:
+              type: integer
+        stops:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              position:
+                type: integer
+              stop_key:
+                type: string
+              title:
+                type: string
+                description: The stop's own title, or Makerble's default
+              reached:
+                type: integer
+              completed:
+                type: integer
+              skipped_by_user:
+                type: integer
+              skipped_by_system:
+                type: integer
     FeatureTour:
       type: object
       description: A feature tour and its stops in order
@@ -19416,7 +19510,8 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, live]
+          enum: [draft, amends_needed, live]
+          description: Only a live tour is shown to anyone. `amends_needed` is a draft that came back from review
         page_key:
           type: string
           nullable: true
@@ -19481,7 +19576,8 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, live]
+          enum: [draft, amends_needed, live]
+          description: Only a live tour is shown to anyone. `amends_needed` is a draft that came back from review
         page_key:
           type: string
           nullable: true
@@ -27712,6 +27808,16 @@ components:
           format: date-time
         updated_by:
           $ref: '#/components/schemas/GuidancePanelUser'
+        feature_tour_id:
+          type: integer
+          nullable: true
+          description: |
+            The feature tour this Intro offers with "Take the tour" (its live tour, otherwise the one most recently
+            updated whose `page_key` is this Intro); null for none. Only a live tour is shown.
+        feature_tour_name:
+          type: string
+          nullable: true
+          description: That feature tour's name
 
     GuidancePanelVersion:
       type: object
@@ -27747,6 +27853,11 @@ components:
               description: The last 10 versions, newest first
               items:
                 $ref: '#/components/schemas/GuidancePanelVersion'
+            notices:
+              type: array
+              description: After a change, names any feature tour no longer offered on this Intro, e.g. "Checklists is no longer offered here."; otherwise empty
+              items:
+                type: string
 
     GuidancePanelRequest:
       type: object
@@ -27774,6 +27885,12 @@ components:
               type: string
             storyboard:
               $ref: '#/components/schemas/GuidancePanelStoryboard'
+            feature_tour_id:
+              type: integer
+              nullable: true
+              description: |
+                The feature tour this Intro offers with "Take the tour"; null for none. Any other tour whose
+                `page_key` was this Intro is unlinked, and `notices` names it.
 
     PaginatedGuidancePanels:
       allOf:
