@@ -17059,7 +17059,12 @@ paths:
 
         `storyboard` is the Intro's animation, drawn from Makerble building blocks when there is no Vimeo
         link (see `GuidancePanelStoryboard` for its rules). Send it as an object, or `null` to remove it.
-        A broken rule answers `422` with every message in `errors`.
+
+        `feature_tour_id` chooses the feature tour the Intro offers with "Take the tour" (`null` for none).
+        It sets that tour's `page_key` to this Intro and unlinks any other tour that pointed here, naming it in
+        `notices`. It is refused when the chosen tour is live and another live tour is already on this Intro:
+        choose `null` first to take that one off.
+        A broken rule answers `422` with every message in `errors`, and nothing is changed.
       operationId: updateGuidancePanel
       security: [{tokenAuth: []}]
       requestBody:
@@ -19416,7 +19421,8 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, live]
+          enum: [draft, amends_needed, live]
+          description: Only a live tour is shown to anyone. `amends_needed` is a draft that came back from review
         page_key:
           type: string
           nullable: true
@@ -19481,7 +19487,8 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, live]
+          enum: [draft, amends_needed, live]
+          description: Only a live tour is shown to anyone. `amends_needed` is a draft that came back from review
         page_key:
           type: string
           nullable: true
@@ -27712,6 +27719,16 @@ components:
           format: date-time
         updated_by:
           $ref: '#/components/schemas/GuidancePanelUser'
+        feature_tour_id:
+          type: integer
+          nullable: true
+          description: |
+            The feature tour this Intro offers with "Take the tour" (its live tour, otherwise the one most recently
+            updated whose `page_key` is this Intro); null for none. Only a live tour is shown.
+        feature_tour_name:
+          type: string
+          nullable: true
+          description: That feature tour's name
 
     GuidancePanelVersion:
       type: object
@@ -27747,6 +27764,11 @@ components:
               description: The last 10 versions, newest first
               items:
                 $ref: '#/components/schemas/GuidancePanelVersion'
+            notices:
+              type: array
+              description: Only after a change. Says which feature tour is no longer offered on this Intro, e.g. "Checklists is no longer offered here."
+              items:
+                type: string
 
     GuidancePanelRequest:
       type: object
@@ -27774,6 +27796,12 @@ components:
               type: string
             storyboard:
               $ref: '#/components/schemas/GuidancePanelStoryboard'
+            feature_tour_id:
+              type: integer
+              nullable: true
+              description: |
+                The feature tour this Intro offers with "Take the tour"; null for none. Any other tour whose
+                `page_key` was this Intro is unlinked, and `notices` names it.
 
     PaginatedGuidancePanels:
       allOf:

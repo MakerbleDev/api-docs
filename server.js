@@ -4238,7 +4238,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/guidance_panels/{key}", "Get a Guidance Panel and its recent changes", true, [
             { name: "key", in: "path", type: "string", required: true, desc: "The panel's key, e.g. <code>events</code>" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The panel, with its last 10 versions: who, when, and what changed from what to what" },
+            { code: "200", cls: "response-2xx", desc: "The panel, with its last 10 versions: who, when, and what changed from what to what, and the feature tour it offers (<code>feature_tour_id</code>, <code>feature_tour_name</code>)" },
             { code: "403", cls: "response-4xx", desc: "No System Access" },
             { code: "404", cls: "response-4xx", desc: "No panel with that key" }
           ])}
@@ -4250,7 +4250,8 @@ function buildDocsPage() {
             { name: "guidance_panel[staff_text]", in: "body", type: "string", required: false, desc: "Shown instead of the main action to people who can't use it" },
             { name: "guidance_panel[user_guide_url]", in: "body", type: "string", required: false, desc: "A page in the Makerble User Guide" },
             { name: "guidance_panel[vimeo_url]", in: "body", type: "string", required: false, desc: "A Vimeo link, or empty to show the page's own image or animation" },
-            { name: "guidance_panel[storyboard]", in: "body", type: "object", required: false, desc: "The animation shown when there is no Vimeo link (see above), or <code>null</code> to remove it" }
+            { name: "guidance_panel[storyboard]", in: "body", type: "object", required: false, desc: "The animation shown when there is no Vimeo link (see above), or <code>null</code> to remove it" },
+            { name: "guidance_panel[feature_tour_id]", in: "body", type: "integer", required: false, desc: "The feature tour this Intro offers with \"Take the tour\", or <code>null</code> for none. Any other tour pointing here is unlinked and named in <code>notices</code>. Refused when the tour is live and another live tour is already on this Intro" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The changed panel and its last 10 versions; the page shows the change from its next load" },
             { code: "403", cls: "response-4xx", desc: "No System Access" },
@@ -4783,7 +4784,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Integrations</div>
         <h2 class="section-title">Feature Tours</h2>
         <div class="section-desc">
-          <p>A feature tour is a short guided tour that introduces one feature to people who already use Makerble. Unlike a Welcome Tour it belongs to no Organisation: Makerble staff write it once. A <code>live</code> tour with a <code>page_key</code> is offered by "Take the tour" on that page's Intro (the Show/Hide Guidance panel at the top of a Manage page, such as <code>contacts</code>); each Intro has at most one live tour. <code>auto_prompt</code> offers it once, the first time someone opens its page.</p>
+          <p>A feature tour is a short guided tour that introduces one feature to people who already use Makerble. Unlike a Welcome Tour it belongs to no Organisation: Makerble staff write it once. Its <code>status</code> is <code>draft</code>, <code>amends_needed</code> (a draft that came back from review) or <code>live</code>; only a live tour is shown to anyone. A <code>live</code> tour with a <code>page_key</code> is offered by "Take the tour" on that page's Intro (the Show/Hide Guidance panel at the top of a Manage page, such as <code>contacts</code>); each Intro has at most one live tour. The link can also be set from the Intro's side, with <code>feature_tour_id</code> on <code>PATCH /guidance_panels/{key}</code>. <code>auto_prompt</code> offers it once, the first time someone opens its page.</p>
           <p>Each stop is one of the stops Welcome Tours use, named by <code>stop_key</code>, and shows Makerble's <code>default_title</code> and <code>default_body</code> unless it has its own <code>title</code> or <code>body</code>. <code>GET /tour_stops</code> lists every stop Makerble knows, grouped by feature, with the page each opens and its default wording. System Access users (Makerble staff) only; anyone else gets <code>403</code>.</p>
         </div>
         <div class="endpoint-list">
