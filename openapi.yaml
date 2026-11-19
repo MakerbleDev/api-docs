@@ -1670,6 +1670,83 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+  /feature_launches/email_preview:
+    post:
+      tags: [Feature Launches]
+      summary: Preview the feature launch email
+      description: |
+        Gives the feature launch email for up to 10 feature launches, as one person would get it, without sending
+        anything: the subject, the HTML and the plain-text version. It is the email the weekly and one-off feature
+        launch emails send, and the same as Site Overview › Feature launches › Preview email shows.
+
+        Send `user_email` to see it as that Makerble user gets it: a deep link ("Open Registers") and Take the tour
+        show only when their account can open the page. Leave it out to see it as someone without a Makerble account,
+        who gets the User Guide and blog links instead. The launches appear in the order of `feature_launch_ids`.
+        System Access users (Makerble staff) only. Anyone else gets 403.
+      operationId: previewFeatureLaunchEmail
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureLaunchEmailInput'
+            example:
+              feature_launch_ids: [12, 9]
+              user_email: someone@example.org
+              intro: Here is what we released this month.
+      responses:
+        "200":
+          description: The email as that person would get it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureLaunchEmailPreview'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /feature_launches/email_test:
+    post:
+      tags: [Feature Launches]
+      summary: Send yourself a test of the feature launch email
+      description: |
+        Sends the feature launch email, as `user_email` (or someone without an account) would get it, to you and no
+        one else. The subject starts "[Test]". Takes the same input as POST /feature_launches/email_preview.
+        System Access users (Makerble staff) only. Anyone else gets 403.
+      operationId: sendFeatureLaunchEmailTest
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureLaunchEmailInput'
+            example:
+              feature_launch_ids: [12]
+      responses:
+        "200":
+          description: The test is on its way
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, to]
+                properties:
+                  message:
+                    type: string
+                    example: Test sent to you@makerble.com.
+                  to:
+                    type: string
+                    description: The address it was sent to, always your own.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /feature_launches/{id}:
     parameters:
       - name: id
@@ -19713,6 +19790,39 @@ components:
                 type: integer
               skipped_by_system:
                 type: integer
+    FeatureLaunchEmailInput:
+      type: object
+      required: [feature_launch_ids]
+      properties:
+        feature_launch_ids:
+          type: array
+          description: The feature launches to show, 1 to 10, in this order (from GET /feature_launches).
+          items:
+            type: integer
+        user_email:
+          type: string
+          description: Show it as this Makerble user gets it. Leave it out for someone without a Makerble account.
+        intro:
+          type: string
+          description: An opening paragraph, shown before the feature launches.
+        subject:
+          type: string
+          description: The subject. Leave it out to name the features ("What’s new in Makerble - Registers and Albums").
+    FeatureLaunchEmailPreview:
+      type: object
+      required: [subject, to, html, text]
+      properties:
+        subject:
+          type: string
+        to:
+          type: string
+          description: Who it would go to.
+        html:
+          type: string
+          description: The HTML version, a 600px email with inline styles.
+        text:
+          type: string
+          description: The plain-text version.
     FeatureLaunch:
       type: object
       description: A feature launch and its launch content
