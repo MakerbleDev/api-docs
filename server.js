@@ -2239,9 +2239,8 @@ function buildDocsPage() {
             { name: "start_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or after this date" },
             { name: "end_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or before this date" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Stories enriched with named Indicators, Changes, and Custom Field values — ideal for reporting" },
-            { code: "403", cls: "response-4xx", desc: "<code>not_available_to_connected_apps</code>: called with an Organisation API key or a connected app" }
-          ], `Not yet available with an Organisation <a href="#api-keys">API key</a> or a connected app: they get <code>403</code> with <code>not_available_to_connected_apps</code>. Call it with a person's <code>X-User-Email</code> and <code>X-User-Token</code>, or, with an API key, read the same answers from <code>GET /stories</code> (each Story's <code>story_indicator_beneficiaries</code>, <code>story_change_beneficiaries</code> and <code>custom_fields</code>, filtered on <code>story_category_id</code> and <code>project_id</code>) and look up question names with <code>GET /indicators</code> and <code>GET /scale_indicator_choices</code>.`)}
+            { code: "200", cls: "response-2xx", desc: "Stories enriched with named Indicators, Changes, and Custom Field values — ideal for reporting" }
+          ], `Works with an Organisation <a href="#api-keys">API key</a> or a connected app too: they get only their Organisation's Stories, even when the colleague behind the key belongs to other Organisations.`)}
           ${endpointCard("GET", "/stories/{id}/attachments", "Get attachments for a Story", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Story ID" }
           ], [{ code: "200", cls: "response-2xx", desc: "Paginated media attachments" }])}
@@ -4274,7 +4273,7 @@ function buildDocsPage() {
           <p><strong>Using a key:</strong> send <code>Authorization: Bearer mk_live_…</code> on every request. The key acts as the colleague chosen when it was created: it can see and do only what they can, in its Organisation only. It can call the same endpoints as a connected app (OAuth); any other answers <code>403</code> with <code>not_available_to_connected_apps</code>. A revoked key, or one whose colleague has left the Organisation, gets <code>401</code>. Calls made with an Organisation's API keys count towards its monthly API usage.</p>
           <p><strong>Which endpoints a key can call:</strong> an Organisation API key is limited to one Organisation, so it can only call endpoints that have been checked to return that Organisation's data and nothing else. Those are listed below. Any other endpoint answers <code>403</code> with <code>not_available_to_connected_apps</code>, even when the same request works with a person's <code>X-User-Email</code> and <code>X-User-Token</code>. A person's own token can call every endpoint, and sees everything that person can see in every Organisation they belong to. More endpoints are added to this list as they are checked; if you need one that isn't here, contact Makerble support.</p>
           <details class="api-key-endpoints">
-            <summary>Endpoints an Organisation API key or connected app can call (74)</summary>
+            <summary>Endpoints an Organisation API key or connected app can call (75)</summary>
             <ul style="list-style:none;padding-left:0;margin-top:12px">
               <li><span class="method-badge method-GET">GET</span> <code>/access_logs</code></li>
               <li><span class="method-badge method-GET">GET</span> <code>/audit_trail</code></li>
@@ -4329,6 +4328,7 @@ function buildDocsPage() {
               <li><span class="method-badge method-GET">GET</span> <code>/stories/{id}</code></li>
               <li><span class="method-badge method-GET">GET</span> <code>/stories/{id}/attachments</code></li>
               <li><span class="method-badge method-GET">GET</span> <code>/stories/attachments</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/stories/story_category_response</code></li>
               <li><span class="method-badge method-POST">POST</span> <code>/stories/create2</code></li>
               <li><span class="method-badge method-GET">GET</span> <code>/story_beneficiaries</code></li>
               <li><span class="method-badge method-GET">GET</span> <code>/story_categories</code></li>

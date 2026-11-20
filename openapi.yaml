@@ -6070,7 +6070,7 @@ paths:
       description: |
         Returns Stories enriched with named Indicators, Changes, and Custom Fields — ideal for reporting and data exports.
 
-        Not yet available with an Organisation API key or a connected app (OAuth): they get `403` with `not_available_to_connected_apps`. Call it with a person's `X-User-Email` and `X-User-Token`. With an API key, read the same answers from `GET /stories` (each Story's `story_indicator_beneficiaries`, `story_change_beneficiaries` and `custom_fields`, filtered on `story_category_id` and `project_id`), and look up question names with `GET /indicators` and `GET /scale_indicator_choices`.
+        Works with an Organisation API key or a connected app (OAuth) too: they get only their Organisation's Stories, even when the colleague behind the key belongs to other Organisations.
       operationId: listStoryCategoryResponses
       security: [{tokenAuth: []}]
       parameters:
@@ -6107,17 +6107,6 @@ paths:
                 $ref: '#/components/schemas/PaginatedStoryCategoryResponses'
         "401":
           $ref: '#/components/responses/Unauthorized'
-        "403":
-          description: Called with an Organisation API key or a connected app, which can't use this endpoint yet
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-              example:
-                error: not_available_to_connected_apps
 
   /story_categories:
     get:
