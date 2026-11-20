@@ -2238,7 +2238,10 @@ function buildDocsPage() {
             { name: "project_ids[]", type: "integer", required: false, desc: "Filter by Project ID (repeat for multiple)" },
             { name: "start_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or after this date" },
             { name: "end_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or before this date" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Stories enriched with named Indicators, Changes, and Custom Field values — ideal for reporting" }])}
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Stories enriched with named Indicators, Changes, and Custom Field values — ideal for reporting" },
+            { code: "403", cls: "response-4xx", desc: "<code>not_available_to_connected_apps</code>: called with an Organisation API key or a connected app" }
+          ], `Not yet available with an Organisation <a href="#api-keys">API key</a> or a connected app: they get <code>403</code> with <code>not_available_to_connected_apps</code>. Call it with a person's <code>X-User-Email</code> and <code>X-User-Token</code>, or, with an API key, read the same answers from <code>GET /stories</code> (each Story's <code>story_indicator_beneficiaries</code>, <code>story_change_beneficiaries</code> and <code>custom_fields</code>, filtered on <code>story_category_id</code> and <code>project_id</code>) and look up question names with <code>GET /indicators</code> and <code>GET /scale_indicator_choices</code>.`)}
           ${endpointCard("GET", "/stories/{id}/attachments", "Get attachments for a Story", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Story ID" }
           ], [{ code: "200", cls: "response-2xx", desc: "Paginated media attachments" }])}
@@ -4269,6 +4272,86 @@ function buildDocsPage() {
         <div class="section-desc">
           <p>An API key lets a custom integration call the API for one Organisation without using a person's own token. An Organisation Admin creates one in Makerble under <strong>Data In &amp; Out → Integrations → API keys</strong>, or with <code>POST /api_keys</code> below. The key itself (<code>mk_live_…</code>) is shown only once, when it is created.</p>
           <p><strong>Using a key:</strong> send <code>Authorization: Bearer mk_live_…</code> on every request. The key acts as the colleague chosen when it was created: it can see and do only what they can, in its Organisation only. It can call the same endpoints as a connected app (OAuth); any other answers <code>403</code> with <code>not_available_to_connected_apps</code>. A revoked key, or one whose colleague has left the Organisation, gets <code>401</code>. Calls made with an Organisation's API keys count towards its monthly API usage.</p>
+          <p><strong>Which endpoints a key can call:</strong> an Organisation API key is limited to one Organisation, so it can only call endpoints that have been checked to return that Organisation's data and nothing else. Those are listed below. Any other endpoint answers <code>403</code> with <code>not_available_to_connected_apps</code>, even when the same request works with a person's <code>X-User-Email</code> and <code>X-User-Token</code>. A person's own token can call every endpoint, and sees everything that person can see in every Organisation they belong to. More endpoints are added to this list as they are checked; if you need one that isn't here, contact Makerble support.</p>
+          <details class="api-key-endpoints">
+            <summary>Endpoints an Organisation API key or connected app can call (74)</summary>
+            <ul style="list-style:none;padding-left:0;margin-top:12px">
+              <li><span class="method-badge method-GET">GET</span> <code>/access_logs</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/audit_trail</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiaries</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/beneficiaries</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiaries/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiaries/advanced_custom_fields</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiaries/impact_box_data</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiary_categories</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiary_categories/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiary_categories/current_fields</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiary_types</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/beneficiary_types_categories</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/calendar_feeds</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/calendar_feeds</code></li>
+              <li><span class="method-badge method-DELETE">DELETE</span> <code>/calendar_feeds/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/calendar_feeds/{id}</code></li>
+              <li><span class="method-badge method-PATCH">PATCH</span> <code>/calendar_feeds/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/cases</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/cases</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/cases_stories</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/changes</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/charities</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/charities/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/custom_field_categories</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/custom_fields</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/draft_stories</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/event_categories</code></li>
+              <li><span class="method-badge method-DELETE">DELETE</span> <code>/event_categories/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/health</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/indicators</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/indicators/{id}</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/indicators/create_v2</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/media_items</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/outcome_indicators</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/outcomes</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/outcomes/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/project_beneficiaries</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/project_story_categories</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/project_story_categories/{project_story_category_id}/survey_links</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/project_story_categories/{project_story_category_id}/survey_links</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/project_story_categories/{project_story_category_id}/survey_waves</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/projects</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/projects/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/projects_beneficiaries_cases</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/ratio_set_choiceables</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/ratio_sets</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/referral_link_details/{id}/definition</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/scale_indicator_choices</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/stories</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/stories</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/stories/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/stories/{id}/attachments</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/stories/attachments</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/stories/create2</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/story_beneficiaries</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/story_categories</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/story_categories/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/story_categories/{id}/verdicts</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/story_change_beneficiaries</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/story_changes</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/story_indicator_beneficiaries</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/story_indicators</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/sub_ratios</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/sub_ratios/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/users</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/users/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/users/permissions</code></li>
+              <li><span class="method-badge method-PATCH">PATCH</span> <code>/users/update_information</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/versions</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/versions/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/webhook_endpoints</code></li>
+              <li><span class="method-badge method-POST">POST</span> <code>/webhook_endpoints</code></li>
+              <li><span class="method-badge method-DELETE">DELETE</span> <code>/webhook_endpoints/{id}</code></li>
+              <li><span class="method-badge method-GET">GET</span> <code>/webhook_endpoints/{id}</code></li>
+            </ul>
+          </details>
           <p><strong>Managing keys:</strong> only the Organisation's admins can list, create and revoke its keys, and only with their own <code>X-User-Email</code> and <code>X-User-Token</code>: an API key, an AI assistant link or a connected app can't create or revoke keys.</p>
         </div>
         <div class="endpoint-list">
