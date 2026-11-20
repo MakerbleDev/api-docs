@@ -4047,6 +4047,18 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The event" },
             { code: "422", cls: "response-4xx", desc: "The last Event Manager, or not on the event's staff" }
           ])}
+          ${endpointCard("GET", "/sessions_and_attendance", "Get sessions run and attendance", true, [
+            { name: "project_ids", type: "integer[]", required: false, desc: "Projects to include, as <code>project_ids[]=619</code> or a JSON array string. Defaults to every Project you can view" },
+            { name: "start_date", type: "string", required: false, desc: "First Event start date to include, YYYY-MM-DD. Omit both dates for all time" },
+            { name: "end_date", type: "string", required: false, desc: "Last Event start date to include, YYYY-MM-DD" },
+            { name: "group_by", type: "string", required: false, desc: "<code>project</code>, <code>event_format</code> or <code>month</code>: <code>data</code> then holds one row per group (every month in the dates, empty ones included)" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Groups per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "totals, plus start_date, end_date, project_ids, group_by and the paginated groups in data" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "422", cls: "response-4xx", desc: "Invalid project_ids, date, group_by or per_page" }
+          ], "How many Events (sessions) the Projects you can view ran, and how well they were attended, for Events starting in the dates. <code>events_scheduled</code> counts every Event; <code>events_held</code> those already started; <code>hours_delivered</code> adds up the Events held. <code>invited_contacts</code> counts distinct guests; <code>attending_contacts</code> distinct Contacts with attendance recorded on an attendance form. <code>attendance_rates</code> gives, per Engagement tracker on the attendance forms, the <code>average_attendance_rate</code> over the Contacts invited, as on the Event Attendance page: it counts attendance records, so it can exceed 100% when an Event has duplicate attendance Stories. Deleted Contacts are left out; Makerble doesn't record cancelled Events.")}
         </div>
       </section>
 
