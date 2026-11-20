@@ -29,7 +29,7 @@ info:
     Authorization: Bearer mk_live_...
     ```
 
-    A key belongs to one Organisation and acts as the colleague chosen when it was created: it can see and do only what they can, in that Organisation only. It can call the same endpoints as a connected app (OAuth), and gets `403` with `not_available_to_connected_apps` from any other. If the colleague leaves the Organisation, or the key is revoked, requests get `401`. Calls made with an Organisation's API keys count towards its monthly API usage.
+    A key belongs to one Organisation and acts as the colleague chosen when it was created: it can see and do only what they can, in that Organisation only. It can call the same endpoints as a connected app (OAuth), and gets `403` with `not_available_to_connected_apps` from any other, even when the same request works with a person's own token. The endpoints it can call are listed in the API keys section of https://api-docs.makerble.com/#api-keys. If the colleague leaves the Organisation, or the key is revoked, requests get `401`. Calls made with an Organisation's API keys count towards its monthly API usage.
 
     ## Creating Users via the API
     `POST /users` requires a separate API Key (`auth_code`). Request one at [api-key-request@makerble.com](mailto:api-key-request@makerble.com).
@@ -6069,6 +6069,8 @@ paths:
       summary: Get Stories with full survey response detail
       description: |
         Returns Stories enriched with named Indicators, Changes, and Custom Fields — ideal for reporting and data exports.
+
+        Not yet available with an Organisation API key or a connected app (OAuth): they get `403` with `not_available_to_connected_apps`. Call it with a person's `X-User-Email` and `X-User-Token`. With an API key, read the same answers from `GET /stories` (each Story's `story_indicator_beneficiaries`, `story_change_beneficiaries` and `custom_fields`, filtered on `story_category_id` and `project_id`), and look up question names with `GET /indicators` and `GET /scale_indicator_choices`.
       operationId: listStoryCategoryResponses
       security: [{tokenAuth: []}]
       parameters:
@@ -6105,6 +6107,17 @@ paths:
                 $ref: '#/components/schemas/PaginatedStoryCategoryResponses'
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: Called with an Organisation API key or a connected app, which can't use this endpoint yet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: not_available_to_connected_apps
 
   /story_categories:
     get:
