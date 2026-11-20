@@ -1347,6 +1347,18 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "422", cls: "response-4xx", desc: "Invalid project_ids, date, tracker_types, group_by, per_page or template_id" }
           ], "Returns the figures on each Project's Results Canvas (the Results panel on a Project page), one entry per tracker, for the Projects you can view. Activity and Engagement trackers (Changes) give <code>times_recorded</code> and <code>contacts</code>; Achievement trackers (Binary Indicators) give <code>times_recorded</code> and <code>contacts_achieved</code>; Choice trackers (Scale Indicators) give <code>answers</code> with a count and contacts per Sub Ratio; Numerical trackers (Value Indicators) give <code>total</code> and <code>average_per_contact</code>. <code>times_recorded</code> counts records, not people; <code>contacts</code> counts distinct Contacts tagged. <code>anonymous_count</code> is what was recorded with no Contact tagged. <code>target</code>, <code>target_deadline</code> and <code>percent_of_target</code> appear when the Project has a target.")}
+          ${endpointCard("GET", "/distance_travelled", "Get distance travelled on Choice trackers", true, [
+            { name: "project_ids", type: "integer[]", required: false, desc: "Projects to include, as <code>project_ids[]=619</code> or a JSON array string. Defaults to every Project you can view" },
+            { name: "tracker_ids", type: "integer[]", required: false, desc: "Choice trackers (Indicator IDs) to include, as an array or comma-separated list. Defaults to every Choice tracker with a success direction on the Projects" },
+            { name: "start_date", type: "string", required: false, desc: "First Story date to include, YYYY-MM-DD. Omit both dates for all time" },
+            { name: "end_date", type: "string", required: false, desc: "Last Story date to include, YYYY-MM-DD" },
+            { name: "page", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", type: "integer", required: false, desc: "Trackers per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated Choice trackers, plus start_date, end_date and project_ids (and skipped_trackers when you chose trackers with no success direction)" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "422", cls: "response-4xx", desc: "Invalid project_ids, tracker_ids, date or per_page" }
+          ], "For each Choice tracker (Scale Indicator) with a success direction, how many Contacts <code>improved</code>, stayed the same (<code>no_change</code>) or <code>worsened</code> between their first and latest answer: the figures in a Progress Board's Success Direction Summary. Contacts with only one answer in the period aren't judged; they are counted in <code>not_judged</code>, and each <code>percent</code> is of <code>judged_contacts</code> only. <code>answers</code> is a before/after table of first and latest answers. Answers with no Contact tagged are left out.")}
         </div>
       </section>
 
