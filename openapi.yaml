@@ -3879,6 +3879,74 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /distance_travelled:
+    get:
+      tags: [Projects]
+      summary: Get distance travelled on Choice trackers
+      description: |
+        For each **Choice tracker** (Indicator of Scale type) that has a **success direction**, how many Contacts
+        improved, stayed the same or worsened between their first and latest answer. These are the figures in a
+        Progress Board's **Success Direction Summary**, and the same rules the **distance travelled** Contact Filter
+        uses. Use them for change-over-time evidence such as "68% of young people reported improved confidence".
+        Covers the Projects you can view (Editor, Reporter or Observer of the Project or its Organisation).
+
+        Answers are ordered by their Story's date, one answer per Story per Contact, and answers saved with no
+        Contact tagged are left out. Contacts with only one answer in the period are **not judged**: they are
+        counted in `not_judged`, and every `percent` is of `judged_contacts` only. `contacts_answered` is everyone
+        who answered at least once. `success_direction_meaning` says which answer is the best. `answers` is a
+        before/after table: for each answer, how many judged Contacts gave it first and how many gave it last.
+
+        Choice trackers with no success direction are left out; when you choose them with `tracker_ids`,
+        `skipped_trackers` says which. `last_synced_datetime` doesn't apply, as the figures are totals.
+      operationId: getDistanceTravelled
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: project_ids
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+          example: [619, 620]
+          description: Projects to include, as project_ids[]=619&project_ids[]=620 or a JSON array string ("[619,620]"). Defaults to every Project you can view; Projects you can't view are left out.
+        - name: tracker_ids
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          example: [362]
+          description: Choice trackers (Indicator IDs) to include, as an array or a comma-separated list. Defaults to every Choice tracker with a success direction used on the Projects.
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-04-01"
+          description: First Story date to include (YYYY-MM-DD). Omit start_date and end_date for all time.
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2027-03-31"
+          description: Last Story date to include (YYYY-MM-DD)
+      responses:
+        "200":
+          description: One page of Choice trackers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDistanceTravelled'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /projects/bulk_status_change:
     post:
       tags: [Projects]
@@ -21800,6 +21868,111 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/ProjectResultsTracker'
+
+    PaginatedDistanceTravelled:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            start_date:
+              type: string
+              format: date
+              nullable: true
+              example: "2026-04-01"
+            end_date:
+              type: string
+              format: date
+              nullable: true
+              example: "2027-03-31"
+            project_ids:
+              type: array
+              items:
+                type: integer
+              example: [619]
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/DistanceTravelledTracker'
+            skipped_trackers:
+              type: array
+              description: Only when tracker_ids is given. Chosen Choice trackers left out because they have no success direction.
+              items:
+                type: object
+                properties:
+                  tracker_id:
+                    type: integer
+                    example: 363
+                  tracker_name:
+                    type: string
+                    example: Attended with a carer
+                  reason:
+                    type: string
+                    example: No success direction is set, so there is no better or worse answer
+
+    DistanceTravelledTracker:
+      type: object
+      description: Distance travelled on one Choice tracker.
+      properties:
+        tracker_id:
+          type: integer
+          description: The Indicator ID
+          example: 362
+        tracker_name:
+          type: string
+          example: Confidence
+        success_direction:
+          type: string
+          enum: [bottom to top, top to bottom]
+          example: bottom to top
+        success_direction_meaning:
+          type: string
+          nullable: true
+          example: The last answer (Very confident) is the best
+        contacts_answered:
+          type: integer
+          description: Contacts who answered at least once in the period
+          example: 27
+        judged_contacts:
+          type: integer
+          description: Contacts with two or more answers in the period
+          example: 18
+        not_judged:
+          type: integer
+          description: Contacts with only one answer in the period
+          example: 9
+        improved:
+          $ref: '#/components/schemas/DistanceTravelledShare'
+        no_change:
+          $ref: '#/components/schemas/DistanceTravelledShare'
+        worsened:
+          $ref: '#/components/schemas/DistanceTravelledShare'
+        answers:
+          type: array
+          description: For each answer (Sub Ratio), in the tracker's order, how many judged Contacts gave it first and last.
+          items:
+            type: object
+            properties:
+              answer:
+                type: string
+                example: Very confident
+              first:
+                type: integer
+                example: 2
+              latest:
+                type: integer
+                example: 6
+
+    DistanceTravelledShare:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 2
+        percent:
+          type: number
+          nullable: true
+          description: Percent of judged_contacts, to one decimal place. null when no Contact was judged.
+          example: 11.1
 
     ProjectResultsTracker:
       type: object
