@@ -3963,9 +3963,9 @@ paths:
         - `attending_contacts`: distinct Contacts with attendance recorded on an Event's attendance form, whether
           or not they were invited.
         - `attendance_rates`: one entry per Engagement tracker on the Events' attendance forms.
-          `average_attendance_rate` is the average, over the Contacts invited, of each Contact's attendance rate
-          as the **Event Attendance** page shows it: attendance records divided by the Events they were invited
-          to. It counts records, not distinct Events, so it can exceed 100% when an Event has duplicate attendance
+          `attendance_rate` is `attendances` (attendance records) divided by `invitations` (each time a Contact
+          was added to an Event), as the **Event Attendance** page's "Total across all guests" row shows it. It
+          counts records, not distinct Events, so it can exceed 100% when an Event has duplicate attendance
           Stories. It is `null` when nobody was invited.
 
         Deleted Contacts are left out. Makerble doesn't record cancelled Events. With `group_by`, `data` holds one
@@ -22064,10 +22064,16 @@ components:
               invited_contacts:
                 type: integer
                 example: 61
-              average_attendance_rate:
+              attendances:
+                type: integer
+                example: 9
+              invitations:
+                type: integer
+                example: 21
+              attendance_rate:
                 type: number
                 nullable: true
-                example: 72.4
+                example: 42.9
 
     DistanceTravelledTracker:
       type: object
