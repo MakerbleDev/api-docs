@@ -3947,6 +3947,79 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /sessions_and_attendance:
+    get:
+      tags: [Events]
+      summary: Get sessions run and attendance
+      description: |
+        Delivery figures from Scheduling for the Projects you can view (Editor, Reporter or Observer of the
+        Project or its Organisation): how many **Events** (sessions) were run, the hours delivered, and how well
+        they were attended. An Event counts when its start falls between `start_date` and `end_date`.
+
+        `totals` holds:
+        - `events_scheduled`: every Event in the dates; `events_held`: those that have already started.
+        - `hours_delivered`: the length (start to end) of the Events held, in hours.
+        - `invited_contacts`: distinct Contacts added to the Events as guests.
+        - `attending_contacts`: distinct Contacts with attendance recorded on an Event's attendance form, whether
+          or not they were invited.
+        - `attendance_rates`: one entry per Engagement tracker on the Events' attendance forms.
+          `attendance_rate` is `attendances` (attendance records) divided by `invitations` (each time a Contact
+          was added to an Event), as the **Event Attendance** page's "Total across all guests" row shows it. It
+          counts records, not distinct Events, so it can exceed 100% when an Event has duplicate attendance
+          Stories. It is `null` when nobody was invited.
+
+        Deleted Contacts are left out. Makerble doesn't record cancelled Events. With `group_by`, `data` holds one
+        row per group (every month in the dates, Projects, or Event formats), each with the same figures as
+        `totals`; without it `data` is empty. `last_synced_datetime` doesn't apply, as the figures are totals.
+        These are the figures ReportMaker uses to answer delivery questions.
+      operationId: getSessionsAndAttendance
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: project_ids
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+          example: [619, 620]
+          description: Projects to include, as project_ids[]=619&project_ids[]=620 or a JSON array string ("[619,620]"). Defaults to every Project you can view; Projects you can't view are left out.
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-04-01"
+          description: First Event start date to include (YYYY-MM-DD). Omit start_date and end_date for all time.
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2027-03-31"
+          description: Last Event start date to include (YYYY-MM-DD)
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [project, event_format, month]
+          example: month
+          description: Split the figures by Project, by Event format (Event Category) or by month. Omit for totals only.
+      responses:
+        "200":
+          description: The totals, and one page of groups when group_by is given
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSessionsAndAttendance'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /projects/bulk_status_change:
     post:
       tags: [Projects]
@@ -21908,6 +21981,99 @@ components:
                   reason:
                     type: string
                     example: No success direction is set, so there is no better or worse answer
+
+    PaginatedSessionsAndAttendance:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            start_date:
+              type: string
+              format: date
+              nullable: true
+              example: "2026-04-01"
+            end_date:
+              type: string
+              format: date
+              nullable: true
+              example: "2027-03-31"
+            project_ids:
+              type: array
+              items:
+                type: integer
+              example: [619]
+            group_by:
+              type: string
+              nullable: true
+              enum: [project, event_format, month]
+              example: month
+            totals:
+              $ref: '#/components/schemas/SessionsAndAttendanceFigures'
+            data:
+              type: array
+              description: One row per group; empty without group_by.
+              items:
+                allOf:
+                  - type: object
+                    properties:
+                      group:
+                        description: The month (YYYY-MM), or the Project's or Event format's id and name.
+                        oneOf:
+                          - type: string
+                            example: "2026-04"
+                          - type: object
+                            properties:
+                              id:
+                                type: integer
+                                example: 619
+                              name:
+                                type: string
+                                example: Youth club
+                  - $ref: '#/components/schemas/SessionsAndAttendanceFigures'
+
+    SessionsAndAttendanceFigures:
+      type: object
+      description: Events run and attendance for a set of Events.
+      properties:
+        events_scheduled:
+          type: integer
+          example: 24
+        events_held:
+          type: integer
+          example: 20
+        hours_delivered:
+          type: number
+          example: 40.5
+        invited_contacts:
+          type: integer
+          example: 61
+        attending_contacts:
+          type: integer
+          example: 48
+        attendance_rates:
+          type: array
+          items:
+            type: object
+            properties:
+              tracker_id:
+                type: integer
+                example: 1204
+              tracker_name:
+                type: string
+                example: Session attendance
+              invited_contacts:
+                type: integer
+                example: 61
+              attendances:
+                type: integer
+                example: 9
+              invitations:
+                type: integer
+                example: 21
+              attendance_rate:
+                type: number
+                nullable: true
+                example: 42.9
 
     DistanceTravelledTracker:
       type: object
