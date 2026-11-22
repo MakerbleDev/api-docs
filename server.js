@@ -4696,12 +4696,13 @@ function buildDocsPage() {
         <div class="endpoint-list">
           ${endpointCard("GET", "/whats_new", "List your What's new", true, [
             { name: "section", type: "string", required: false, desc: "Only <code>new_since_joined</code> or <code>before_joined</code>; leave out for both" },
+            { name: "filter", type: "string", required: false, desc: "<code>unread</code>: only the ones you haven't opened yet (What's new › Unread); <code>read</code>: only those you have; leave out for both" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated What's new announcements for you, newest first: Makerble's own that have gone live for an audience you're in, and scheduled ones still to start that you can read early. Each has its <code>section</code>, <code>includes_tour</code>, <code>asked_for</code> (it answered one of your requests), <code>seen</code> and <code>seen_at</code>" },
-            { code: "422", cls: "response-4xx", desc: "An unknown <code>section</code>" }
+            { code: "422", cls: "response-4xx", desc: "An unknown <code>section</code> or <code>filter</code>" }
           ], "Listing them doesn't mark them seen: you still get an unseen one in the popup. Opening one in Wishlist › What's new marks it seen there.")}
           ${endpointCard("GET", "/wishes", "List your Wishlist", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },

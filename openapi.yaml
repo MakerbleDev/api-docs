@@ -1147,7 +1147,8 @@ paths:
         and which section it is in: `new_since_joined` (it started on or after the day the user's
         account was made) or `before_joined`.
 
-        Listing them records nothing; the user still sees an unseen one in the popup.
+        Listing them records nothing; the user still sees an unseen one in the popup. Use `filter`
+        to list only the Unread or only the Read ones, as the page's Unread and Read filters do.
       operationId: listWhatsNew
       security: [{tokenAuth: []}]
       parameters:
@@ -1158,6 +1159,15 @@ paths:
           schema:
             type: string
             enum: [new_since_joined, before_joined]
+        - name: filter
+          in: query
+          required: false
+          description: |
+            `unread`: only the ones the user hasn't opened yet, in the popup or in What's new (the page's
+            Unread filter). `read`: only the ones they have opened (Read). Without it, both.
+          schema:
+            type: string
+            enum: [unread, read]
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
