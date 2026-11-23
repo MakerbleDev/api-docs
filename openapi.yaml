@@ -30413,6 +30413,35 @@ components:
           type: integer
           nullable: true
           description: The Survey (Story Category) used to record attendance
+        survey_kiosk_enabled:
+          type: boolean
+          description: Self Check-in
+        survey_kiosk_registration_enabled:
+          type: boolean
+          description: Let new people register at Self Check-in
+        enable_guest_fields:
+          type: boolean
+        enable_guest_booking_form:
+          type: boolean
+        assign_guests_to_workers_setting:
+          type: string
+          enum: [default, skill, limit]
+        suggest_shortened_address:
+          type: boolean
+        apply_shortened_address:
+          type: boolean
+        enable_event_roles:
+          type: boolean
+        event_role_ids_for_event_managers_and_workers:
+          type: array
+          items:
+            type: integer
+          description: The organisation's Event Roles that Event Managers and Workers can have
+        event_role_ids_for_guests:
+          type: array
+          items:
+            type: integer
+          description: The organisation's Event Roles that guests can have
         appointment_type:
           type: string
           nullable: true
@@ -30450,6 +30479,30 @@ components:
         attendance_form_id:
           type: integer
           nullable: true
+        survey_kiosk_enabled:
+          type: boolean
+        survey_kiosk_registration_enabled:
+          type: boolean
+        enable_guest_fields:
+          type: boolean
+        enable_guest_booking_form:
+          type: boolean
+        assign_guests_to_workers_setting:
+          type: string
+        suggest_shortened_address:
+          type: boolean
+        apply_shortened_address:
+          type: boolean
+        enable_event_roles:
+          type: boolean
+        event_role_ids_for_event_managers_and_workers:
+          type: array
+          items:
+            type: integer
+        event_role_ids_for_guests:
+          type: array
+          items:
+            type: integer
         appointment_type:
           type: string
           nullable: true
