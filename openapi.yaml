@@ -190,6 +190,8 @@ tags:
     description: When a colleague is free for an appointment, and which colleagues could take on a Contact for one-to-one appointments, best fit first
   - name: Training Materials
     description: An Organisation's links to its own training documents and videos, each shown to the whole Organisation or to chosen Teams and Workspaces
+  - name: Training Tours
+    description: The guided tours on the Training materials page - the Welcome Tours picked for you, and every feature tour, with how far you have got
   - name: Announcements
     description: '"What''s new in Makerble" popups, written and scheduled by Makerble staff in Site Overview'
   - name: Wishlist
@@ -2866,6 +2868,170 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         "404":
           $ref: '#/components/responses/NotFound'
+  /organisations/{organisation_id}/picked_tours:
+    parameters:
+      - name: organisation_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Training Tours]
+      summary: List the Welcome Tours picked for you
+      description: |
+        The Welcome Tours picked for you in the Organisation, as on Training materials › Tours picked for me:
+        the Organisation's tour for everyone, and the tour of each Team you are in there, from the day you join it.
+        Each says how far you have got. Someone with no part in the Organisation gets 403.
+      operationId: listPickedTours
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The Welcome Tours picked for you
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [page, page_size, page_count, total_count, data]
+                properties:
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  page_count: { type: integer }
+                  total_count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PickedTour'
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - {id: 3, name: Welcome to Hillside, team: null, stop_count: 6, status: not_started}
+                  - {id: 7, name: Admin basics, team: {id: 12, name: Centre Administrators}, stop_count: 4, status: finished}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You have no part in this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /organisations/{organisation_id}/picked_tours/{id}/restart:
+    parameters:
+      - name: organisation_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: id
+        in: path
+        required: true
+        description: The Welcome Tour's id
+        schema:
+          type: integer
+    post:
+      tags: [Training Tours]
+      summary: Restart a Welcome Tour picked for you
+      description: |
+        Starts a Welcome Tour picked for you again from its first stop, as Restart the tour on Training materials
+        does, even one you have finished. It runs the next time you open a Makerble page. A tour not picked for you is refused.
+      operationId: restartPickedTour
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The tour has started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartedTour'
+              example: {id: 7, status: started, url: /charities/hillside/beneficiaries}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: You have no part in this Organisation
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+  /training_tours:
+    get:
+      tags: [Training Tours]
+      summary: List every training tour
+      description: |
+        Every feature tour, the short tours that each introduce one feature, as on Training materials › All training
+        tours, with how far you have got: ready_to_watch (not started), started (begun but not finished) or completed.
+      operationId: listTrainingTours
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Only the tours with this status
+          schema:
+            type: string
+            enum: [ready_to_watch, started, completed]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The training tours
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [page, page_size, page_count, total_count, data]
+                properties:
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  page_count: { type: integer }
+                  total_count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrainingTour'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - {id: 4, name: Checklists, stop_count: 5, status: ready_to_watch}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+  /training_tours/{id}/start:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The feature tour's id
+        schema:
+          type: integer
+    post:
+      tags: [Training Tours]
+      summary: Start a training tour
+      description: |
+        Starts a feature tour for you from its first stop, as Take the tour does, even one you have finished.
+        It runs the next time you open a Makerble page.
+      operationId: startTrainingTour
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The tour has started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartedTour'
+              example: {id: 4, status: started, url: /charities/hillside/checklists}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
   /organisations/{organisation_id}/welcome_journey_settings:
     parameters:
       - name: organisation_id
@@ -21747,6 +21913,44 @@ components:
                   project_name: { type: string, nullable: true }
                   editable: { type: boolean, description: Whether the caller may edit the event, and so unassign the colleague }
                   unassigned: { type: boolean, description: Whether this call took the colleague off the event }
+    PickedTour:
+      type: object
+      required: [id, name, team, stop_count, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        team:
+          type: object
+          nullable: true
+          description: The Team the tour is for; null for the Organisation's tour for everyone
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        stop_count: { type: integer, description: How many stops the tour has }
+        status:
+          type: string
+          enum: [not_started, started, finished]
+          description: started includes a tour you put off; finished includes one you ended early
+    TrainingTour:
+      type: object
+      required: [id, name, stop_count, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        stop_count: { type: integer, description: How many stops the tour has }
+        status:
+          type: string
+          enum: [ready_to_watch, started, completed]
+    StartedTour:
+      type: object
+      required: [id, status, url]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [started] }
+        url:
+          type: string
+          nullable: true
+          description: The page the tour's first stop opens; null when it starts on any page
     TrainingMaterial:
       type: object
       description: A link to one of an Organisation's own training documents or videos, and who it is for

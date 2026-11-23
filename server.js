@@ -998,6 +998,7 @@ function buildDocsPage() {
         <a href="#feature-launches" class="nav-link"><span class="nav-method method-POST">POST</span>Feature Launches</a>
         <a href="#feature-tours"   class="nav-link"><span class="nav-method method-POST">POST</span>Feature Tours</a>
         <a href="#training-materials" class="nav-link"><span class="nav-method method-POST">POST</span>Training Materials</a>
+        <a href="#training-tours" class="nav-link"><span class="nav-method method-GET">GET</span>Training Tours</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Reference data</div>
@@ -5450,6 +5451,47 @@ function buildDocsPage() {
             { code: "204", cls: "response-2xx", desc: "Removed from Makerble; the document itself is untouched" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Training Tours -->
+      <section class="section" id="training-tours">
+        <div class="section-eyebrow">Integrations</div>
+        <h2 class="section-title">Training Tours</h2>
+        <div class="section-desc">
+          <p>The guided tours on the Training materials page under Helpdesk. <strong>Tours picked for me</strong> lists the Welcome Tours picked for you in an Organisation: its tour for everyone, and the tour of each Team you are in there. <strong>All training tours</strong> lists every feature tour, the short tours that each introduce one feature, with how far you have got.</p>
+          <p>Starting or restarting a tour sets it running from its first stop; it appears the next time you open a Makerble page. Someone with no part in the Organisation gets <code>403</code> for its Welcome Tours.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/organisations/{organisation_id}/picked_tours", "List the Welcome Tours picked for you", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{page, page_size, page_count, total_count, data: [{id, name, team, stop_count, status}]}</code>; status is <code>not_started</code>, <code>started</code> or <code>finished</code>" },
+            { code: "403", cls: "response-4xx", desc: "You have no part in this Organisation" }
+          ])}
+          ${endpointCard("POST", "/organisations/{organisation_id}/picked_tours/{id}/restart", "Restart a Welcome Tour picked for you", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "Organisation ID" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "Welcome Tour ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{id, status: \"started\", url}</code>; url is the page its first stop opens" },
+            { code: "422", cls: "response-4xx", desc: "The tour wasn't picked for you" }
+          ])}
+          ${endpointCard("GET", "/training_tours", "List every training tour", true, [
+            { name: "status", type: "string", required: false, desc: "<code>ready_to_watch</code>, <code>started</code> or <code>completed</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{page, page_size, page_count, total_count, data: [{id, name, stop_count, status}]}</code>" },
+            { code: "422", cls: "response-4xx", desc: "An unknown status" }
+          ])}
+          ${endpointCard("POST", "/training_tours/{id}/start", "Start a training tour", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Feature tour ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{id, status: \"started\", url}</code>" },
+            { code: "422", cls: "response-4xx", desc: "The tour isn't live" }
           ])}
         </div>
       </section>
