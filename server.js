@@ -1010,7 +1010,7 @@ function buildDocsPage() {
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Service</div>
-        <a href="#health"          class="nav-link"><span class="nav-method method-GET" style="background:rgba(74,138,201,0.15);color:#4a8ac9;border-color:rgba(74,138,201,0.2)">GET</span>Health</a>
+        <a href="#health"          class="nav-link"><span class="nav-method method-GET">GET</span>Health</a>
       </div>
     </nav>
 
