@@ -2208,7 +2208,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/project_story_categories", "List Survey Campaigns", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects" }])}
+          ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects, with their display settings (including hide_unanswered_questions and allow_respondent_finish_later)" }])}
           ${endpointCard("PATCH", "/project_story_categories/{id}", "Change a Survey Campaign's settings", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "force_interval", in: "body", type: "boolean", required: true, desc: "\"Force colleagues to select an interval\": when true and the campaign has Waves, every story, survey invitation, shared link and automation for it must name an interval" }

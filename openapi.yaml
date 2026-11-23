@@ -24427,6 +24427,12 @@ components:
                 When true, a Contact who opens their personal survey link (Survey Invitation)
                 without signing in can press Save & Finish Later and come back to the same link
                 to finish. Unfinished responses are deleted 30 days after they were last saved.
+            hide_unanswered_questions:
+              type: boolean
+              description: >-
+                "Hide unanswered questions when viewing the story" on the Survey Campaign Settings page. When true,
+                viewing one contact's response (for example on their profile timeline) leaves out the questions they
+                did not answer. Read-only through the API.
             is_stopped:
               type: boolean
             display_intro_message:
