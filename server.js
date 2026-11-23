@@ -1135,7 +1135,7 @@ function buildDocsPage() {
 
         <div class="callout callout-info" style="margin-top:20px">
           <span class="callout-icon">ℹ</span>
-          <span>A connected app sees only the organisation the user chose, with that user's permissions there. Endpoints that accept it list <code>oauth2</code> under Security in the <a href="/openapi.yaml">OpenAPI spec</a>; more are added as they are reviewed. Users and Organisation Admins can disconnect an app at any time from <strong>Settings → Connected Apps</strong>, and it stops working straight away.</span>
+          <span>A connected app sees only the organisation the user chose, with that user's permissions there. It can call the same endpoints as an Organisation API key, and gets <code>403</code> with <code>not_available_to_connected_apps</code> from any other. Users and Organisation Admins can disconnect an app at any time from <strong>Settings → Connected Apps</strong>, and it stops working straight away.</span>
         </div>
 
         <div class="endpoint-list">
