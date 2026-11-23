@@ -932,6 +932,7 @@ function buildDocsPage() {
         <a href="#contacts"        class="nav-link"><span class="nav-method method-POST">POST</span>Contacts</a>
         <a href="#contact-forms"   class="nav-link"><span class="nav-method method-GET">GET</span>Contact Bio Forms</a>
         <a href="#cases"           class="nav-link"><span class="nav-method method-POST">POST</span>Cases</a>
+        <a href="#audio-notes"     class="nav-link"><span class="nav-method method-POST">POST</span>Audio Notes</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Surveys &amp; stories</div>
@@ -950,6 +951,11 @@ function buildDocsPage() {
         <a href="#outcomes"        class="nav-link"><span class="nav-method method-GET">GET</span>Outcomes</a>
         <a href="#library"         class="nav-link"><span class="nav-method method-GET">GET</span>Library</a>
         <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Surveys</a>
+        <a href="#explore-report-templates" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Report Templates</a>
+        <a href="#explore-dropdowns" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Dropdowns</a>
+        <a href="#explore-impact-frameworks" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Impact Frameworks</a>
+        <a href="#explore-ideas" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Ideas</a>
+        <a href="#explore-metrics" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Metrics</a>
         <a href="#impact-store"    class="nav-link"><span class="nav-method method-GET">GET</span>ImpactStore</a>
         <a href="#framework-sets"  class="nav-link"><span class="nav-method method-POST">POST</span>Framework Sets</a>
         <a href="#suggested-merges" class="nav-link"><span class="nav-method method-POST">POST</span>Suggested Merges</a>
@@ -967,6 +973,8 @@ function buildDocsPage() {
         <div class="nav-section-label">Events</div>
         <a href="#events"          class="nav-link"><span class="nav-method method-GET">GET</span>Events</a>
         <a href="#event-formats"   class="nav-link"><span class="nav-method method-GET">GET</span>Event Formats</a>
+        <a href="#event-catalogues" class="nav-link"><span class="nav-method method-GET">GET</span>Event Catalogues</a>
+        <a href="#contacts-portal" class="nav-link"><span class="nav-method method-POST">POST</span>Contacts' Portal</a>
         <a href="#staff-capacity" class="nav-link"><span class="nav-method method-PATCH">PATCH</span>Staff Capacity</a>
         <a href="#staff-matching" class="nav-link"><span class="nav-method method-GET">GET</span>Staff Matching</a>
         <a href="#staff-unavailability" class="nav-link"><span class="nav-method method-POST">POST</span>Staff Unavailability</a>
@@ -999,6 +1007,10 @@ function buildDocsPage() {
         <a href="#start-page"      class="nav-link"><span class="nav-method method-GET">GET</span>Start page</a>
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET">GET</span>Case Forms</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">Service</div>
+        <a href="#health"          class="nav-link"><span class="nav-method method-GET">GET</span>Health</a>
       </div>
     </nav>
 
@@ -1099,6 +1111,53 @@ function buildDocsPage() {
               <div class="response-row"><span class="response-code response-4xx">401</span><span class="response-desc">Invalid credentials (<code>invalid-credentials</code>), or <code>invitation-pending</code> with a <code>message</code> when the person hasn't accepted their invitation yet and so has no password of their own</span></div>
             </div>
           </div>
+        </div>
+
+        <h3 id="oauth" style="margin-top:36px">Connecting an app with OAuth 2.0</h3>
+        <div class="section-desc">
+          <p>Apps published for other people to use, such as marketplace connectors, connect with OAuth 2.0 instead of asking for a password. The user signs in to Makerble, chooses which of their organisations the app may use, and selects <strong>Allow</strong>. The app then calls the API as that user, limited to that organisation.</p>
+          <ol>
+            <li><strong>Get a client ID and secret.</strong> Makerble registers client applications: email <a href="mailto:api-key-request@makerble.com">api-key-request@makerble.com</a> with your app's name and its exact redirect URI (https only).</li>
+            <li><strong>Send the user to</strong> <code>https://makerble.com/oauth/authorize?response_type=code&amp;client_id=…&amp;redirect_uri=…&amp;scope=api&amp;state=…</code>. After the consent screen, Makerble redirects to your redirect URI with <code>?code=…&amp;state=…</code>, or <code>?error=access_denied</code> if the user cancels.</li>
+            <li><strong>Exchange the code</strong> at <code>POST https://makerble.com/oauth/token</code>. It works once and expires after 10 minutes.</li>
+            <li><strong>Call the API</strong> with <code>Authorization: Bearer &lt;access_token&gt;</code> instead of the <code>X-User-*</code> headers.</li>
+            <li><strong>Refresh</strong> when the access token expires (after 1 hour). Refresh tokens don't expire, but each refresh returns a new one: always store the latest.</li>
+          </ol>
+        </div>
+
+        <table class="info-table" style="margin-top:20px">
+          <thead><tr><th>Situation</th><th>Response</th></tr></thead>
+          <tbody>
+            <tr><td>Token expired or revoked, or the user is no longer in the connected organisation</td><td><code>401 {"error":"invalid_token"}</code></td></tr>
+            <tr><td>Endpoint not yet available to connected apps</td><td><code>403 {"error":"not_available_to_connected_apps"}</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout-info" style="margin-top:20px">
+          <span class="callout-icon">ℹ</span>
+          <span>A connected app sees only the organisation the user chose, with that user's permissions there. It can call the same endpoints as an Organisation API key, and gets <code>403</code> with <code>not_available_to_connected_apps</code> from any other. Users and Organisation Admins can disconnect an app at any time from <strong>Settings → Connected Apps</strong>, and it stops working straight away.</span>
+        </div>
+
+        <div class="endpoint-list">
+          ${endpointCard("POST", "/oauth/token", "Exchange a code, or refresh a token (OAuth 2.0)", false, [
+            { name: "grant_type", in: "body", required: true, desc: "<code>authorization_code</code> or <code>refresh_token</code>" },
+            { name: "code", in: "body", desc: "For <code>authorization_code</code>: the code from the redirect" },
+            { name: "redirect_uri", in: "body", desc: "For <code>authorization_code</code>: the same redirect URI used on <code>/oauth/authorize</code>" },
+            { name: "refresh_token", in: "body", desc: "For <code>refresh_token</code>: the latest refresh token" },
+            { name: "client_id", in: "body", required: true, desc: "Your app's client ID" },
+            { name: "client_secret", in: "body", required: true, desc: "Your app's client secret (or send both with HTTP Basic auth)" },
+          ], [
+            { code: 200, cls: "response-2xx", desc: "<code>access_token</code>, <code>token_type: Bearer</code>, <code>expires_in: 3600</code>, <code>refresh_token</code>, <code>scope: api</code>" },
+            { code: 400, cls: "response-4xx", desc: "<code>invalid_grant</code>: the code or refresh token is invalid, expired or already used" },
+            { code: 401, cls: "response-4xx", desc: "<code>invalid_client</code>: unknown client or wrong secret" },
+          ], "<p>Sent to <code>https://makerble.com/oauth/token</code>, not under <code>/api/v2</code>. Body is form-urlencoded.</p>")}
+          ${endpointCard("POST", "/oauth/revoke", "Revoke a token (OAuth 2.0)", false, [
+            { name: "token", in: "body", required: true, desc: "An access or refresh token. Revoking either stops both working" },
+            { name: "client_id", in: "body", required: true, desc: "Your app's client ID" },
+            { name: "client_secret", in: "body", required: true, desc: "Your app's client secret" },
+          ], [
+            { code: 200, cls: "response-2xx", desc: "Revoked, or already invalid" },
+          ], "<p>Sent to <code>https://makerble.com/oauth/revoke</code>, not under <code>/api/v2</code>. Use it when the user disconnects from inside your app.</p>")}
         </div>
       </section>
 
@@ -1311,8 +1370,10 @@ function buildDocsPage() {
           ${endpointCard("POST", "/projects/add_colleague.json", "Add users to a Project", true, [], [
             { code: "200", cls: "response-2xx", desc: "Users added successfully" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
-            { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Grant one or more users a role on a Project. A user can hold Editor, Reporter, and Observer simultaneously. Pass user IDs in <code>role_data[].editor_ids</code>, <code>reporter_ids</code>, or <code>observer_ids</code>.")}
+            { code: "403", cls: "response-4xx", desc: "Not a Project Manager of one of the Projects or an Organisation Admin of its Organisation (e.g. a Changemaker)" },
+            { code: "404", cls: "response-4xx", desc: "A Project wasn't found" },
+            { code: "422", cls: "response-4xx", desc: "A user can't be added: not a colleague in the Project's Organisation" }
+          ], "Adds users to Projects' teams, as the Project's <b>Add Users</b> page does: as Project Managers (<code>role_data[].editor_ids</code>), Changemakers (<code>reporter_ids</code>) or Analysts (<code>observer_ids</code>). A user can hold more than one role. You must be a Project Manager of every listed Project or an Organisation Admin of its Organisation, and the users must already be colleagues in that Organisation unless its preference lets Project Managers add users from outside it. It's all or nothing: on any error nobody is added.")}
           ${endpointCard("POST", "/projects/bulk_status_change", "Close or reopen many Projects at once", true, [
             { name: "status_action", type: "string", required: true, desc: "<code>close</code> or <code>reopen</code>" },
             { name: "project_ids", type: "integer[]", required: true, desc: "The Projects to change, at most 200" },
@@ -1853,6 +1914,42 @@ function buildDocsPage() {
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found, or started by someone else" }
           ], "Only the user who started the move can see it.")}
+          ${endpointCard("POST", "/beneficiaries/bulk_checklists", "Start a Checklist for many Contacts at once", true, [
+            { name: "checklist_id", in: "body", type: "integer", required: true, desc: "The Checklist to start" },
+            { name: "project_id", in: "body", type: "integer", required: true, desc: "The Project it is started through: one that lets colleagues add it by hand" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, started straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: started in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "A Checklist or Project you can't start it through, more than 500 <code>beneficiary_ids</code>, or no <code>charity_id</code> when you belong to several organisations" }
+          ], "<strong>Add to › A Checklist</strong> for the Contacts selected on the Manage Contacts page. Each Contact is started as Add a Checklist on their profile does, and steps their records already prove done are ticked off. Contacts outside the Project are skipped (<code>skip_counts.not_in_project</code>), as are those you only have Headline Only Access to (<code>skip_counts.headline_only</code>). Contacts who already have the Checklist keep their progress. Organisation Editors and Reporters may use any open Project; others only Projects they are an Editor or Reporter of.")}
+          ${endpointCard("POST", "/beneficiaries/bulk_relationships", "Link many Contacts to one Contact with the same relationship", true, [
+            { name: "relationship_category_id", in: "body", type: "integer", required: true, desc: "One of the organisation's Relationship Categories (<code>GET /relationship_categories</code>)" },
+            { name: "related_contact_id", in: "body", type: "integer", required: true, desc: "The Contact everyone is linked to" },
+            { name: "related_contact_is", in: "body", type: "string", required: true, desc: "<code>parent</code> or <code>child</code>: which side of the category the related Contact takes. The selected Contacts take the other" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "The organisation. Optional if you belong to only one" },
+            { name: "beneficiary_ids", in: "body", type: "integer[]", required: false, desc: "The Contacts, at most 500. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", in: "body", type: "object", required: false, desc: "Manage Contacts filters choosing the Contacts" },
+            { name: "excluded_ids", in: "body", type: "integer[]", required: false, desc: "Contacts matching the filters to leave out" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Up to 50 Contacts, linked straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code> and <code>summary</code>" },
+            { code: "202", cls: "response-2xx", desc: "More than 50 Contacts: linked in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "An organisation you aren't in" },
+            { code: "422", cls: "response-4xx", desc: "Another organisation's category or Contact, an unknown side, more than 500 <code>beneficiary_ids</code>, or no <code>charity_id</code> when you belong to several organisations" }
+          ], "<strong>Add to › A relationship</strong> for the Contacts selected on the Manage Contacts page, e.g. making Oakfield School the School of every selected pupil. Each relationship is added as Add a Relationship on a Contact's profile does and appears on both Contacts' History. Skipped Contacts are counted in <code>skip_counts</code>: <code>already_linked</code> (they already have that relationship with that Contact), <code>same_contact</code>, <code>headline_only</code> and <code>not_allowed</code>.")}
+          ${endpointCard("GET", "/beneficiaries/bulk_actions/{id}", "Get the progress of a bulk action on Contacts", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The <code>id</code> returned by a bulk change, e.g. <code>POST /events/{id}/guests</code> with <code>filter_data</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>action_name</code> (e.g. add_to_event, move_through_projects), <code>status</code> (pending, running, completed, failed or undone), <code>processed_count</code> of <code>total_count</code>, <code>changed_count</code>, <code>skip_counts</code>, and <code>summary</code> once finished" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or started by someone else" }
+          ], "Works for any change to many Contacts at once. Only the user who started it can see it.")}
           ${endpointCard("POST", "/beneficiaries/bulk_groups", "Add many Contacts to Groups, or take them out of Groups", true, [
             { name: "add_ids", in: "body", type: "integer[]", required: false, desc: "Groups to add every Contact to, from <code>GET /groups</code>" },
             { name: "remove_ids", in: "body", type: "integer[]", required: false, desc: "Groups to take every Contact out of. Give at least one of <code>add_ids</code> and <code>remove_ids</code>, and never the same Group in both" },
@@ -2112,6 +2209,55 @@ function buildDocsPage() {
         </div>
       </section>
 
+      <!-- Audio Notes -->
+      <section class="section" id="audio-notes">
+        <div class="section-eyebrow">Core resource</div>
+        <h2 class="section-title">Audio Notes</h2>
+        <div class="section-desc">
+          <p>AI AudioNotes (CaseNotes in the API) are audio recordings of a conversation with one Contact (<code>note_type: case_note</code>) or of an Event session (<code>note_type: session_note</code>). Makerble transcribes and summarises each one, then writes a draft survey response from the summary for a colleague to check and save. These endpoints return the same Audio Notes the user sees on the <strong>Audio Notes</strong> page: every one in the Organisations they are an admin of and the Projects they are a Project Editor of, plus the ones they recorded themselves.</p>
+          <p><code>source</code> is <code>product</code> for a recording made in Makerble and <code>manual</code> for an attached audio file. <code>platform</code> is <code>desktop_web</code>, <code>mobile_web</code> or <code>api</code>, and null for notes made before it was recorded.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/case_notes", "List Audio Notes", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only Audio Notes in this Organisation" },
+            { name: "project_id", type: "integer", required: false, desc: "Only Audio Notes in this Project" },
+            { name: "beneficiary_id", type: "integer", required: false, desc: "Only CaseNotes about this Contact" },
+            { name: "event_id", type: "integer", required: false, desc: "Only SessionNotes about this Event" },
+            { name: "note_type", type: "string", required: false, desc: "<code>case_note</code> or <code>session_note</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list of Audio Notes, newest first" }])}
+          ${endpointCard("GET", "/case_notes/{id}", "Get an Audio Note", true, [
+            { name: "id", type: "integer", required: true, in: "path", desc: "Audio Note (CaseNote) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Audio Note with its <code>transcript</code> and <code>summary</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one the user may see" }
+          ])}
+          ${endpointCard("POST", "/case_notes", "Attach an audio file as a new Audio Note", true, [
+            { name: "charity_id", type: "integer", required: true, in: "form", desc: "An Organisation with AI AudioNotes turned on" },
+            { name: "project_id", type: "integer", required: true, in: "form", desc: "One of its running Projects the user is a member of" },
+            { name: "note_type", type: "string", required: true, in: "form", desc: "<code>case_note</code> or <code>session_note</code>" },
+            { name: "beneficiary_id", type: "integer", required: false, in: "form", desc: "Required for a <code>case_note</code>: a Contact in the Project the user may see" },
+            { name: "event_id", type: "integer", required: false, in: "form", desc: "Optional for a <code>session_note</code>: an Event in the Project the user manages or works on" },
+            { name: "audio_file", type: "file", required: true, in: "form", desc: "MP3, M4A, MP4, WAV, WEBM, OGG, OGA, AAC or FLAC, up to 200 MB" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created and queued for transcription" },
+            { code: "422", cls: "response-4xx", desc: "A choice is missing or not allowed, or the file is not supported audio" },
+            { code: "503", cls: "response-5xx", desc: "The file could not be stored; nothing was created" }
+          ], "Send as <code>multipart/form-data</code>, then poll <code>GET /case_notes/{id}</code> until <code>status</code> is <code>completed</code>.")}
+          ${endpointCard("DELETE", "/case_notes/{id}/recording", "Delete an Audio Note's recording", true, [
+            { name: "id", type: "integer", required: true, in: "path", desc: "Audio Note (CaseNote) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Audio Note, with <code>has_recording: false</code>" },
+            { code: "403", cls: "response-4xx", desc: "Only the Organisation's admins may delete a recording" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one the user may see" },
+            { code: "422", cls: "response-4xx", desc: "Still being transcribed" },
+            { code: "503", cls: "response-5xx", desc: "Could not be removed from storage; nothing changed" }
+          ], "Keeps the note, its transcript, summary and survey response. Cannot be undone.")}
+        </div>
+      </section>
+
       <!-- Surveys -->
       <section class="section" id="surveys">
         <div class="section-eyebrow">Surveys &amp; Stories</div>
@@ -2157,7 +2303,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/project_story_categories", "List Survey Campaigns", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects" }])}
+          ], [{ code: "200", cls: "response-2xx", desc: "Surveys deployed to specific Projects, with their display settings (including hide_unanswered_questions and allow_respondent_finish_later)" }])}
           ${endpointCard("PATCH", "/project_story_categories/{id}", "Change a Survey Campaign's settings", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Survey Campaign (Project Story Category) ID" },
             { name: "force_interval", in: "body", type: "boolean", required: true, desc: "\"Force colleagues to select an interval\": when true and the campaign has Waves, every story, survey invitation, shared link and automation for it must name an interval" }
@@ -2246,8 +2392,8 @@ function buildDocsPage() {
           <br/><br/>Send <code>story.project_id</code>, <code>story.story_category_id</code> and <code>story.text</code>, plus optional <code>story.event_id</code>, <code>beneficiaries</code> (Contact IDs), <code>story_privacy</code> and <code>custom_fields</code>.
           <br/><br/>Allowed for the Project's editors, reporters and observers, the organisation's editors and reporters, and the workers and managers of <code>story.event_id</code> when that Event belongs to the Project. Anyone else gets <code>403</code>, as does a <code>story.charity_id</code> that isn't the Project's organisation.`)}
           ${endpointCard("GET", "/stories/story_category_response", "Get Stories with full survey response detail", true, [
-            { name: "story_category_id", type: "integer", required: false, desc: "Filter by Survey" },
-            { name: "project_ids[]", type: "integer", required: false, desc: "Filter by Project ID (repeat for multiple)" },
+            { name: "story_category_ids", type: "string", required: false, desc: "Filter by one or more Surveys. Accepts a JSON array, repeated story_category_ids[] params, a comma-separated list or a single ID. Only Surveys you can access are returned. story_category_id is accepted as an alias" },
+            { name: "project_ids", type: "string", required: false, desc: "Filter by one or more Project IDs. Same formats as story_category_ids" },
             { name: "start_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or after this date" },
             { name: "end_date", type: "string", required: false, desc: "YYYY-MM-DD — stories on or before this date" }
           ], [{ code: "200", cls: "response-2xx", desc: "Stories enriched with named Indicators, Changes, and Custom Field values — ideal for reporting" }])}
@@ -2815,6 +2961,163 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Survey's fields as above plus <code>sections</code>, each with its <code>title</code> (null before the first section header) and its <code>questions</code> in order" },
             { code: "404", cls: "response-4xx", desc: "Not listed on Explore Surveys (unpublished, unapproved or without a description)" }
           ], "To use a Survey, add it to a project in Makerble with Add to a project on Explore Surveys.")}
+        </div>
+      </section>
+
+      <!-- Explore Report Templates -->
+      <section class="section" id="explore-report-templates">
+        <div class="section-eyebrow">Reporting</div>
+        <h2 class="section-title">Explore Report Templates</h2>
+        <div class="section-desc">
+          <p>Explore Report Templates lists the Report Templates in the Makerble&reg; ImpactStore&trade;: funder reports, trustee updates, contract monitoring returns and other reports, each set out as the questions to answer. The API gives the same search, filters, counts and sort as the Explore Report Templates page. Every caller sees the same Report Templates; only <code>yours</code> and <code>in_your_library</code> depend on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=community</code>) or comma-separated (<code>theme=community,governance</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/report_templates", "Explore Report Templates", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Report Template's name or description, or who it's for or its theme" },
+            { name: "recipient", type: "string", required: false, desc: "Who it's for: <code>funder</code>, <code>trustees</code>, <code>local_authority</code> (Commissioner or contract), <code>corporate_partner</code>, <code>internal</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>children_and_young_people</code>, <code>community</code>, <code>employment</code>, <code>governance</code>, <code>health_and_wellbeing</code>, <code>volunteering</code>" },
+            { name: "output", type: "string", required: false, desc: "Answer formats any of its questions ask for: <code>narrative</code>, <code>number</code>, <code>chart</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (in the most organisations' libraries first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Report Templates per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Report Templates updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Report Templates with <code>id</code>, <code>slug</code>, <code>name</code>, <code>description</code>, <code>recipient</code>, <code>theme</code>, <code>question_count</code>, <code>answer_formats</code>, <code>shared_by</code>, <code>libraries_count</code> (organisations with it in their library), <code>yours</code> and <code>in_your_library</code>, plus <code>facets</code>: each filter's options with how many Report Templates each would return given the other filters" }
+          ])}
+          ${endpointCard("GET", "/explore/report_templates/{id}", "Preview an Explore Report Template", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Report Template's id from Explore Report Templates" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Report Template's fields as above plus <code>questions</code>, each with its <code>title</code> and the <code>answer_formats</code> it asks for, in order" },
+            { code: "404", cls: "response-4xx", desc: "Not in the ImpactStore" }
+          ], "To use a Report Template, add it to your organisation's library in Makerble with Add to your library on Explore Report Templates.")}
+        </div>
+      </section>
+
+      <!-- Explore Dropdowns -->
+      <section class="section" id="explore-dropdowns">
+        <div class="section-eyebrow">Forms and surveys</div>
+        <h2 class="section-title">Explore Dropdowns</h2>
+        <div class="section-desc">
+          <p>Explore Dropdowns lists the Dropdowns (answer-choice lists, Ratio Sets) shared to the Makerble&reg; ImpactStore&trade; and approved: standard scales and category lists that make results compare cleanly across organisations. The API gives the same search, filters, counts and sort as the Explore Dropdowns page. Every caller sees the same Dropdowns; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=scales</code>) or comma-separated (<code>choices=up_to_10,11_to_100</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/dropdowns", "Explore Dropdowns", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Dropdown's title or any of its answer choices" },
+            { name: "designed_for", type: "string", required: false, desc: "<code>surveys_and_trackers</code>, <code>forms</code> (bio, event and project forms)" },
+            { name: "choices", type: "string", required: false, desc: "Number of answer choices: <code>up_to_10</code>, <code>11_to_100</code>, <code>over_100</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>scales</code>, <code>demographics</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Scales</code>, <code>Demographics</code>, <code>Equality monitoring</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (used in the most surveys, trackers and forms first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Dropdowns per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Dropdowns updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Dropdowns with <code>id</code>, <code>title</code>, <code>choice_count</code>, <code>designed_for</code>, <code>themes</code>, <code>shared_by</code>, <code>used_in_count</code> (surveys, trackers and forms using it) and <code>yours</code>, plus <code>facets</code>: each filter's options with how many Dropdowns each would return given the other filters" }
+          ])}
+          ${endpointCard("GET", "/explore/dropdowns/{id}", "Preview an Explore Dropdown", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Dropdown's id from Explore Dropdowns" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Dropdown's fields as above plus every one of its answer <code>choices</code>, in order" },
+            { code: "404", cls: "response-4xx", desc: "Not listed on Explore Dropdowns (not shared or not approved)" }
+          ], "To use a Dropdown, copy it into your organisation in Makerble with Add to organisation on Explore Dropdowns.")}
+        </div>
+      </section>
+
+      <!-- Explore Impact Frameworks -->
+      <section class="section" id="explore-impact-frameworks">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Explore Impact Frameworks</h2>
+        <div class="section-desc">
+          <p>Explore Impact Frameworks lists the public, approved Impact Frameworks (Templates) in the Makerble&reg; ImpactStore&trade;: sets of outcomes and progress trackers across the stages of change. The API gives the same search, filters, counts and sort as the Explore Impact Frameworks page. Every caller sees the same Impact Frameworks; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=inclusion</code>) or comma-separated (<code>size=up_to_5,6_to_10</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/impact_frameworks", "Explore Impact Frameworks", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Impact Framework's name or description" },
+            { name: "theme", type: "string", required: false, desc: "<code>mental_health_and_wellbeing</code>, <code>children_and_young_people</code>, <code>employment_and_skills</code>, <code>community_and_culture</code>, <code>health</code>, <code>organisational</code>, <code>global_goals</code>, <code>inclusion</code>, <code>education_and_training</code>, <code>leadership</code>" },
+            { name: "set", type: "string", required: false, desc: "Part of a Framework Set: a platform-wide Framework Set's id (listed in <code>facets</code>), or <code>none</code>" },
+            { name: "size", type: "string", required: false, desc: "Number of outcomes: <code>up_to_5</code>, <code>6_to_10</code>, <code>over_10</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>SDGs</code>, <code>Inclusion</code>, <code>Employment</code>, <code>Wellbeing</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (on the most organisations' projects first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Impact Frameworks per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Impact Frameworks updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Impact Frameworks with <code>id</code>, <code>name</code>, <code>description</code>, <code>themes</code>, <code>framework_sets</code> (each with <code>id</code>, <code>name</code> and <code>short_code</code>), <code>outcome_count</code>, <code>progress_tracker_count</code>, <code>shared_by</code>, <code>libraries_count</code> (organisations using it on a project) and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/impact_frameworks/{id}", "Preview an Explore Impact Framework", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Impact Framework's id from Explore Impact Frameworks" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Impact Framework's fields as above plus <code>stages</code>, each stage of change with its <code>title</code> (Activities, Engagement, Ability, Behaviour or Effect) and its outcomes and progress trackers as <code>items</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not public and approved" }
+          ], "To use an Impact Framework, add it to projects in Makerble with Add to projects on Explore Impact Frameworks.")}
+        </div>
+      </section>
+
+      <!-- Explore Ideas -->
+      <section class="section" id="explore-ideas">
+        <div class="section-eyebrow">Learning</div>
+        <h2 class="section-title">Explore Ideas</h2>
+        <div class="section-desc">
+          <p>Explore Ideas lists the approved Ideas (Tips) shared with everyone in the Makerble&reg; ImpactStore&trade;: what other organisations tried, how it went and what they would change. The API gives the same search, filters, counts and sort as the Explore Ideas page. <code>shared_by</code>, <code>person</code> and <code>yours</code> depend on you: your colleagues, the people you follow and you.</p>
+          <p>Filters take option keys, as arrays (<code>theme[]=leadership</code>) or comma-separated (<code>shared_by=colleagues,following</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/ideas", "Explore Ideas", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the Idea's title or text" },
+            { name: "shared_by", type: "string", required: false, desc: "<code>anyone</code>, <code>colleagues</code>, <code>following</code>, <code>me</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>mental_health_and_wellbeing</code>, <code>children_and_young_people</code>, <code>employment_and_skills</code>, <code>community_and_culture</code>, <code>health</code>, <code>organisational</code>, <code>global_goals</code>, <code>inclusion</code>, <code>education_and_training</code>, <code>leadership</code>" },
+            { name: "audience", type: "string", required: false, desc: "<code>public_impact</code>, <code>personal</code>, <code>professional</code>" },
+            { name: "person", type: "string", required: false, desc: "User ids of colleagues or people you follow; any other id is ignored" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Community</code>, <code>Young people</code>, <code>Training</code>, <code>Leadership</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (saved to the most collections first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Ideas per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only Ideas updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Ideas with <code>id</code>, <code>title</code>, <code>themes</code>, <code>reading_minutes</code>, <code>shared_by</code>, <code>saved_count</code> (collections it is saved to) and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/ideas/{id}", "Read an Explore Idea", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The Idea's id from Explore Ideas" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Idea's fields as above plus its <code>text</code>, without formatting" },
+            { code: "404", cls: "response-4xx", desc: "Not approved and shared with everyone" }
+          ], "To keep an Idea, save it to a collection in Makerble with Save idea on Explore Ideas.")}
+        </div>
+      </section>
+
+      <!-- Explore Metrics -->
+      <section class="section" id="explore-metrics">
+        <div class="section-eyebrow">Impact framework</div>
+        <h2 class="section-title">Explore Metrics</h2>
+        <div class="section-desc">
+          <p>Explore Metrics lists the published, approved metrics of the Makerble&reg; ImpactStore&trade; across the stages of change: progress trackers (<code>kind</code> <code>change</code>: Activities and Engagement), outcome indicators (<code>indicator</code>: Ability, Behaviour and Effect) and Financial Values (<code>financial_value</code>). The API gives the same search, filters, counts and sort as the Explore Metrics page. Every caller sees the same metrics; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>stage[]=ability</code>) or comma-separated (<code>answer_format=scale,yes_no</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/metrics", "Explore Metrics", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the metric's name or description" },
+            { name: "stage", type: "string", required: false, desc: "<code>activities</code>, <code>engagement</code>, <code>ability</code>, <code>behaviour</code>, <code>effect</code>, <code>financial_values</code>" },
+            { name: "answer_format", type: "string", required: false, desc: "<code>count</code>, <code>scale</code>, <code>yes_no</code>, <code>value</code>" },
+            { name: "audience", type: "string", required: false, desc: "<code>public_impact</code>, <code>personal</code>, <code>professional</code>" },
+            { name: "shared_by", type: "string", required: false, desc: "<code>makerble</code>, <code>others</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Wellbeing</code>, <code>Employment</code>, <code>Housing</code>, <code>Attendance</code>, <code>SDGs</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (on the most organisations' projects first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Metrics per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only metrics updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Metrics with <code>kind</code>, <code>id</code>, <code>name</code>, <code>stage</code>, <code>whats_inside</code> (e.g. 5-level scale), <code>shared_by</code>, <code>libraries_count</code> and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/metrics/{kind}/{id}", "Preview an Explore Metric", true, [
+            { name: "kind", in: "path", type: "string", required: true, desc: "<code>change</code>, <code>indicator</code> or <code>financial_value</code>" },
+            { name: "id", in: "path", type: "integer", required: true, desc: "The metric's id from Explore Metrics" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The metric's fields as above plus <code>description</code>, <code>details</code> (its key facts by label) and the <code>choices</code> of a scale or yes-or-no indicator" },
+            { code: "404", cls: "response-4xx", desc: "Not published and approved" }
+          ], "To use a tracker or indicator, add it to a project in Makerble with Add to a project on Explore Metrics.")}
         </div>
       </section>
 
@@ -3447,7 +3750,7 @@ function buildDocsPage() {
         <div class="section-eyebrow">Impact framework</div>
         <h2 class="section-title">Workflow Trackers</h2>
         <div class="section-desc">
-          <p>A Workflow Tracker is a metric that counts records Makerble's own features create, rather than Contacts tagged in updates. Its <code>source</code> says what it counts: <code>signpostings</code> (Signpostings made from the Project, counted once whether they name the Organisation signposted to, the Person, or both; signpostings saved without a Project aren't counted anywhere), <code>internal_referrals</code> (Contacts in the Project who are added to another of the Organisation's Projects, dated by the Status in Projects history), <code>cases_created</code> (Cases created on the Project), <code>cases_closed</code> (each time one of those Cases is closed), <code>cases_open</code> (the Cases open at the end of each timeframe; always a snapshot) or <code>time_spent</code> (hours logged in Timesheets, to 1 decimal place: Task and Update Timesheets dated by their Update or by when the Task was done, and Event Timesheets dated by when the Event started, so time logged later lands in the period the work happened; Timesheets on draft Updates aren't counted; its <code>unit</code> is <code>hours</code>). <code>count_mode</code> is <code>items</code> (each signposting, referral, Case or closing; adds up across periods, except <code>cases_open</code>) or <code>contacts</code> (each Contact once; a snapshot). Confidential Cases are counted, but only listed to people who can see them. It is placed in an Impact Scorecard column like other metrics.</p>
+          <p>A Workflow Tracker is a metric that counts records Makerble's own features create, rather than Contacts tagged in updates. Its <code>source</code> says what it counts: <code>signpostings</code> (Signpostings made from the Project, counted once whether they name the Organisation signposted to, the Person, or both; signpostings saved without a Project aren't counted anywhere), <code>internal_referrals</code> (Contacts in the Project who are added to another of the Organisation's Projects, dated by the Status in Projects history), <code>cases_created</code> (Cases created on the Project), <code>cases_closed</code> (each time one of those Cases is closed), <code>cases_open</code> (the Cases open at the end of each timeframe; always a snapshot) or <code>time_spent</code> (hours logged in Timesheets, to 1 decimal place: Task and Update Timesheets dated by their Update or by when the Task was done, and Event Timesheets dated by when the Event started, so time logged later lands in the period the work happened; Timesheets on draft Updates aren't counted; its <code>unit</code> is <code>hours</code>). <code>count_mode</code> is <code>items</code> (each signposting, referral, Case or closing; adds up across periods, except <code>cases_open</code>) or <code>contacts</code> (each Contact once; a snapshot). Confidential Cases are counted, but only listed to people who can see them. It is placed in an Impact Scorecard column like other metrics. Set <code>contact_criteria</code> (\"Only count contacts who match\") to count only the items of Contacts who meet Contact Filters criteria, in the same shape as a Cohort Tracker's <code>criteria</code>; they are matched on each Contact's current details, so editing a Contact can change past results.</p>
         </div>
         <div class="callout callout-tip">
           <span class="callout-icon">✓</span>
@@ -3473,12 +3776,12 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "<code>results: {period, year_to_date, all_time}</code> on the Project, and the latest <code>records</code> counted that the user may see, with <code>hidden_count</code> for the rest" },
             { code: "404", cls: "response-4xx", desc: "The Project isn't the Organisation's" },
             { code: "422", cls: "response-4xx", desc: "Unknown source or count_mode, or bad settings" }
-          ], "Body: <code>charity_id</code>, <code>project_id</code>, <code>workflow_tracker: {source, count_mode, settings}</code>. The Period ends at the Project's next deadline, or today when it has none ahead.")}
+          ], "Body: <code>charity_id</code>, <code>project_id</code>, <code>workflow_tracker: {source, count_mode, settings, contact_criteria}</code>. The Period ends at the Project's next deadline, or today when it has none ahead.")}
           ${endpointCard("POST", "/workflow_trackers", "Create a Workflow Tracker", true, [], [
             { code: "201", cls: "response-2xx", desc: "Workflow Tracker created" },
             { code: "403", cls: "response-4xx", desc: "Not an editor or reporter of the Organisation" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Body: <code>workflow_tracker: {charity_id, name, description, source, count_mode, settings}</code>. For <code>internal_referrals</code>, <code>settings</code> choose which Projects count as a referral: <code>{destinations: \"any\"}</code>, <code>{destinations: \"only\", project_ids: [...]}</code> or <code>{destinations: \"except\", project_ids: [...]}</code> (the default, with none listed). For the Cases sources, <code>settings: {case_form_id: ...}</code> counts only the Cases created with that Case Form; leave it out for any. For <code>time_spent</code>, <code>settings: {kinds: [...], user_ids: [...], roles: [...]}</code>: <code>kinds</code> are any of <code>updates_and_tasks</code>, <code>event_staff</code> (Event Workers and Event Managers) and <code>event_guests</code> (default the first two); <code>user_ids</code> and <code>roles</code> (<code>editor</code>: Organisation Admins and Project Managers, <code>reporter</code>: Changemakers, <code>observer</code>: Observers) count only those colleagues' time, and leave Event guests' time as it is. <code>count_mode</code> is always <code>items</code>.")}
+          ], "Body: <code>workflow_tracker: {charity_id, name, description, source, count_mode, settings, contact_criteria}</code>. <code>contact_criteria</code> (optional): Contact Filters criteria a Contact must meet for their items to count, e.g. <code>{age_to: {year: \"17\"}}</code>; <code>{}</code> counts every Contact. For <code>internal_referrals</code>, <code>settings</code> choose which Projects count as a referral: <code>{destinations: \"any\"}</code>, <code>{destinations: \"only\", project_ids: [...]}</code> or <code>{destinations: \"except\", project_ids: [...]}</code> (the default, with none listed). For the Cases sources, <code>settings: {case_form_id: ...}</code> counts only the Cases created with that Case Form; leave it out for any. For <code>time_spent</code>, <code>settings: {kinds: [...], user_ids: [...], roles: [...]}</code>: <code>kinds</code> are any of <code>updates_and_tasks</code>, <code>event_staff</code> (Event Workers and Event Managers) and <code>event_guests</code> (default the first two); <code>user_ids</code> and <code>roles</code> (<code>editor</code>: Organisation Admins and Project Managers, <code>reporter</code>: Changemakers, <code>observer</code>: Observers) count only those colleagues' time, and leave Event guests' time as it is. <code>count_mode</code> is always <code>items</code>.")}
           ${endpointCard("PATCH", "/workflow_trackers/{id}", "Update a Workflow Tracker", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Workflow Tracker ID" }
           ], [
@@ -3750,6 +4053,30 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Targets saved" },
             { code: "403", cls: "response-4xx", desc: "Can't edit the Album's targets" }
           ])}
+          ${endpointCard("GET", "/formula_trackers/{id}/projects/{project_id}/results", "Get a Formula Tracker's result on a Project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default). Each timeframe is worked out from its own tracker numbers, so Year to Date of a percentage is Year to Date numerator ÷ Year to Date denominator" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on (default: the next Target Deadline, or today)" },
+            { name: "page", type: "integer", required: false, desc: "Page of items, when the formula adds trackers that count items" },
+            { name: "per_page", type: "integer", required: false, desc: "Items per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{number, display_value, target, result_kind, as_of, starts_on, ends_on, formula, formula_with_values, trackers: [{type, id, name, type_name, unit, number}], itemised, page, page_size, page_count, total_count, hidden_count, data}</code>. <code>number</code> is null and <code>display_value</code> is \"–\" when there isn't enough data (a tracker has no result, or it divides by 0). When <code>itemised</code>, <code>data</code> lists the items counted, newest first; items you may not see are counted in <code>hidden_count</code>, never listed" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Project's Results Canvas" },
+            { code: "404", cls: "response-4xx", desc: "The tracker isn't on the Project" },
+            { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
+          ])}
+          ${endpointCard("GET", "/formula_trackers/{id}/albums/{bundle_id}/results", "Get a Formula Tracker's result on an Album", true, [
+            { name: "bundle_id", in: "path", type: "integer", required: true, desc: "Album ID" },
+            { name: "timeframe", type: "string", required: false, desc: "<code>period</code>, <code>year_to_date</code> or <code>all_time</code> (default)" },
+            { name: "as_of", type: "date", required: false, desc: "The deadline the window ends on" },
+            { name: "page", type: "integer", required: false, desc: "Page of items" },
+            { name: "per_page", type: "integer", required: false, desc: "Items per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "As for a Project. Each tracker is worked out on the Album as a whole, then the formula, so an Album percentage is the Album's numerator ÷ the Album's denominator" },
+            { code: "403", cls: "response-4xx", desc: "Can't see the Album" },
+            { code: "404", cls: "response-4xx", desc: "The tracker isn't on any of the Album's Projects" },
+            { code: "422", cls: "response-4xx", desc: "Unknown timeframe or bad date" }
+          ])}
           ${endpointCard("DELETE", "/formula_trackers/{id}/projects/{project_id}", "Remove a Formula Tracker from a Project", true, [], [
             { code: "204", cls: "response-2xx", desc: "Removed" },
             { code: "404", cls: "response-4xx", desc: "Not on the Project" }
@@ -3996,14 +4323,19 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "You may not see this event" }
           ])}
           ${endpointCard("POST", "/events/{id}/guests", "Add guests to an event", true, [
-            { name: "contact_ids", type: "array", required: true, desc: "Contacts in the event's project" },
+            { name: "contact_ids", type: "array", required: false, desc: "Contacts in the event's project. Leave out to choose them with <code>filter_data</code>" },
+            { name: "filter_data", type: "object", required: false, desc: "Instead of <code>contact_ids</code>: everyone matching the Manage Contacts filters, e.g. <code>{\"beneficiary_state_ids\": [\"1\"]}</code>" },
+            { name: "excluded_ids", type: "integer[]", required: false, desc: "With <code>filter_data</code>: Contacts matching the filters to leave out" },
+            { name: "project_id", type: "integer", required: false, desc: "With <code>filter_data</code>: shortcut for the Contacts in this Project" },
             { name: "guest_status_id", type: "integer", required: false, desc: "One of the Event Format's Guest Statuses; its requirements are checked" },
-            { name: "event_role_id", type: "integer", required: false, desc: "One of the Event Format's Event Roles for guests" },
-            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or this_and_upcoming_events" }
+            { name: "event_role_id", type: "integer", required: false, desc: "One of the Event Format's Event Roles for guests (<code>contact_ids</code> only)" },
+            { name: "apply_to", type: "string", required: false, desc: "this_event (default) or this_and_upcoming_events (<code>contact_ids</code> only)" }
           ], [
-            { code: "201", cls: "response-2xx", desc: "event_id and guests_count" },
-            { code: "422", cls: "response-4xx", desc: "Every problem: Contacts outside the project, an unmet requirement, a full event..." }
-          ])}
+            { code: "200", cls: "response-2xx", desc: "<code>filter_data</code>, up to 50 Contacts added straight away: <code>id</code>, <code>status</code>, <code>changed_count</code>, <code>skip_counts</code>, <code>summary</code>, <code>event_id</code> and <code>guests_count</code>" },
+            { code: "201", cls: "response-2xx", desc: "<code>contact_ids</code>: event_id and guests_count" },
+            { code: "202", cls: "response-2xx", desc: "<code>filter_data</code>, more than 50 Contacts: added in the background. Poll <code>GET /beneficiaries/bulk_actions/{id}</code> with the <code>id</code>" },
+            { code: "422", cls: "response-4xx", desc: "Every problem: Contacts outside the project, an unmet requirement, a full event... (<code>contact_ids</code>), or a Guest Status not on the Event Format" }
+          ], "With <code>contact_ids</code> all the Contacts are added or none are. With <code>filter_data</code> (<strong>Add to › An event</strong> for the Contacts selected on Manage Contacts) each Contact is added in turn, and those that can't be are skipped and counted in <code>skip_counts</code>: <code>headline_only</code>, <code>not_in_project</code>, <code>event_full</code>, <code>requirements_not_met</code>. Contacts already on the event keep their Guest Status.")}
           ${endpointCard("PATCH", "/events/{id}/guests/{contact_id}", "Change a guest's Guest Status or Event Role", true, [
             { name: "guest_status_id", type: "integer", required: false, desc: "New Guest Status; its requirements are checked" },
             { name: "event_role_id", type: "integer | null", required: false, desc: "New Event Role, or null to clear it" }
@@ -4230,6 +4562,24 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "A setting is invalid, e.g. a length not in 5-minute steps" }
           ])}
+          ${endpointCard("POST", "/event_categories/{id}/projects", "Add an Event Format to a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "project_id", type: "integer", required: true, desc: "A project in the same organisation; adding one also turns events on for it" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Added — status: added" },
+            { code: "200", cls: "response-2xx", desc: "It was already added — status: already_added" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Event Format or project not found, or in an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "The project isn't in the Event Format's organisation" }
+          ])}
+          ${endpointCard("DELETE", "/event_categories/{id}/projects/{project_id}", "Remove an Event Format from a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Removed — status: removed. Events already using it keep it" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or the Event Format isn't added to the project" }
+          ])}
           ${endpointCard("DELETE", "/event_categories/{id}", "Delete an Event Format", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
           ], [
@@ -4237,6 +4587,101 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "Has events or is added to projects — error gives the reason and counts" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Event Catalogues -->
+      <section class="section" id="event-catalogues">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Event Catalogues</h2>
+        <div class="section-desc">
+          <p>An Event Catalogue is a public page listing an organisation's upcoming events that people can book onto, at its <code>public_url</code>, which can also be embedded on a website. It shows only events that haven't started, have a Signup Page and have their listing turned on, narrowed by its filters. Organisation Admins, Organisation Reporters and Project Managers can list and read catalogues; Organisation Admins and Project Managers can create and edit them.</p>
+          <p>Contacts can also see a catalogue on their Contacts' Portal. Each project decides who: every Contact enrolled in the project, or only the Contacts ticked. The project's Project Managers and the organisation's Admins can change it.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/event_catalogues", "List an organisation's Event Catalogues", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list by name — each with filters and public_url" },
+            { code: "403", cls: "response-4xx", desc: "You can't see this organisation's catalogues" },
+            { code: "404", cls: "response-4xx", desc: "Organisation not found, or you are not in it" }
+          ])}
+          ${endpointCard("GET", "/event_catalogues/{id}", "Get an Event Catalogue", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Catalogue ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The catalogue, with upcoming_events_count" },
+            { code: "403", cls: "response-4xx", desc: "You can't see this organisation's catalogues" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("POST", "/event_catalogues", "Create an Event Catalogue", true, [
+            { name: "charity_id", type: "integer", required: true, desc: "The Organisation that will own it" },
+            { name: "name", type: "string", required: true, desc: "e.g. Drop-ins" },
+            { name: "filters", type: "object", required: false, desc: "project_ids, event_category_ids, user_ids, beneficiary_ids, event_types, date_from" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Created — returns the catalogue with its public_url" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin or Project Manager" },
+            { code: "422", cls: "response-4xx", desc: "errors lists every problem" }
+          ])}
+          ${endpointCard("PATCH", "/event_catalogues/{id}", "Edit an Event Catalogue", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Catalogue ID" },
+            { name: "name", type: "string", required: false, desc: "Give only what changes" },
+            { name: "filters", type: "object", required: false, desc: "Replaces all its filters" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Updated — the public_url stays the same" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin or Project Manager" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
+          ])}
+          ${endpointCard("GET", "/event_catalogues/{id}/projects/{project_id}/access", "Get who can see an Event Catalogue in a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Catalogue ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "mode (every_enrolled or specific) and the ticked contact_ids" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or the catalogue doesn't show this project's events" }
+          ])}
+          ${endpointCard("PATCH", "/event_catalogues/{id}/projects/{project_id}/access", "Change who can see an Event Catalogue in a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Catalogue ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "mode", type: "string", required: false, desc: "every_enrolled (drops the ticks) or specific" },
+            { name: "add_contact_ids", type: "array", required: false, desc: "Contacts in the project to tick, under specific" },
+            { name: "remove_contact_ids", type: "array", required: false, desc: "Contacts to untick" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Who can now see it" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Manager of the project or an Organisation Admin" },
+            { code: "422", cls: "response-4xx", desc: "e.g. a Contact who isn't in the project, or ticks under every_enrolled" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Contacts' Portal -->
+      <section class="section" id="contacts-portal">
+        <div class="section-eyebrow">Events</div>
+        <h2 class="section-title">Contacts' Portal</h2>
+        <div class="section-desc">
+          <p>Each Contact has their own link to the Contacts' Portal, where they see the Event Catalogues their project lets them see and book onto events. These endpoints do what a project's Portal Links page does: list the Contacts who can see at least one Event Catalogue, and send them their link by email or SMS. The link itself is never returned, because it signs the Contact in to their Portal.</p>
+          <p>To give a Contact Portal access, first let them see an Event Catalogue (<code>PATCH /event_catalogues/{id}/projects/{project_id}/access</code>), then send them their link. Project Managers, Reporters and Organisation Admins and Reporters can list; only Project Managers and Organisation Admins can send.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/projects/{project_id}/portal_links", "List Contacts' Portal links in a project", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Each Contact's link_status (active, deactivated or none), last_sent_at, last_sent_channel, can_email and can_sms" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Manager or Reporter of the project, or an Organisation Admin or Reporter" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ])}
+          ${endpointCard("POST", "/projects/{project_id}/portal_links/send", "Send Contacts their Portal link", true, [
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
+            { name: "contact_ids", type: "array", required: true, desc: "Contacts in the project who can see an Event Catalogue" },
+            { name: "channel", type: "string", required: true, desc: "email or sms" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "sent (how many) and skipped (names of Contacts with no email address or mobile number)" },
+            { code: "403", cls: "response-4xx", desc: "Not a Project Manager of the project or an Organisation Admin" },
+            { code: "422", cls: "response-4xx", desc: "e.g. a Contact who can't see any Event Catalogue yet, or none can receive it" }
           ])}
         </div>
       </section>
@@ -4359,7 +4804,8 @@ function buildDocsPage() {
         <div class="section-eyebrow">Integrations</div>
         <h2 class="section-title">Webhooks</h2>
         <div class="section-desc">
-          <p>Instead of polling, an Organisation's admins can register webhook endpoints: HTTPS URLs that Makerble sends a signed JSON <code>POST</code> to when records change. Only the Organisation's admins can manage them, and only once an admin has ticked <strong>Turn on Webhooks</strong> in the Organisation's Settings (Preferences) page; until then these endpoints answer <code>403</code>.</p>
+          <p>Instead of polling, an Organisation's admins can register webhook endpoints: HTTPS URLs that Makerble sends a signed JSON <code>POST</code> to when records change. Only the Organisation's admins can manage them, and only once an admin has ticked <strong>Turn on Webhooks</strong> in the Organisation's Settings (Preferences) page; until then these endpoints answer <code>403</code>. A colleague who is not an Organisation Admin also gets <code>403</code>, with an <code>error</code> message that can be shown to them as it is.</p>
+          <p><strong>Automation platforms:</strong> a connector such as the Power Automate one creates an endpoint for each flow with a Makerble trigger, usually for one event, and deletes it when the flow is deleted. The create response's <code>Location</code> header is the endpoint's full address to send that <code>DELETE</code> to, and deleting is idempotent (<code>204</code> again if it has already gone). Such endpoints have a <code>source</code> of <code>power_automate</code>, <code>zapier</code> or <code>dynamics</code>, set by Makerble from the connected app (an OAuth connection, which may list, get, create and delete webhook endpoints in the one Organisation it was connected to), and their own limit of 100 per Organisation, separate from the 10 added by hand (<code>source: manual</code>). Power Automate flows can't check the signature themselves; they rely on the callback address being secret, which Microsoft generates for each flow.</p>
           <p><strong>Events:</strong> <code>contact.created</code>, <code>contact.updated</code> (with <code>changed_fields</code>), <code>story.created</code> (about 30 seconds after the Story is posted, so survey answers are included; drafts are not sent), <code>story.updated</code> (including a draft being published), <code>project.created</code>, <code>project.updated</code> (update events are sent about 10 seconds after the change, so several saves of one change arrive as one event), <code>import.completed</code> (once per finished spreadsheet import; its rows send no events of their own) and <code>webhook.test</code>. The <code>data</code> of a Contact, Story or Project event is the same JSON as <code>GET /beneficiaries/{id}</code>, <code>GET /stories/{id}</code> or <code>GET /projects/{id}</code>, as the record is when the request is sent. A changed dropdown answer on a Contact sends <code>contact.updated</code> with <code>custom_fields.&lt;dropdown title&gt;</code> in <code>changed_fields</code>.</p>
           <p><strong>Removal and membership events:</strong> <code>contact.deleted</code> (<code>id</code>, <code>deleted_at</code>; no personal data), <code>contact.merged</code> (<code>kept_contact_id</code>, <code>merged_contact_ids</code>, <code>merged_at</code>; no <code>contact.deleted</code> is sent for a merged Contact), <code>contact.restored</code> (the full Contact, when a deleted Contact is restored or a merge undone), <code>story.deleted</code> (<code>id</code>, <code>project_id</code>, <code>contact_ids</code>, <code>deleted_at</code>), <code>project.deleted</code> (<code>id</code>, <code>name</code>, <code>deleted_at</code>), and <code>project.contact_added</code> / <code>project.contact_removed</code> (<code>project_id</code>, <code>project_name</code>, <code>contact_id</code>, <code>contact_state</code>). Their <code>data</code> is recorded when the event happens. Webhooks created before these events existed receive them only once an admin ticks them. Once an endpoint has 100 events waiting, further ones are spaced out at 5 a second, so a bulk action on thousands of records may take some minutes to arrive in full.</p>
           <p><strong>Envelope:</strong> <code>{ "id": "evt_…", "event": "contact.updated", "occurred_at": "2026-10-04T09:15:00Z", "charity_id": 123, "changed_fields": ["name"], "data": { … } }</code>. Headers: <code>X-Makerble-Event</code>, <code>X-Makerble-Delivery</code> (the <code>id</code>), <code>User-Agent: Makerble-Webhooks/1</code> and <code>X-Makerble-Signature: t=&lt;unix time&gt;,v1=&lt;signature&gt;</code>.</p>
@@ -4378,8 +4824,8 @@ function buildDocsPage() {
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list of endpoints, without secrets" },
-            { code: "403", cls: "response-4xx", desc: "Webhooks are not turned on for this Organisation" },
-            { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation" }
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin, or Webhooks are not turned on for this Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not a member of this Organisation" }
           ])}
           ${endpointCard("POST", "/webhook_endpoints", "Register a webhook endpoint", true, [
             { name: "webhook_endpoint[charity_id]", in: "body", type: "integer", required: true, desc: "The Organisation ID" },
@@ -4387,14 +4833,16 @@ function buildDocsPage() {
             { name: "webhook_endpoint[description]", in: "body", type: "string", required: false, desc: "What it is for" },
             { name: "webhook_endpoint[event_types]", in: "body", type: "array", required: false, desc: "Events to send (default: all)" }
           ], [
-            { code: "201", cls: "response-2xx", desc: "Created — includes the secret, shown only this once" },
-            { code: "422", cls: "response-4xx", desc: "Invalid URL or events, or the Organisation already has 10 endpoints" }
+            { code: "201", cls: "response-2xx", desc: "Created — includes the secret, shown only this once. The Location header is the endpoint's full address" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin, or Webhooks are not turned on for this Organisation" },
+            { code: "422", cls: "response-4xx", desc: "Invalid URL or events, or the Organisation already has 10 endpoints (100 from automation platforms)" }
           ])}
           ${endpointCard("GET", "/webhook_endpoints/{id}", "Get a webhook endpoint", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The endpoint, without its secret" },
-            { code: "404", cls: "response-4xx", desc: "Not found, or not an admin of its Organisation" }
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of its Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not a member of its Organisation" }
           ])}
           ${endpointCard("PATCH", "/webhook_endpoints/{id}", "Change, pause or resume a webhook endpoint", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" },
@@ -4407,7 +4855,8 @@ function buildDocsPage() {
           ${endpointCard("DELETE", "/webhook_endpoints/{id}", "Delete a webhook endpoint", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
           ], [
-            { code: "204", cls: "response-2xx", desc: "Deleted, with its delivery log" }
+            { code: "204", cls: "response-2xx", desc: "Deleted, with its delivery log, or already gone" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of its Organisation" }
           ])}
           ${endpointCard("POST", "/webhook_endpoints/{id}/rotate_secret", "Rotate a webhook endpoint's secret", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Endpoint ID" }
@@ -5237,6 +5686,20 @@ function buildDocsPage() {
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" }
           ], [{ code: "200", cls: "response-2xx", desc: "Case Form schemas with field definition IDs and types" }])}
+        </div>
+      </section>
+
+      <!-- Health -->
+      <section class="section" id="health">
+        <div class="section-eyebrow">Service</div>
+        <h2 class="section-title">Health</h2>
+        <div class="section-desc">
+          <p>Checks that the service and its database are answering, and reports which build is running. No sign-in is needed. After a release, <code>commit</code> changes to the new build's commit and <code>uptime_seconds</code> starts again from a small number, so you can tell when the new version is live.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/health", "Check the service is up and which build is running", false, [], [
+            { code: "200", cls: "response-2xx", desc: "status, database (true/false), uptime_seconds, commit (git SHA or null), built_at (ISO 8601 UTC or null) and environment" }
+          ])}
         </div>
       </section>
 

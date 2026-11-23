@@ -30,6 +30,21 @@ info:
     ```
 
     A key belongs to one Organisation and acts as the colleague chosen when it was created: it can see and do only what they can, in that Organisation only. It can call the same endpoints as a connected app (OAuth), and gets `403` with `not_available_to_connected_apps` from any other. If the colleague leaves the Organisation, or the key is revoked, requests get `401`. Calls made with an Organisation's API keys count towards its monthly API usage.
+    ## Connecting an app with OAuth 2.0
+    Apps published for other people to use, such as marketplace connectors, connect with OAuth 2.0 instead of asking for a password. The user signs in to Makerble, chooses which of their organisations (Charities) the app may use, and selects **Allow**. The app then calls the API as that user, limited to that organisation.
+
+    1. **Get a client ID and secret.** Makerble registers client applications; email [api-key-request@makerble.com](mailto:api-key-request@makerble.com) with your app's name and its exact redirect URI (https only). There is no self-service registration.
+    2. **Send the user to** `GET https://makerble.com/oauth/authorize?response_type=code&client_id=…&redirect_uri=…&scope=api&state=…`. Makerble shows the consent screen, then redirects to your redirect URI with `?code=…&state=…`, or `?error=access_denied` if the user cancels. A redirect URI that isn't registered for your app is refused without redirecting.
+    3. **Exchange the code** at `POST https://makerble.com/oauth/token` with `grant_type=authorization_code`. The code works once and expires after 10 minutes.
+    4. **Call the API** with `Authorization: Bearer <access_token>`. Don't send `X-User-Email`/`X-User-Token` as well. Tokens are only read from the `Authorization` header.
+    5. **Refresh** at `POST https://makerble.com/oauth/token` with `grant_type=refresh_token`. Access tokens last 1 hour. Refresh tokens don't expire, but each refresh returns a new refresh token: always store the latest one.
+
+    | Situation | Response |
+    |---|---|
+    | Token expired, revoked, or the user is no longer in the connected organisation | `401 {"error":"invalid_token"}` |
+    | Endpoint not yet available to connected apps | `403 {"error":"not_available_to_connected_apps"}` |
+
+    A connected app sees only the organisation the user chose, with that user's permissions there. It can call the same endpoints as an Organisation API key (see Organisation API keys above), and gets `403` with `not_available_to_connected_apps` from any other. Users and Organisation Admins can disconnect an app at any time from **Settings → Connected Apps**, and it stops working straight away. The scope is always `api`.
 
     ## Creating Users via the API
     `POST /users` requires a separate API Key (`auth_code`). Request one at [api-key-request@makerble.com](mailto:api-key-request@makerble.com).
@@ -213,6 +228,10 @@ tags:
     description: Contact Bio Forms — field schemas for creating and editing Beneficiary records
   - name: Beneficiary Types
     description: The four contact types — Person, Organisation, Animal, Object
+  - name: Audio Notes
+    description: |
+      AI AudioNotes (CaseNotes): audio recordings of a conversation with a Contact (Beneficiary) or
+      of an Event session, which Makerble transcribes and summarises into a draft survey response.
   - name: Cases
     description: Cases linked to a Beneficiary and a Project
   - name: Stories
@@ -318,6 +337,10 @@ tags:
       ever added to a Project through one of its Outcomes.
   - name: Event Formats
     description: Event Categories — templates for an organisation's events (e.g. Workshops, Classes, Meetings)
+  - name: Event Catalogues
+    description: Public, bookable lists of an organisation's upcoming events, and who can see them on the Contacts' Portal
+  - name: Contacts' Portal
+    description: Each Contact's own link to the Contacts' Portal, where they book onto events from Event Catalogues
   - name: Formula Trackers
     description: |
       Metrics worked out from other trackers with + − × ÷, numbers and brackets, e.g. Referrals
@@ -359,6 +382,8 @@ tags:
       An Organisation's connection to Eventbrite, which brings Eventbrite events, ticket holders and
       check-ins into Makerble as Events, Contacts and attendance Stories. Only the Organisation's admins
       can see or change it.
+  - name: Health
+    description: Whether the service is up, and which build of it is running
 
 paths:
 
@@ -413,6 +438,105 @@ paths:
                   value:
                     error: invitation-pending
                     message: "You haven't set a password yet. Open your invitation email to set one."
+
+  /oauth/token:
+    servers:
+      - url: https://makerble.com
+        description: Production (OAuth endpoints are not under /api/v2)
+      - url: https://staging.makerble.com
+        description: Staging
+    post:
+      tags: [Authentication]
+      summary: Exchange an authorisation code, or refresh an access token (OAuth 2.0)
+      description: |
+        For apps connected with OAuth 2.0. Exchange the `code` from the consent screen for an
+        access token and refresh token, or swap a refresh token for a new pair. Authenticate
+        the app with `client_id` and `client_secret` in the body, or with HTTP Basic auth.
+        Access tokens last 1 hour (`expires_in: 3600`). Each refresh returns a new refresh
+        token; store the latest one.
+      operationId: createOauthToken
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type, client_id, client_secret]
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code, refresh_token]
+                code:
+                  type: string
+                  description: Required for `authorization_code`. Works once; expires after 10 minutes.
+                redirect_uri:
+                  type: string
+                  description: Required for `authorization_code`; must match the one used on `/oauth/authorize`.
+                refresh_token:
+                  type: string
+                  description: Required for `refresh_token`.
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+            example:
+              grant_type: authorization_code
+              code: "Zx1...code"
+              redirect_uri: https://global.consent.azure-apim.net/redirect
+              client_id: "your-client-id"
+              client_secret: "your-client-secret"
+      responses:
+        "200":
+          description: Tokens issued
+          content:
+            application/json:
+              example:
+                access_token: "kq3...access"
+                token_type: Bearer
+                expires_in: 3600
+                refresh_token: "9Lm...refresh"
+                scope: api
+                created_at: 1791726153
+        "400":
+          description: Invalid, expired or already-used code or refresh token (`{"error":"invalid_grant"}`)
+        "401":
+          description: Unknown client or wrong client secret (`{"error":"invalid_client"}`)
+
+  /oauth/revoke:
+    servers:
+      - url: https://makerble.com
+        description: Production (OAuth endpoints are not under /api/v2)
+      - url: https://staging.makerble.com
+        description: Staging
+    post:
+      tags: [Authentication]
+      summary: Revoke an access or refresh token (OAuth 2.0)
+      description: |
+        For apps connected with OAuth 2.0, e.g. when the user disconnects from inside your app.
+        Revoking either token of a pair stops both working. Always returns 200, even for an
+        unknown token.
+      operationId: revokeOauthToken
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, client_id, client_secret]
+              properties:
+                token:
+                  type: string
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+            example:
+              token: "9Lm...refresh"
+              client_id: "your-client-id"
+              client_secret: "your-client-secret"
+      responses:
+        "200":
+          description: Token revoked (or already invalid)
 
   /users:
     get:
@@ -3754,7 +3878,16 @@ paths:
     post:
       tags: [Projects]
       summary: Add users to a Project
-      description: Grants roles on a Project. A user can hold Editor, Reporter, and Observer simultaneously.
+      description: |
+        Adds users to Projects' teams, as the Project's **Add Users** page does: as Project Managers (`editor_ids`),
+        Changemakers (`reporter_ids`) or Analysts (`observer_ids`). A user can hold more than one role.
+
+        You must be a Project Manager of every listed Project, or an Organisation Admin of its Organisation. The users
+        must already be colleagues in the Project's Organisation, unless the Organisation's preference "Allow Project
+        Managers to add Makerble Users outside the organisation to their project" is on.
+
+        The request is all or nothing: if any Project isn't found (404), isn't yours to manage (403) or any user can't
+        be added (422), nobody is added to any Project.
       operationId: addColleague
       security: [{tokenAuth: []}]
       requestBody:
@@ -3794,6 +3927,10 @@ paths:
           description: Users added
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/AddColleagueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -4738,6 +4875,238 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+  /beneficiaries/bulk_actions/{id}:
+    get:
+      tags: [Beneficiaries]
+      summary: Get the progress of a bulk action on Contacts
+      description: |
+        The progress of any change to many Contacts at once, such as adding everyone matching
+        `filter_data` as an event's guests (`POST /events/{id}/guests`). Only the user who started
+        it can see it. `action_name` says which change it is (e.g. `add_to_event`,
+        `move_through_projects`). `status` is `pending`, `running`, `completed`, `failed` or
+        `undone`; `processed_count` of `total_count` Contacts have been reached so far, and `summary`
+        is filled in once it has finished.
+      operationId: getBeneficiaryBulkAction
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The bulk action's progress
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BeneficiaryBulkAction'
+                  - type: object
+                    properties:
+                      action_name:
+                        type: string
+                        description: Which change this is, e.g. add_to_event or move_through_projects
+              example:
+                id: 52
+                status: running
+                total_count: 812
+                processed_count: 240
+                changed_count: 231
+                skip_counts: { not_in_project: 9 }
+                background: true
+                summary: null
+                action_name: add_to_event
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /beneficiaries/bulk_checklists:
+    post:
+      tags: [Beneficiaries]
+      summary: Start a Checklist for many Contacts at once
+      description: |
+        Starts a Checklist for many Contacts (Beneficiaries) in one request. This is **Add to › A
+        Checklist** for the Contacts selected on the Manage Contacts page. Each Contact is started
+        the same way as Add a Checklist on their profile, and actions their records already prove
+        done are marked done straight away.
+
+        **Which Checklist.** `checklist_id` and `project_id`: a Checklist the project lets colleagues
+        add by hand, through that project. Organisation Editors and Reporters may use any open
+        project; other users only projects they are an Editor or Reporter of. Anything else is
+        refused with `422`.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`. With `filter_data`,
+        `project_id` also narrows the filters to Contacts in that project, since anyone outside it
+        would be skipped anyway.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` (the user only has
+        Headline Only Access to them), `not_in_project` (they aren't in the project), `not_allowed`
+        (the Checklist can't be started for them). A Contact who already has the Checklist keeps
+        their progress and isn't counted as changed.
+
+        Up to 50 Contacts are started straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: startChecklistForBeneficiaries
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checklist_id, project_id]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to start it for
+                checklist_id:
+                  type: integer
+                  description: The Checklist to start
+                project_id:
+                  type: integer
+                  description: The project it is started through (one that lets colleagues add it by hand)
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              checklist_id: 31
+              project_id: 572
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Checklist was started straight away (50 Contacts or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiaryBulkAction' }
+              example:
+                id: 61
+                status: completed
+                total_count: 10
+                processed_count: 10
+                changed_count: 7
+                skip_counts: { not_in_project: 3 }
+                background: false
+                summary: "7 contacts changed. 3 skipped: 3 because they aren't in Youth Mentoring."
+        "202":
+          description: More than 50 Contacts, so it runs in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiaryBulkAction' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /beneficiaries/bulk_relationships:
+    post:
+      tags: [Beneficiaries]
+      summary: Link many Contacts to one Contact with the same relationship
+      description: |
+        Gives many Contacts (Beneficiaries) the same relationship with one Contact, in one request.
+        This is **Add to › A relationship** for the Contacts selected on the Manage Contacts page,
+        e.g. making Oakfield School the School of every selected pupil. Each relationship is added
+        the same way as Add a Relationship on a Contact's profile, so it appears on both Contacts'
+        History.
+
+        **Which relationship.** `relationship_category_id` is one of the organisation's
+        Relationship Categories (`GET /relationship_categories`), which has two sides, e.g. School &
+        Pupil. `related_contact_id` is the one Contact everyone is linked to, and
+        `related_contact_is` says which side that Contact takes: `parent` (the first title, School)
+        or `child` (the second, Pupil). Each selected Contact takes the other side.
+
+        **Which Contacts.** Either `beneficiary_ids` (at most 500), or everyone matching
+        `filter_data` (the Manage Contacts filters) leaving out `excluded_ids`.
+
+        **Skipped Contacts** are counted in `skip_counts`: `headline_only` (the user only has
+        Headline Only Access to them), `already_linked` (they already have that relationship with
+        that Contact), `same_contact` (the chosen Contact itself), `not_allowed` (the relationship
+        couldn't be saved for them).
+
+        Up to 50 Contacts are linked straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `charity_id` may be left out when
+        the user belongs to one organisation.
+      operationId: linkBeneficiariesToContact
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [relationship_category_id, related_contact_id, related_contact_is]
+              properties:
+                charity_id:
+                  type: integer
+                  description: The organisation whose Contacts to link
+                relationship_category_id:
+                  type: integer
+                  description: One of the organisation's Relationship Categories
+                related_contact_id:
+                  type: integer
+                  description: The Contact every selected Contact is linked to
+                related_contact_is:
+                  type: string
+                  enum: [parent, child]
+                  description: Which side of the category the related Contact takes; the selected Contacts take the other
+                beneficiary_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                  description: The Contacts to link, at most 500. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts, used when beneficiary_ids is left out
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: Contacts matching the filters to leave out
+            example:
+              charity_id: 12
+              relationship_category_id: 8
+              related_contact_id: 160400
+              related_contact_is: parent
+              beneficiary_ids: [160498, 160499, 160500]
+      responses:
+        "200":
+          description: The Contacts were linked straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiaryBulkAction' }
+              example:
+                id: 71
+                status: completed
+                total_count: 5
+                processed_count: 5
+                changed_count: 5
+                skip_counts: {}
+                background: false
+                summary: "5 contacts changed."
+        "202":
+          description: More than 50 Contacts, so they are linked in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiaryBulkAction' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /project_beneficiaries:
     get:
       tags: [Beneficiaries]
@@ -6225,16 +6594,20 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
-        - name: story_category_id
+        - name: story_category_ids
           in: query
           schema:
-            type: integer
-          description: Filter by a specific Survey
-        - name: "project_ids[]"
+            type: string
+          description: >-
+            Filter by one or more Surveys (Story Categories). Accepts a JSON array (`[1,2]`), a repeated
+            array parameter (`story_category_ids[]=1&story_category_ids[]=2`), a comma-separated list (`1,2`)
+            or a single ID. Only Surveys the authenticated user can access are returned; any others are
+            ignored. `story_category_id` is also accepted as an alias.
+        - name: project_ids
           in: query
           schema:
-            type: integer
-          description: Filter by Project ID (repeat for multiple)
+            type: string
+          description: Filter by one or more Project IDs. Accepts the same formats as `story_category_ids`.
         - name: start_date
           in: query
           schema:
@@ -7053,6 +7426,203 @@ paths:
                 $ref: '#/components/schemas/PaginatedGeneric'
         "401":
           $ref: '#/components/responses/Unauthorized'
+
+  /case_notes:
+    get:
+      tags: [Audio Notes]
+      summary: List Audio Notes
+      description: |
+        The Audio Notes (CaseNotes) the user may see on the **Audio Notes** page, newest first:
+        every one in the Organisations (Charities) they are an admin (Charity Editor) of and the
+        Projects they are a Project Editor of, plus the ones they recorded themselves. Each is a
+        CaseNote (`note_type: case_note`, about one Contact) or a SessionNote
+        (`note_type: session_note`, about an Event). Get one to read its transcript and summary.
+      operationId: listCaseNotes
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          schema:
+            type: integer
+          description: Only Audio Notes in this Organisation (Charity)
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: Only Audio Notes in this Project
+        - name: beneficiary_id
+          in: query
+          schema:
+            type: integer
+          description: Only CaseNotes about this Contact (Beneficiary)
+        - name: event_id
+          in: query
+          schema:
+            type: integer
+          description: Only SessionNotes about this Event
+        - name: note_type
+          in: query
+          schema:
+            type: string
+            enum: [case_note, session_note]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Audio Notes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCaseNotes'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Audio Notes]
+      summary: Attach an audio file as a new Audio Note
+      description: |
+        Creates an Audio Note (CaseNote) from an audio file, as the **New AudioNote** popup on the Audio
+        Notes page does. Send it as `multipart/form-data`. Makerble then transcribes and summarises it
+        and writes a draft survey response, the same as for a recording made in Makerble; poll
+        **Get an Audio Note** until `status` is `completed`. The note's `source` is `manual` and its
+        `platform` is `api`.
+
+        Choose an Organisation (Charity) with AI AudioNotes turned on and one of its running Projects
+        the user is a member of. For a `case_note` give a Contact (Beneficiary) in that Project whom
+        the user may see. For a `session_note` the `event_id` is optional; it must be an Event in that
+        Project that the user is an Event Manager or Event Worker of (a Project or Organisation admin
+        may choose any of the Project's Events). The file must be MP3, M4A, MP4, WAV, WEBM, OGG, OGA,
+        AAC or FLAC audio, up to 200 MB.
+      operationId: createCaseNote
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [charity_id, project_id, note_type, audio_file]
+              properties:
+                charity_id:
+                  type: integer
+                project_id:
+                  type: integer
+                note_type:
+                  type: string
+                  enum: [case_note, session_note]
+                beneficiary_id:
+                  type: integer
+                  description: Required for a `case_note`
+                event_id:
+                  type: integer
+                  description: Optional, for a `session_note`
+                audio_file:
+                  type: string
+                  format: binary
+            example:
+              charity_id: 913
+              project_id: 2201
+              note_type: case_note
+              beneficiary_id: 50412
+              audio_file: "(binary) session.mp3"
+      responses:
+        "201":
+          description: The Audio Note, queued for transcription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseNoteDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          description: A choice was missing or not allowed, or the file is not a supported audio file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Choose a contact."
+        "503":
+          description: The audio file could not be stored; nothing was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /case_notes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Audio Notes]
+      summary: Get an Audio Note
+      description: |
+        One Audio Note (CaseNote) with its transcript and AI summary, if the user may see it on the
+        **Audio Notes** page (otherwise `404`).
+      operationId: getCaseNote
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Audio Note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseNoteDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /case_notes/{id}/recording:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    delete:
+      tags: [Audio Notes]
+      summary: Delete an Audio Note's recording
+      description: |
+        Deletes the audio recording of an Audio Note (CaseNote), for example to meet a privacy request,
+        as **Delete Recording** does on the Audio Note page. The note itself is kept, with its transcript,
+        summary and draft or saved survey response; `has_recording` becomes false and `audio_deleted_at`
+        is set. This cannot be undone. Only the Organisation's admins (Charity Editors) and Makerble
+        System Access admins may do this (`403`), and only once the note has finished processing
+        (`status` is `completed` or `failed`; otherwise `422`). Deleting an already deleted recording
+        returns the note unchanged. `503` means the recording could not be removed from storage and
+        nothing was changed: try again.
+      operationId: deleteCaseNoteRecording
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The Audio Note, without its recording
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseNoteDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user is not an admin of the Audio Note's Organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Only an organisation admin can delete a recording."
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: The Audio Note is still being processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "The recording can be deleted once it has been transcribed."
+        "503":
+          description: The recording could not be removed from storage; nothing was changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /cases:
     get:
@@ -9156,6 +9726,461 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: "This Event Format can't be deleted because it has 3 events. Delete or move those events first. This Event Format can't be deleted because it is added to 2 projects. Remove it from those projects first."
+  /event_categories/{id}/projects:
+    post:
+      tags: [Event Formats]
+      summary: Add an Event Format to a project
+      operationId: addEventFormatToProject
+      description: |
+        Adds an Event Format (Event Category in the API) to a project, so the project's events can
+        use it, as **Add to projects** on the Manage Event Formats page does. It also turns events
+        on for the project. Adding one that is already added does nothing and returns `200`.
+
+        - Only an **Organisation Admin** of the organisation that owns the Event Format may (`403`).
+        - The project must be in the same organisation (`422`). An Event Format or project in an
+          organisation you are not a member of returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id]
+              properties:
+                project_id:
+                  type: integer
+            example:
+              project_id: 301
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+              example:
+                event_category_id: 4530
+                project_id: 301
+                status: added
+        "200":
+          description: It was already added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: The project isn't in the Event Format's organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "That project isn't in the Event Format's organisation."
+  /event_categories/{id}/projects/{project_id}:
+    delete:
+      tags: [Event Formats]
+      summary: Remove an Event Format from a project
+      operationId: removeEventFormatFromProject
+      description: |
+        Takes an Event Format off a project, so new events in the project can't use it. Events
+        that already use it keep it. Same permissions as **Add an Event Format to a project**;
+        an Event Format that isn't added to the project returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+              example:
+                event_category_id: 4530
+                project_id: 301
+                status: removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /event_catalogues:
+    get:
+      tags: [Event Catalogues]
+      summary: List an organisation's Event Catalogues
+      operationId: listEventCatalogues
+      description: |
+        Lists an organisation's Event Catalogues, as on the Manage Event Catalogues page. An Event
+        Catalogue is a public, bookable list of the organisation's upcoming events, chosen by its
+        filters, at its `public_url` (which can also be embedded on a website). Contacts can also
+        see a catalogue on their Contacts' Portal, if the project allows it (see **Get who can see
+        an Event Catalogue in a project**).
+
+        Organisation Admins, Organisation Reporters and Project Managers of the organisation's
+        projects can list them; anyone else in the organisation gets `403`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: The Organisation (Charity)
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: Paginated list of Event Catalogues, by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventCatalogues'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Event Catalogues]
+      summary: Create an Event Catalogue
+      operationId: createEventCatalogue
+      description: |
+        Creates an Event Catalogue, as **New Event Catalogue** on the Manage Event Catalogues page
+        does. Organisation Admins and Project Managers of the organisation's projects may.
+
+        A catalogue only ever shows events that haven't started yet, that have a Signup Page and
+        whose listing is turned on, and that match `filters`. With no filters it shows every such
+        event in the organisation.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charity_id, name]
+              properties:
+                charity_id:
+                  type: integer
+                name:
+                  type: string
+                filters:
+                  $ref: '#/components/schemas/EventCatalogueFilters'
+            example:
+              charity_id: 123
+              name: "Drop-ins"
+              filters:
+                project_ids: [301]
+                event_category_ids: [4530]
+      responses:
+        "201":
+          description: The Event Catalogue was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /event_catalogues/{id}:
+    get:
+      tags: [Event Catalogues]
+      summary: Get an Event Catalogue
+      operationId: getEventCatalogue
+      description: |
+        Reads one Event Catalogue, with `upcoming_events_count`, the number of events its public
+        page shows now. Same permissions as **List an organisation's Event Catalogues**; a
+        catalogue of an organisation you are not in returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        "200":
+          description: The Event Catalogue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueDetail'
+              example:
+                id: 77
+                name: "Drop-ins"
+                charity_id: 123
+                filters:
+                  project_ids: [301]
+                public_url: "https://makerble.com/events-catalogue/Zx9s1Qk2vB7nT4pR"
+                created_at: "2026-10-22T12:00:00.000Z"
+                updated_at: "2026-10-22T12:00:00.000Z"
+                upcoming_events_count: 9
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Event Catalogues]
+      summary: Edit an Event Catalogue
+      operationId: updateEventCatalogue
+      description: |
+        Renames an Event Catalogue or replaces its filters. Give only what changes; `filters`,
+        when given, replaces them all. Its `public_url` stays the same. Same permissions as
+        **Create an Event Catalogue**.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                filters:
+                  $ref: '#/components/schemas/EventCatalogueFilters'
+            example:
+              name: "Evening drop-ins"
+      responses:
+        "200":
+          description: The Event Catalogue was changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /event_catalogues/{id}/projects/{project_id}/access:
+    get:
+      tags: [Event Catalogues]
+      summary: Get who can see an Event Catalogue in a project
+      operationId: getEventCatalogueAccess
+      description: |
+        Says which of a project's Contacts can see an Event Catalogue on their Contacts' Portal, as
+        the project's Event Catalogues page shows it: `every_enrolled` (every Contact currently
+        Enrolled in the project) or `specific` (only the Contacts in `contact_ids`). Project
+        Managers and Reporters of the project, and the organisation's Admins and Reporters, may
+        read it. A catalogue that doesn't show the project's events, or isn't the project's
+        organisation's, returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Who can see the catalogue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueAccess'
+              example:
+                event_catalogue_id: 77
+                project_id: 301
+                mode: specific
+                contact_ids: [9001, 9002]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Event Catalogues]
+      summary: Change who can see an Event Catalogue in a project
+      operationId: updateEventCatalogueAccess
+      description: |
+        Changes who in a project can see an Event Catalogue on the Contacts' Portal. Only the
+        project's Project Managers and the organisation's Admins may. Switching to
+        `every_enrolled` drops the ticked Contacts. Contacts can only be ticked under `specific`,
+        and must be in the project.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [every_enrolled, specific]
+                add_contact_ids:
+                  type: array
+                  items:
+                    type: integer
+                remove_contact_ids:
+                  type: array
+                  items:
+                    type: integer
+            example:
+              mode: specific
+              add_contact_ids: [9001]
+      responses:
+        "200":
+          description: Who can now see the catalogue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCatalogueAccess'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventCatalogueForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+  /projects/{project_id}/portal_links:
+    get:
+      tags: [Contacts' Portal]
+      summary: List Contacts' Portal links in a project
+      operationId: listPortalLinks
+      description: |
+        Lists the project's Contacts who can see at least one Event Catalogue on the Contacts'
+        Portal, where Contacts book onto events, as the project's Portal Links page shows them:
+        whether each has a Portal link, when it was last sent and how, and whether they can be
+        sent it by email or SMS. The link itself is never returned, because it signs the Contact
+        in to their Portal. Project Managers and Reporters of the project, and the organisation's
+        Admins and Reporters, may read it. To give a Contact access, change who can see an Event
+        Catalogue in the project (`PATCH /event_catalogues/{id}/projects/{project_id}/access`).
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: One page of Contacts, by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPortalLinks'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - contact_id: 9001
+                    name: Amara Diallo
+                    link_status: active
+                    last_sent_at: "2026-10-20T09:15:00Z"
+                    last_sent_channel: email
+                    can_email: true
+                    can_sms: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/PortalLinksForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /projects/{project_id}/portal_links/send:
+    post:
+      tags: [Contacts' Portal]
+      summary: Send Contacts their Portal link
+      operationId: sendPortalLinks
+      description: |
+        Sends each Contact their own link to the Contacts' Portal by email or SMS, as the Send
+        button on the project's Portal Links page does, creating the link if they don't have one
+        yet. Every Contact must be in the project and able to see at least one of its Event
+        Catalogues; otherwise nothing is sent and the response says why. Contacts with no email
+        address (or, for SMS, no mobile number) are skipped and named in `skipped`. Only the
+        project's Project Managers and the organisation's Admins may send links.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_ids, channel]
+              properties:
+                contact_ids:
+                  type: array
+                  items:
+                    type: integer
+                channel:
+                  type: string
+                  enum: [email, sms]
+            example:
+              contact_ids: [9001, 9002]
+              channel: email
+      responses:
+        "200":
+          description: The links were queued to send
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent:
+                    type: integer
+                    description: How many Contacts were sent their link
+                  skipped:
+                    type: array
+                    description: Names of the Contacts with no way to receive it
+                    items:
+                      type: string
+              example:
+                sent: 1
+                skipped: [Ben Okafor]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/PortalLinksForbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
 
   /events:
     get:
@@ -9999,6 +11024,21 @@ paths:
         Roles for guests. A fixed guest limit is respected. For an event in a recurring
         series, `apply_to: this_and_upcoming_events` adds them to the later events too.
         Anyone who can open the event page can add guests.
+
+        **Adding everyone who matches the Manage Contacts filters.** Instead of `contact_ids`, give
+        `filter_data` (the Manage Contacts filters, e.g. `{"beneficiary_state_ids": ["1"]}`; `{}`
+        for every Contact the user can see), leaving out `excluded_ids`. `project_id` is a shortcut
+        for the Project filter. This is **Add to › An event** for the Contacts selected on Manage
+        Contacts. Each Contact is added in turn, and those that can't be added are skipped and
+        counted in `skip_counts` rather than refusing the whole request:
+        - `headline_only`: the user only has Headline Only Access to them;
+        - `not_in_project`: they aren't in the event's project;
+        - `event_full`: the event's guest limit has been reached;
+        - `requirements_not_met`: they don't meet the Guest Status's requirements.
+        Contacts already on the event keep their Guest Status. Up to 50 Contacts are added
+        straight away (`200`); more run in the background (`202`), and
+        `GET /beneficiaries/bulk_actions/{id}` reports the progress. `filter_data` adds guests to
+        this event only, and can't be combined with `contact_ids` or `event_role_id`.
       security: [{tokenAuth: []}]
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -10008,22 +11048,65 @@ paths:
           application/json:
             schema:
               type: object
-              required: [contact_ids]
               properties:
-                contact_ids: { type: array, items: { type: integer } }
+                contact_ids:
+                  type: array
+                  items: { type: integer }
+                  description: The Contacts to add. Leave out to use filter_data instead.
+                filter_data:
+                  type: object
+                  additionalProperties: true
+                  description: Manage Contacts filters selecting the Contacts to add, used instead of contact_ids
+                excluded_ids:
+                  type: array
+                  items: { type: integer }
+                  description: With filter_data, Contacts matching the filters to leave out
+                project_id:
+                  type: integer
+                  description: With filter_data, a shortcut for the Project filter (Contacts in this Project)
                 guest_status_id: { type: integer }
                 event_role_id: { type: integer }
                 apply_to: { type: string, enum: [this_event, this_and_upcoming_events], default: this_event }
-            example:
-              contact_ids: [5501, 5502]
-              guest_status_id: 12
-              event_role_id: 4
+            examples:
+              contacts:
+                summary: Named Contacts
+                value:
+                  contact_ids: [5501, 5502]
+                  guest_status_id: 12
+                  event_role_id: 4
+              matching:
+                summary: Everyone matching the Manage Contacts filters
+                value:
+                  filter_data: { beneficiary_state_ids: ["1"] }
+                  excluded_ids: [5503]
+                  guest_status_id: 12
       responses:
+        "200":
+          description: filter_data was given and the matching Contacts were added straight away (50 or fewer)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestsBulkAdd' }
+              example:
+                id: 51
+                status: completed
+                total_count: 8
+                processed_count: 8
+                changed_count: 6
+                skip_counts: { not_in_project: 1 }
+                background: false
+                summary: "6 contacts changed. 1 skipped: 1 because they aren't in Youth Mentoring, the event's project."
+                event_id: 2201
+                guests_count: 14
         "201":
           description: The guests were added
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EventGuestCount' }
+        "202":
+          description: filter_data was given and more than 50 Contacts match, so they are added in the background. Poll GET /beneficiaries/bulk_actions/{id}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestsBulkAdd' }
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -10592,6 +11675,764 @@ paths:
                 sections:
                   - title: Positive emotional state
                     questions: ["I've been feeling calm", "I've been in a good mood"]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /explore/report_templates:
+    get:
+      tags: [Explore]
+      summary: Explore Report Templates
+      operationId: listExploreReportTemplates
+      description: |
+        Lists the Report Templates in the Makerble® ImpactStore™, with the same search, filters,
+        counts and sort as the Explore Report Templates page. Every caller sees the same Report
+        Templates; `yours` and `in_your_library` depend on the caller's organisations.
+
+        - `query` matches the Report Template's name or description, or the label of who it's for
+          or its theme.
+        - The filters take option keys, as arrays (`theme[]=community`) or comma-separated
+          (`theme=community,governance`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `recipient` (Who it's for): `funder`, `trustees`, `local_authority` (Commissioner or
+            contract), `corporate_partner`, `internal`
+          - `theme`: `children_and_young_people`, `community`, `employment`, `governance`,
+            `health_and_wellbeing`, `volunteering`
+          - `output` (Answer formats): `narrative`, `number`, `chart`. A Report Template matches
+            when any of its questions asks for that format.
+        - `facets` gives each filter's options with how many Report Templates each would return,
+          given the other filters already chosen.
+        - `sort` is `added` (in the most organisations' libraries first, the default), `new` or `az`.
+        - Add a Report Template to your organisation's library in the app with **Add to your
+          library** on Explore Report Templates.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: end of grant
+          description: Words to look for in the Report Template's name, description, recipient or theme
+        - name: recipient
+          in: query
+          required: false
+          schema:
+            type: string
+          example: funder,trustees
+          description: Who it's for option keys, comma-separated or repeated as recipient[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: community
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: output
+          in: query
+          required: false
+          schema:
+            type: string
+          example: chart
+          description: Answer format option keys, comma-separated or repeated as output[]
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Report Templates that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreReportTemplates'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 18
+                    slug: annual-grant-report-to-a-funder
+                    name: Annual Grant Report to a Funder
+                    description: The yearly report most grant funders ask for.
+                    recipient: funder
+                    theme: community
+                    question_count: 5
+                    answer_formats: [narrative, number, chart]
+                    shared_by: Makerble® ImpactStore™
+                    libraries_count: 31
+                    yours: false
+                    in_your_library: false
+                facets:
+                  - key: recipient
+                    label: Who it's for
+                    options:
+                      - value: funder
+                        label: Funder
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /explore/report_templates/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Report Template
+      operationId: getExploreReportTemplate
+      description: |
+        One Report Template listed on Explore Report Templates, as its Preview shows it: the fields
+        of **Explore Report Templates** plus `questions`, each with its `title` and the
+        `answer_formats` it asks for, in order. A Report Template that isn't in the ImpactStore is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 18
+      responses:
+        "200":
+          description: The Report Template's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreReportTemplatePreview'
+              example:
+                id: 18
+                slug: annual-grant-report-to-a-funder
+                name: Annual Grant Report to a Funder
+                description: The yearly report most grant funders ask for.
+                recipient: funder
+                theme: community
+                question_count: 2
+                answer_formats: [narrative, number]
+                shared_by: Makerble® ImpactStore™
+                libraries_count: 31
+                yours: false
+                in_your_library: false
+                questions:
+                  - title: What did you set out to achieve?
+                    answer_formats: [narrative]
+                  - title: Who did you reach?
+                    answer_formats: [number]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /explore/dropdowns:
+    get:
+      tags: [Explore]
+      summary: Explore Dropdowns
+      operationId: listExploreDropdowns
+      description: |
+        Lists the Dropdowns (answer-choice lists, Ratio Sets) shared to the Makerble® ImpactStore™
+        and approved, with the same search, filters, counts and sort as the Explore Dropdowns page.
+        Every caller sees the same Dropdowns; `yours` depends on the caller's organisations.
+
+        - `query` matches the Dropdown's title or any of its answer choices.
+        - The filters take option keys, as arrays (`theme[]=scales`) or comma-separated
+          (`theme=scales,demographics`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `designed_for`: `surveys_and_trackers`, `forms` (bio, event and project forms)
+          - `choices` (Number of choices): `up_to_10`, `11_to_100`, `over_100`
+          - `theme`: `scales`, `demographics`
+        - `chip` is one of the page's Popular chips: `Scales`, `Demographics`, `Equality monitoring`.
+        - `facets` gives each filter's options with how many Dropdowns each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (used in the most surveys, trackers and forms first, the default), `new`
+          or `az`.
+        - Copy a Dropdown into your organisation in the app with **Add to organisation** on Explore
+          Dropdowns.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: ethnicity
+          description: Words to look for in the Dropdown's title or answer choices
+        - name: designed_for
+          in: query
+          required: false
+          schema:
+            type: string
+          example: surveys_and_trackers
+          description: Designed for option keys, comma-separated or repeated as designed_for[]
+        - name: choices
+          in: query
+          required: false
+          schema:
+            type: string
+          example: up_to_10
+          description: Number of choices option keys, comma-separated or repeated as choices[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: scales
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Scales, Demographics, Equality monitoring]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Dropdowns that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreDropdowns'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 87
+                    title: Agreement scale
+                    choice_count: 5
+                    designed_for: [surveys_and_trackers]
+                    themes: [scales]
+                    shared_by: Makerble Templates
+                    used_in_count: 42
+                    yours: false
+                facets:
+                  - key: theme
+                    label: Theme
+                    options:
+                      - value: scales
+                        label: Scales
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /explore/dropdowns/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Dropdown
+      operationId: getExploreDropdown
+      description: |
+        One Dropdown listed on Explore Dropdowns: the fields of **Explore Dropdowns** plus every
+        one of its answer `choices`, in order. A Dropdown that isn't listed on Explore (not shared
+        or not approved) is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 87
+      responses:
+        "200":
+          description: The Dropdown and its answer choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreDropdownPreview'
+              example:
+                id: 87
+                title: Agreement scale
+                choice_count: 5
+                designed_for: [surveys_and_trackers]
+                themes: [scales]
+                shared_by: Makerble Templates
+                used_in_count: 42
+                yours: false
+                choices: [Strongly disagree, Disagree, Not sure, Agree, Strongly agree]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /explore/impact_frameworks:
+    get:
+      tags: [Explore]
+      summary: Explore Impact Frameworks
+      operationId: listExploreImpactFrameworks
+      description: |
+        Lists the public, approved Impact Frameworks (Templates) in the Makerble® ImpactStore™, with
+        the same search, filters, counts and sort as the Explore Impact Frameworks page. Every caller
+        sees the same Impact Frameworks; `yours` depends on the caller's organisations.
+
+        - `query` matches the Impact Framework's name or description.
+        - The filters take option keys, as arrays (`theme[]=inclusion`) or comma-separated
+          (`theme=inclusion,leadership`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `theme`: `mental_health_and_wellbeing`, `children_and_young_people`, `employment_and_skills`, `community_and_culture`, `health`, `organisational`, `global_goals`, `inclusion`, `education_and_training`, `leadership`
+          - `set` (Part of a Framework Set): a platform-wide Framework Set's id, or `none` for
+            frameworks in no set. `facets` lists the sets.
+          - `size`: `up_to_5`, `6_to_10`, `over_10` outcomes
+        - `chip` is one of the page's Popular chips: `SDGs`, `Inclusion`, `Employment`, `Wellbeing`.
+        - `facets` gives each filter's options with how many Impact Frameworks each would return,
+          given the other filters already chosen.
+        - `sort` is `added` (on the most organisations' projects first, the default), `new` or `az`.
+        - Add an Impact Framework to projects in the app with **Add to projects** on Explore Impact
+          Frameworks.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: inclusion
+          description: Words to look for in the Impact Framework's name or description
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: global_goals
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: set
+          in: query
+          required: false
+          schema:
+            type: string
+          example: none
+          description: Framework Set ids or none, comma-separated or repeated as set[]
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: string
+          example: up_to_5
+          description: Size option keys, comma-separated or repeated as size[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [SDGs, Inclusion, Employment, Wellbeing]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Impact Frameworks that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreImpactFrameworks'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 301
+                    name: Quality Education
+                    description: Outcomes for SDG 4.
+                    themes: [global_goals, children_and_young_people]
+                    framework_sets:
+                      - id: 2
+                        name: UN Sustainable Development Goals
+                        short_code: SDG 4
+                    outcome_count: 10
+                    progress_tracker_count: 3
+                    shared_by: Makerble Templates
+                    libraries_count: 15
+                    yours: false
+                facets:
+                  - key: size
+                    label: Size
+                    options:
+                      - value: 6_to_10
+                        label: 6 to 10 outcomes
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /explore/impact_frameworks/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Impact Framework
+      operationId: getExploreImpactFramework
+      description: |
+        One Impact Framework listed on Explore Impact Frameworks, as its Preview shows it: the fields
+        of **Explore Impact Frameworks** plus `stages`, each stage of change with its `title`
+        (Activities, Engagement, Ability, Behaviour or Effect) and the outcomes and progress trackers
+        in it as `items`. An Impact Framework that isn't public and approved is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 301
+      responses:
+        "200":
+          description: The Impact Framework's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreImpactFrameworkPreview'
+              example:
+                id: 301
+                name: Quality Education
+                description: Outcomes for SDG 4.
+                themes: [global_goals]
+                framework_sets: []
+                outcome_count: 1
+                progress_tracker_count: 1
+                shared_by: Makerble Templates
+                libraries_count: 15
+                yours: false
+                stages:
+                  - title: Activities
+                    items: [Sessions delivered]
+                  - title: Behaviour (mid-term outcomes)
+                    items: [Stays in school]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /explore/ideas:
+    get:
+      tags: [Explore]
+      summary: Explore Ideas
+      operationId: listExploreIdeas
+      description: |
+        Lists the approved Ideas (Tips) shared with everyone in the Makerble® ImpactStore™, with the
+        same search, filters, counts and sort as the Explore Ideas page. `shared_by`, `person` and
+        `yours` depend on the caller.
+
+        - `query` matches the Idea's title or text.
+        - The filters take option keys, as arrays (`theme[]=leadership`) or comma-separated
+          (`theme=leadership,inclusion`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `shared_by`: `anyone`, `colleagues` (colleagues in the caller's organisations and
+            projects, or the organisations themselves), `following` (people the caller follows),
+            `me`
+          - `theme`: `mental_health_and_wellbeing`, `children_and_young_people`, `employment_and_skills`, `community_and_culture`, `health`, `organisational`, `global_goals`, `inclusion`, `education_and_training`, `leadership`
+          - `audience`: `public_impact`, `personal`, `professional`, from the Idea's causes
+          - `person`: user ids of people who shared Ideas. Only the caller's colleagues, people
+            they follow and the caller count; any other id is ignored.
+        - `chip` is one of the page's Popular chips: `Community`, `Young people`, `Training`,
+          `Leadership`.
+        - `facets` gives each filter's options with how many Ideas each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (saved to the most collections first, the default), `new` or `az`.
+        - Save an Idea to a collection in the app with **Save idea** on Explore Ideas.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: cohesion
+          description: Words to look for in the Idea's title or text
+        - name: shared_by
+          in: query
+          required: false
+          schema:
+            type: string
+          example: colleagues,following
+          description: Shared by option keys, comma-separated or repeated as shared_by[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: leadership
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: audience
+          in: query
+          required: false
+          schema:
+            type: string
+          example: public_impact
+          description: Audience option keys, comma-separated or repeated as audience[]
+        - name: person
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "1204"
+          description: User ids of people who shared Ideas, comma-separated or repeated as person[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Community, Young people, Training, Leadership]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Ideas that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreIdeas'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 77
+                    title: The Resident Leadership Pipeline
+                    themes: [leadership, community_and_culture]
+                    reading_minutes: 4
+                    shared_by: Northside Housing
+                    saved_count: 14
+                    yours: false
+                facets:
+                  - key: theme
+                    label: Theme
+                    options:
+                      - value: leadership
+                        label: Leadership
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /explore/ideas/{id}:
+    get:
+      tags: [Explore]
+      summary: Read an Explore Idea
+      operationId: getExploreIdea
+      description: |
+        One Idea listed on Explore Ideas: the fields of **Explore Ideas** plus its `text`, without
+        formatting. An Idea that isn't approved and shared with everyone is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 77
+      responses:
+        "200":
+          description: The Idea and its text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreIdeaPreview'
+              example:
+                id: 77
+                title: The Resident Leadership Pipeline
+                themes: [leadership]
+                reading_minutes: 1
+                shared_by: Northside Housing
+                saved_count: 14
+                yours: false
+                text: We grew resident leaders who now run three local groups.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /explore/metrics:
+    get:
+      tags: [Explore]
+      summary: Explore Metrics
+      operationId: listExploreMetrics
+      description: |
+        Lists the published, approved metrics of the Makerble® ImpactStore™ across the stages of
+        change, with the same search, filters, counts and sort as the Explore Metrics page:
+        progress trackers (`kind` `change`: Activities and Engagement), outcome indicators (`kind`
+        `indicator`: Ability, Behaviour and Effect, taking the stage of the Outcome they sit under
+        when they have none of their own) and Financial Values (`kind` `financial_value`). Every
+        caller sees the same metrics; `yours` depends on the caller's organisations.
+
+        - `query` matches the metric's name or description.
+        - The filters take option keys, as arrays (`stage[]=ability`) or comma-separated
+          (`stage=ability,behaviour`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `stage` (Stage of change): `activities`, `engagement`, `ability`, `behaviour`,
+            `effect`, `financial_values`
+          - `answer_format`: `count` (progress tracker), `scale` (Choice tracker), `yes_no`
+            (Achievement tracker), `value` (Numerical tracker, and Financial Values)
+          - `audience`: `public_impact`, `personal`, `professional`
+          - `shared_by`: `makerble`, `others`
+        - `chip` is one of the page's Popular chips: `Wellbeing`, `Employment`, `Housing`,
+          `Attendance`, `SDGs`.
+        - `facets` gives each filter's options with how many metrics each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (on the most organisations' projects first, the default), `new` or `az`.
+        - Add a tracker or indicator to a project in the app with **Add to a project** on Explore
+          Metrics; a Financial Value from Explore Financial Values.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: confidence
+          description: Words to look for in the metric's name or description
+        - name: stage
+          in: query
+          required: false
+          schema:
+            type: string
+          example: ability,behaviour
+          description: Stage of change option keys, comma-separated or repeated as stage[]
+        - name: answer_format
+          in: query
+          required: false
+          schema:
+            type: string
+          example: scale
+          description: Answer format option keys, comma-separated or repeated as answer_format[]
+        - name: audience
+          in: query
+          required: false
+          schema:
+            type: string
+          example: personal
+          description: Audience option keys, comma-separated or repeated as audience[]
+        - name: shared_by
+          in: query
+          required: false
+          schema:
+            type: string
+          example: makerble
+          description: Shared by option keys, comma-separated or repeated as shared_by[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Wellbeing, Employment, Housing, Attendance, SDGs]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed metrics that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreMetrics'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - kind: indicator
+                    id: 5310
+                    name: Job satisfaction
+                    stage: ability
+                    whats_inside: 5-level scale
+                    shared_by: Makerble
+                    libraries_count: 21
+                    yours: false
+                facets:
+                  - key: answer_format
+                    label: Answer format
+                    options:
+                      - value: scale
+                        label: Scale (Choice tracker)
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /explore/metrics/{kind}/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Metric
+      operationId: getExploreMetric
+      description: |
+        One metric listed on Explore Metrics, as its Preview shows it: the fields of **Explore
+        Metrics** plus its `description`, `details` (its key facts by label, such as the Outcomes an
+        indicator sits under or a Financial Value's amount and source) and the `choices` of a scale
+        or yes-or-no indicator, in order. A metric that isn't published and approved is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [change, indicator, financial_value]
+          example: indicator
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 5310
+      responses:
+        "200":
+          description: The metric's preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreMetricPreview'
+              example:
+                kind: indicator
+                id: 5310
+                name: Job satisfaction
+                stage: ability
+                whats_inside: 5-level scale
+                shared_by: Makerble
+                libraries_count: 21
+                yours: false
+                description: How satisfied someone is with their job.
+                details:
+                  Answer format: 5-level scale
+                  Stage of change: Ability (short-term outcomes)
+                  Sits under: Job satisfaction at follow-up
+                  Shared by: Makerble
+                choices: [Very dissatisfied, Dissatisfied, Neither, Satisfied, Very satisfied]
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -15257,6 +17098,119 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /formula_trackers/{id}/projects/{project_id}/results:
+    get:
+      tags: [Formula Trackers]
+      summary: Get a Formula Tracker's result on a Project
+      description: |
+        A Formula Tracker's result on a Project's Results Canvas: what its card shows, and what its popup
+        opens. The tracker must be on the Project.
+
+        Each timeframe is worked out from that timeframe's own tracker numbers, so a Year to Date
+        percentage is the Year to Date numerator ÷ the Year to Date denominator, never an average of the
+        periods. `number` is null, and `display_value` is "–", when a tracker the formula uses has no
+        result or it divides by 0 (the canvas says "Not enough data to work this out yet").
+        `display_value` is the result as the canvas shows it, from the tracker's display format, decimal
+        places and unit label.
+
+        `result_kind` `additive` (only + and − of trackers that add up) adds up across periods.
+        `snapshot` (× ÷ or a number) is read as of `as_of`: the window's last day, or today while that is
+        still to come. `target` is the deadline targets dated in the window, added up (for a snapshot,
+        the one on its last day), or else the one-off target, or null.
+
+        `trackers` lists each tracker the formula uses with its number for the window; `formula` writes
+        the formula out in words and `formula_with_values` with those numbers in place.
+
+        When the formula only adds Workflow Trackers that count items (`itemised: true`, e.g. External
+        referrals + Internal referrals), `data` lists one page of the items counted, newest first. An item
+        the user may not see is counted in `hidden_count` for that page but never listed. Otherwise `data`
+        is empty and the counts are 0. Requires the same rights as viewing that Results Canvas.
+      operationId: getFormulaTrackerProjectResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerProjectId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the trackers behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerResult'
+              example:
+                formula_tracker_id: 12
+                name: "% of children receiving support"
+                project_id: 34
+                timeframe: year_to_date
+                starts_on: "2026-01-01"
+                ends_on: "2026-12-31"
+                result_kind: snapshot
+                as_of: "2026-10-13"
+                display_format: percentage
+                decimal_places: 1
+                unit: percentage
+                number: 50
+                display_value: "50.0%"
+                target: 60
+                formula: "% of children receiving support = Children supported ÷ Children flagged × 100"
+                formula_with_values: "4 ÷ 8 × 100"
+                trackers:
+                  - { type: Change, id: 81, name: Children supported, type_name: Engagement tracker, unit: count, number: 4 }
+                  - { type: Change, id: 82, name: Children flagged, type_name: Engagement tracker, unit: count, number: 8 }
+                itemised: false
+                page: 1
+                page_size: 0
+                page_count: 0
+                total_count: 0
+                hidden_count: 0
+                data: []
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Project's Results Canvas
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /formula_trackers/{id}/albums/{bundle_id}/results:
+    get:
+      tags: [Formula Trackers]
+      summary: Get a Formula Tracker's result on an Album
+      description: |
+        As for a Project, with each tracker the formula uses worked out on the Album as a whole (its open
+        Projects together) before the formula is applied, so an Album percentage is the Album's numerator
+        ÷ the Album's denominator, not the Projects' percentages added up. The tracker must be on one of
+        the Album's Projects. Requires rights to see the Album.
+      operationId: getFormulaTrackerAlbumResults
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/CohortTrackerAlbumId'
+        - $ref: '#/components/parameters/CohortTrackerTimeframe'
+        - $ref: '#/components/parameters/CohortTrackerAsOf'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The result and the trackers behind it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTrackerResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: The user can't see this Album
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /workflow_trackers:
     get:
       tags: [Workflow Trackers]
@@ -18232,8 +20186,14 @@ paths:
       summary: Register a webhook endpoint
       description: |
         Starts sending the chosen events to an HTTPS URL. Leave out `event_types` to send every
-        event. An Organisation can have at most 10 endpoints. The response includes the signing
-        `secret`, which is shown only this once.
+        event, or give one event for a trigger that fires on that event only. An Organisation can
+        have at most 10 endpoints added this way, and separately at most 100 created by automation
+        platforms such as Power Automate (one per flow). The response includes the signing `secret`,
+        which is shown only this once, and a `Location` header with the endpoint's full address:
+        send `DELETE` to it to unsubscribe.
+
+        Power Automate flows can't check the signature themselves. They rely instead on the callback
+        address being secret, which Microsoft generates for each flow.
       operationId: createWebhookEndpoint
       security: [{tokenAuth: []}]
       requestBody:
@@ -18251,6 +20211,12 @@ paths:
       responses:
         "201":
           description: Endpoint created, with its secret
+          headers:
+            Location:
+              description: Full address of the new endpoint, e.g. `https://app.makerble.com/api/v2/webhook_endpoints/42`
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
@@ -18322,18 +20288,19 @@ paths:
     delete:
       tags: [Webhooks]
       summary: Delete a webhook endpoint
-      description: Deletes the endpoint and its delivery log. Makerble stops sending to it at once.
+      description: |
+        Deletes the endpoint and its delivery log. Makerble stops sending to it at once. Deleting is
+        idempotent: an endpoint that is already deleted, or that the user can't see, also answers
+        `204`, so an automation platform can unsubscribe safely more than once.
       operationId: deleteWebhookEndpoint
       security: [{tokenAuth: []}]
       responses:
         "204":
-          description: Deleted
+          description: Deleted, or already gone
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
           $ref: '#/components/responses/WebhooksNotTurnedOn'
-        "404":
-          $ref: '#/components/responses/NotFound'
 
   /webhook_endpoints/{id}/rotate_secret:
     parameters:
@@ -18649,6 +20616,59 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+  /health:
+    get:
+      tags: [Health]
+      summary: Check the service is up and which build is running
+      operationId: getHealth
+      description: |
+        Reports whether the service and its database are answering, and which build
+        is running. No sign-in is needed: send no `X-User-Email` / `X-User-Token`.
+
+        Use `commit` to tell when a new release is live: after a deploy finishes it
+        changes to the new build's commit, and `uptime_seconds` starts again from a
+        small number. `commit` and `built_at` are `null` when the build didn't record
+        them. Always answers `200` while the service is running; check `database`
+        to see whether the database is reachable.
+      security: []
+      responses:
+        "200":
+          description: The service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database, commit, built_at, environment]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                    description: Always `ok` when the service answers
+                  database:
+                    type: boolean
+                    description: Whether the database answered a trivial query
+                  uptime_seconds:
+                    type: integer
+                    description: Seconds since the running app started
+                  commit:
+                    type: string
+                    nullable: true
+                    description: Full git commit SHA the running build was made from
+                  built_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: When the running build was made, ISO 8601 in UTC
+                  environment:
+                    type: string
+                    description: Which environment answered, e.g. `production`, `pre-production`, `qa`, `preview`
+              example:
+                status: ok
+                database: true
+                uptime_seconds: 312
+                commit: "0123456789abcdef0123456789abcdef01234567"
+                built_at: "2026-10-12T13:05:09Z"
+                environment: production
 
 components:
 
@@ -18666,6 +20686,19 @@ components:
       description: |
         An Organisation API key (`mk_live_...`), sent as `Authorization: Bearer mk_live_...`. It acts
         as the colleague chosen when it was created, in its Organisation only. See "Organisation API keys" above.
+    oauth2:
+      type: oauth2
+      description: |
+        OAuth 2.0 authorisation code flow for connected apps. The token is limited to the
+        organisation the user chose on the consent screen, with that user's permissions.
+        See "Connecting an app with OAuth 2.0" above.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://makerble.com/oauth/authorize
+          tokenUrl: https://makerble.com/oauth/token
+          refreshUrl: https://makerble.com/oauth/token
+          scopes:
+            api: The same access as the user who connected the app, in the organisation they chose
     submissionBearerAuth:
       type: http
       scheme: bearer
@@ -18854,6 +20887,33 @@ components:
       description: Also include Indicators or Outcomes from the public library shared by all organisations (default false)
 
   responses:
+
+    EventFormatAdminOnly:
+      description: You are not an Organisation Admin of the organisation that owns the Event Format
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Only an Organisation Admin can manage Event Formats."
+
+    PortalLinksForbidden:
+      description: You don't have permission for this project's Portal links
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You don't have permission to send Portal links in this project."
+
+    EventCatalogueForbidden:
+      description: You don't have permission for this organisation's or project's Event Catalogues
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You don't have permission to manage this organisation's Event Catalogues."
     SetupGuideForbidden:
       description: You aren't an Organisation Admin of this Organisation, or its Setup guide is switched off
       content:
@@ -18973,6 +21033,14 @@ components:
           example:
             success: false
             errors: "Permission denied."
+    AddColleagueForbidden:
+      description: You aren't a Project Manager of one of the listed Projects or an Organisation Admin of its Organisation. Nobody is added to any of them.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You don't have permission to add users to project 619."
     UnprocessableEntity:
       description: Validation failed
       content:
@@ -19001,13 +21069,22 @@ components:
           example:
             error: forbidden
     WebhooksNotTurnedOn:
-      description: Webhooks are not turned on for this Organisation yet
+      description: |
+        The user is a member of the Organisation but not an Organisation Admin, or webhooks are not
+        turned on for the Organisation yet. `error` says which, in words that can be shown to the
+        user. For a request from an automation platform such as Power Automate, the first reads
+        "Only an Organisation Admin can create Makerble triggers".
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-          example:
-            error: "Webhooks are not turned on for this organisation"
+          examples:
+            notAnAdmin:
+              value:
+                error: "Only an Organisation Admin can manage Webhooks"
+            notTurnedOn:
+              value:
+                error: "Webhooks are not turned on for this organisation"
 
   schemas:
     SetupGuide:
@@ -20957,7 +23034,7 @@ components:
       properties:
         key:
           type: string
-          enum: [theme, audience, time, feature]
+          description: The filter's query parameter, e.g. theme. Each Explore endpoint lists its own.
         label:
           type: string
         options:
@@ -20990,6 +23067,334 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ExploreSurvey'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreReportTemplatePreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreReportTemplate'
+        - type: object
+          properties:
+            questions:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  answer_formats:
+                    type: array
+                    items:
+                      type: string
+                      enum: [narrative, number, chart]
+
+    ExploreReportTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        recipient:
+          type: string
+          nullable: true
+          enum: [funder, trustees, local_authority, corporate_partner, internal, null]
+        theme:
+          type: string
+          nullable: true
+        question_count:
+          type: integer
+        answer_formats:
+          type: array
+          items:
+            type: string
+            enum: [narrative, number, chart]
+        shared_by:
+          type: string
+        libraries_count:
+          type: integer
+          description: How many organisations have it in their library
+        yours:
+          type: boolean
+          description: Whether one of the caller's organisations owns it
+        in_your_library:
+          type: boolean
+          description: Whether it is in the library of one of the caller's organisations
+
+    PaginatedExploreReportTemplates:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreReportTemplate'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreDropdownPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreDropdown'
+        - type: object
+          properties:
+            choices:
+              type: array
+              items:
+                type: string
+
+    ExploreDropdown:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        choice_count:
+          type: integer
+        designed_for:
+          type: array
+          items:
+            type: string
+            enum: [surveys_and_trackers, forms]
+        themes:
+          type: array
+          items:
+            type: string
+            enum: [scales, demographics]
+        shared_by:
+          type: string
+          nullable: true
+        used_in_count:
+          type: integer
+          description: How many surveys, trackers and forms use it
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreDropdowns:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreDropdown'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreImpactFrameworkPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreImpactFramework'
+        - type: object
+          properties:
+            stages:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: string
+
+    ExploreImpactFramework:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        themes:
+          type: array
+          items:
+            type: string
+        framework_sets:
+          type: array
+          description: The platform-wide Framework Sets it belongs to
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              short_code:
+                type: string
+                nullable: true
+        outcome_count:
+          type: integer
+        progress_tracker_count:
+          type: integer
+        shared_by:
+          type: string
+          nullable: true
+        libraries_count:
+          type: integer
+          description: How many organisations use it on a project
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreImpactFrameworks:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreImpactFramework'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreIdeaPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreIdea'
+        - type: object
+          properties:
+            text:
+              type: string
+
+    ExploreIdea:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        themes:
+          type: array
+          items:
+            type: string
+        reading_minutes:
+          type: integer
+        shared_by:
+          type: string
+          nullable: true
+        saved_count:
+          type: integer
+          description: How many collections it has been saved to
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreIdeas:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreIdea'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreMetricPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreMetric'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            details:
+              type: object
+              description: The metric's key facts, by label
+              additionalProperties:
+                type: string
+            choices:
+              type: array
+              items:
+                type: string
+
+    ExploreMetric:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [change, indicator, financial_value]
+        id:
+          type: integer
+        name:
+          type: string
+        stage:
+          type: string
+          enum: [activities, engagement, ability, behaviour, effect, financial_values]
+        whats_inside:
+          type: string
+          description: The tracker type or scale, e.g. "5-level scale" or "Activity tracker · count"
+        shared_by:
+          type: string
+          nullable: true
+        libraries_count:
+          type: integer
+          description: How many organisations use it on a project
+        yours:
+          type: boolean
+          description: Whether the caller or one of the caller's organisations owns it
+
+    PaginatedExploreMetrics:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreMetric'
         facets:
           type: array
           items:
@@ -21877,6 +24282,46 @@ components:
       properties:
         event_id: { type: integer }
         guests_count: { type: integer }
+
+    BeneficiaryBulkAction:
+      type: object
+      description: A change to many Contacts at once, and how far it has got
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, running, completed, failed, undone]
+        total_count:
+          type: integer
+          description: Contacts it will try to change (the selection, less Headline Only Contacts)
+        processed_count:
+          type: integer
+          description: Contacts reached so far
+        changed_count:
+          type: integer
+          description: Contacts it changed
+        skip_counts:
+          type: object
+          additionalProperties: { type: integer }
+          description: Skipped Contacts by reason, e.g. headline_only, not_in_project or error
+        background:
+          type: boolean
+          description: True when it runs in the background (more than 50 Contacts)
+        summary:
+          type: string
+          nullable: true
+          description: The finished message, e.g. "6 contacts changed. 1 skipped …"; null until it has finished
+
+    EventGuestsBulkAdd:
+      allOf:
+        - $ref: '#/components/schemas/BeneficiaryBulkAction'
+        - type: object
+          properties:
+            event_id: { type: integer }
+            guests_count:
+              type: integer
+              description: The event's guests now (while it runs in the background, so far)
 
     EventStaffMember:
       type: object
@@ -24219,6 +26664,12 @@ components:
                 When true, a Contact who opens their personal survey link (Survey Invitation)
                 without signing in can press Save & Finish Later and come back to the same link
                 to finish. Unfinished responses are deleted 30 days after they were last saved.
+            hide_unanswered_questions:
+              type: boolean
+              description: >-
+                "Hide unanswered questions when viewing the story" on the Survey Campaign Settings page. When true,
+                viewing one contact's response (for example on their profile timeline) leaves out the questions they
+                did not answer. Read-only through the API.
             is_stopped:
               type: boolean
             display_intro_message:
@@ -26435,6 +28886,21 @@ components:
               items:
                 type: string
                 enum: [editor, reporter, observer]
+        contact_criteria:
+          $ref: '#/components/schemas/WorkflowTrackerContactCriteria'
+
+    WorkflowTrackerContactCriteria:
+      type: object
+      description: >-
+        "Only count contacts who match": Contact Filters criteria, in the same shape as a Cohort Tracker's criteria
+        and a Saved Filter's, that a Contact must meet for their items to count. Matched on each Contact's current
+        details, so editing a Contact can change past results. {} counts every Contact. Keys a Contacts filter
+        doesn't read, and blank values, are dropped.
+      additionalProperties: true
+      example:
+        age_to:
+          year: "17"
+        beneficiary_types: ["3"]
 
     WorkflowTracker:
       type: object
@@ -26471,6 +28937,8 @@ components:
           example:
             destinations: "except"
             project_ids: [4512]
+        contact_criteria:
+          $ref: '#/components/schemas/WorkflowTrackerContactCriteria'
         created_at:
           type: string
           format: date-time
@@ -26905,6 +29373,119 @@ components:
                 charity_id:
                   type: integer
                   description: Required when creating
+
+    FormulaTrackerResult:
+      type: object
+      properties:
+        formula_tracker_id:
+          type: integer
+        name:
+          type: string
+        project_id:
+          type: integer
+          description: Present for a Project's result
+        album_id:
+          type: integer
+          description: Present for an Album's result
+        timeframe:
+          type: string
+          enum: [period, year_to_date, all_time]
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+          description: Null when the window runs from the start
+        ends_on:
+          type: string
+          format: date
+        result_kind:
+          type: string
+          enum: [additive, snapshot]
+        as_of:
+          type: string
+          format: date
+          nullable: true
+          description: For a snapshot, the date it is read at
+        display_format:
+          type: string
+          enum: [number, percentage]
+        decimal_places:
+          type: integer
+        unit:
+          type: string
+          description: '"percentage", the unit label (e.g. "h per child"), or "count"'
+        number:
+          type: number
+          nullable: true
+          description: Null when a tracker the formula uses has no result, or it divides by 0
+        display_value:
+          type: string
+          description: The result as the Results Canvas shows it, e.g. "37.5%" or "2.4 h per child"; "–" when number is null
+        target:
+          type: number
+          nullable: true
+        formula:
+          type: string
+          description: e.g. "Referrals completed = External referrals + Internal referrals"
+        formula_with_values:
+          type: string
+          description: The formula with each tracker's number in place, e.g. "2 + 3"; "–" for a tracker with no number
+        trackers:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                description: Change, Indicator, CohortTracker, WorkflowTracker, FilteredMetric or FormulaTracker
+              id:
+                type: integer
+              name:
+                type: string
+              type_name:
+                type: string
+                description: e.g. "Engagement tracker" or "Workflow Tracker"
+              unit:
+                type: string
+              number:
+                type: number
+                nullable: true
+        itemised:
+          type: boolean
+          description: Whether the formula only adds Workflow Trackers that count items, so data lists them
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+          description: Every item counted, when itemised; otherwise 0
+        hidden_count:
+          type: integer
+          description: How many more on this page are counted but not listed, because the user can't see them
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              contact_id:
+                type: integer
+              contact_name:
+                type: string
+              detail:
+                type: string
+                nullable: true
+              project_id:
+                type: integer
+                nullable: true
+              case_id:
+                type: integer
+                nullable: true
+              happened_at:
+                type: string
+                format: date-time
 
     FormulaTrackerTimeframeResults:
       type: object
@@ -27471,6 +30052,15 @@ components:
         active:
           type: boolean
           description: false while paused
+        source:
+          type: string
+          enum: [manual, power_automate, zapier, dynamics]
+          readOnly: true
+          description: |
+            Who created the endpoint: `manual` for one added by hand on the Webhooks page or through
+            this API, otherwise the automation platform's connector. Set by Makerble from the
+            connected app (OAuth client) that made the request; it can't be sent or changed. A
+            connected app may list, get, create and delete endpoints, in its connected Organisation only.
         disabled_at:
           type: string
           format: date-time
@@ -27900,6 +30490,141 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    EventFormatProject:
+      type: object
+      properties:
+        event_category_id:
+          type: integer
+        project_id:
+          type: integer
+        status:
+          type: string
+          enum: [added, already_added, removed]
+
+    EventCatalogueFilters:
+      type: object
+      description: Which upcoming events the catalogue shows. Every filter given must match.
+      properties:
+        project_ids:
+          type: array
+          items:
+            type: integer
+        event_category_ids:
+          type: array
+          items:
+            type: integer
+          description: Event Formats
+        user_ids:
+          type: array
+          items:
+            type: integer
+          description: Events these users are Event Managers or Workers of
+        beneficiary_ids:
+          type: array
+          items:
+            type: integer
+          description: Events these Contacts are guests of
+        event_types:
+          type: array
+          items:
+            type: string
+            enum: [one-off, master, subsequent]
+        date_from:
+          type: string
+          nullable: true
+          description: A date range, "DD/MM/YYYY - DD/MM/YYYY"
+
+    EventCatalogue:
+      type: object
+      description: An Event Catalogue, a public, bookable list of an organisation's upcoming events.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        charity_id:
+          type: integer
+        filters:
+          $ref: '#/components/schemas/EventCatalogueFilters'
+        public_url:
+          type: string
+          description: The public page people book from, which can also be embedded on a website
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EventCatalogueDetail:
+      allOf:
+        - $ref: '#/components/schemas/EventCatalogue'
+        - type: object
+          properties:
+            upcoming_events_count:
+              type: integer
+              description: How many events its public page shows now
+
+    PaginatedEventCatalogues:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventCatalogue'
+
+    EventCatalogueAccess:
+      type: object
+      properties:
+        event_catalogue_id:
+          type: integer
+        project_id:
+          type: integer
+        mode:
+          type: string
+          enum: [every_enrolled, specific]
+        contact_ids:
+          type: array
+          description: The Contacts ticked, under specific
+          items:
+            type: integer
+
+    PortalLink:
+      type: object
+      properties:
+        contact_id:
+          type: integer
+        name:
+          type: string
+        link_status:
+          type: string
+          enum: [active, deactivated, none]
+          description: none means the Contact has never been sent a link
+        last_sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_sent_channel:
+          type: string
+          enum: [email, sms]
+          nullable: true
+        can_email:
+          type: boolean
+        can_sms:
+          type: boolean
+
+    PaginatedPortalLinks:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/PortalLink'
 
     PaginatedEventFormats:
       allOf:
@@ -28867,6 +31592,99 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/ApiKey'
+
+    CaseNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        charity_id:
+          type: integer
+        project_id:
+          type: integer
+        user_id:
+          type: integer
+          description: The colleague who recorded it
+        user_name:
+          type: string
+          nullable: true
+        note_type:
+          type: string
+          enum: [case_note, session_note]
+          description: "`case_note` is about one Contact (Beneficiary); `session_note` is about an Event"
+        status:
+          type: string
+          enum: [queued, recording, transcribing, completed, failed, stitching, summarizing]
+        beneficiary_id:
+          type: integer
+          nullable: true
+        beneficiary_name:
+          type: string
+          nullable: true
+        event_id:
+          type: integer
+          nullable: true
+        draft_story_id:
+          type: integer
+          nullable: true
+          description: The draft survey response written from the summary, once there is one
+        story_id:
+          type: integer
+          nullable: true
+          description: The survey response (Story) saved from that draft
+        started_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          nullable: true
+        source:
+          type: string
+          enum: [product, manual]
+          description: "`product` when recorded in Makerble, `manual` when an audio file was attached"
+        platform:
+          type: string
+          enum: [desktop_web, mobile_web, api]
+          nullable: true
+          description: Where it was started; null for Audio Notes made before this was recorded
+        has_recording:
+          type: boolean
+          description: false once the recording has been deleted, or before it is uploaded
+        audio_deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the recording was deleted, if it has been
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CaseNoteDetail:
+      allOf:
+        - $ref: '#/components/schemas/CaseNote'
+        - type: object
+          properties:
+            transcript:
+              type: string
+              nullable: true
+              description: "The transcript, one paragraph per speaker turn (Speaker A: ...)"
+            summary:
+              type: string
+              nullable: true
+              description: The AI summary
+
+    PaginatedCaseNotes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CaseNote'
 
     PaginatedWebhookEndpoints:
       allOf:
