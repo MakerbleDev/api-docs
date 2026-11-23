@@ -9276,6 +9276,99 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: "This Event Format can't be deleted because it has 3 events. Delete or move those events first. This Event Format can't be deleted because it is added to 2 projects. Remove it from those projects first."
+  /event_categories/{id}/projects:
+    post:
+      tags: [Event Formats]
+      summary: Add an Event Format to a project
+      operationId: addEventFormatToProject
+      description: |
+        Adds an Event Format (Event Category in the API) to a project, so the project's events can
+        use it, as **Add to projects** on the Manage Event Formats page does. It also turns events
+        on for the project. Adding one that is already added does nothing and returns `200`.
+
+        - Only an **Organisation Admin** of the organisation that owns the Event Format may (`403`).
+        - The project must be in the same organisation (`422`). An Event Format or project in an
+          organisation you are not a member of returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id]
+              properties:
+                project_id:
+                  type: integer
+            example:
+              project_id: 301
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+              example:
+                event_category_id: 4530
+                project_id: 301
+                status: added
+        "200":
+          description: It was already added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: The project isn't in the Event Format's organisation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "That project isn't in the Event Format's organisation."
+  /event_categories/{id}/projects/{project_id}:
+    delete:
+      tags: [Event Formats]
+      summary: Remove an Event Format from a project
+      operationId: removeEventFormatFromProject
+      description: |
+        Takes an Event Format off a project, so new events in the project can't use it. Events
+        that already use it keep it. Same permissions as **Add an Event Format to a project**;
+        an Event Format that isn't added to the project returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFormatProject'
+              example:
+                event_category_id: 4530
+                project_id: 301
+                status: removed
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/EventFormatAdminOnly'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /events:
     get:
@@ -19053,6 +19146,15 @@ components:
       description: Also include Indicators or Outcomes from the public library shared by all organisations (default false)
 
   responses:
+
+    EventFormatAdminOnly:
+      description: You are not an Organisation Admin of the organisation that owns the Event Format
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Only an Organisation Admin can manage Event Formats."
     SetupGuideForbidden:
       description: You aren't an Organisation Admin of this Organisation, or its Setup guide is switched off
       content:
@@ -28123,6 +28225,17 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    EventFormatProject:
+      type: object
+      properties:
+        event_category_id:
+          type: integer
+        project_id:
+          type: integer
+        status:
+          type: string
+          enum: [added, already_added, removed]
 
     PaginatedEventFormats:
       allOf:

@@ -4281,6 +4281,24 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" },
             { code: "422", cls: "response-4xx", desc: "A setting is invalid, e.g. a length not in 5-minute steps" }
           ])}
+          ${endpointCard("POST", "/event_categories/{id}/projects", "Add an Event Format to a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "project_id", type: "integer", required: true, desc: "A project in the same organisation; adding one also turns events on for it" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "Added — status: added" },
+            { code: "200", cls: "response-2xx", desc: "It was already added — status: already_added" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Event Format or project not found, or in an organisation you are not in" },
+            { code: "422", cls: "response-4xx", desc: "The project isn't in the Event Format's organisation" }
+          ])}
+          ${endpointCard("DELETE", "/event_categories/{id}/projects/{project_id}", "Remove an Event Format from a project", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" },
+            { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Removed — status: removed. Events already using it keep it" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or the Event Format isn't added to the project" }
+          ])}
           ${endpointCard("DELETE", "/event_categories/{id}", "Delete an Event Format", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
           ], [
