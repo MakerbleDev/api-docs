@@ -12148,6 +12148,176 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+  /explore/checklist_templates:
+    get:
+      tags: [Explore]
+      summary: Explore Checklist Templates
+      operationId: listExploreChecklistTemplates
+      description: |
+        Lists the Checklist Templates shared to the Makerble® ImpactStore™ and approved, with the
+        same search, filters, counts and sort as the Explore Checklist Templates page. A Checklist
+        Template is a ready-made Checklist (participant journey) without an organisation's own
+        content: each step carries a hint for what counts as done, such as "a baseline wellbeing
+        survey", which is matched to your own Surveys, forms and statuses when you use it.
+
+        - `query` matches the template's name and description, and its steps' titles and hints.
+        - The filters take option keys, as arrays (`shape[]=with_stages`) or comma-separated.
+          Options in one filter combine with OR and filters combine with AND:
+          - `designed_for`: `young_people`, `adults`, `families`, `volunteers`, `everyone`
+          - `journey_part` (Part of the journey): `referral`, `enrolment`, `safeguarding`, `exit_and_alumni`
+          - `shape`: `with_stages`, `without_stages`
+          - `shared_by`: `makerble`, `others`
+        - `chip` is one of the page's Popular chips: `Referral`, `Safeguarding`, `Enrolment`,
+          `Volunteers`, `Bursary`.
+        - `sort` is `used` (used by the most organisations first, the default), `new`, `az` or
+          `steps` (fewest steps first).
+        - `yours` is true for a template that belongs to one of your organisations.
+        - Use a template with **Use a Checklist Template** (`/checklist_templates/{id}/mapping`
+          and `/checklist_templates/{id}/use`).
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: safeguarding
+          description: Words in the template's name, description, or steps' titles and hints
+        - name: designed_for
+          in: query
+          required: false
+          schema:
+            type: string
+          example: young_people
+          description: Designed for option keys, comma-separated or repeated as designed_for[]
+        - name: journey_part
+          in: query
+          required: false
+          schema:
+            type: string
+          example: safeguarding
+          description: Part of the journey option keys, comma-separated or repeated as journey_part[]
+        - name: shape
+          in: query
+          required: false
+          schema:
+            type: string
+          example: with_stages
+          description: Shape option keys, comma-separated or repeated as shape[]
+        - name: shared_by
+          in: query
+          required: false
+          schema:
+            type: string
+          example: makerble
+          description: Shared by option keys, comma-separated or repeated as shared_by[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Referral, Safeguarding, Enrolment, Volunteers, Bursary]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [used, new, az, steps]
+            default: used
+          description: Most used, Newest, A to Z, or Fewest steps
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed Checklist Templates that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 12
+                    name: Safeguarding onboarding
+                    description: The checks to complete before anyone takes part in activities.
+                    steps_count: 4
+                    stages_count: 0
+                    designed_for: everyone
+                    journey_part: safeguarding
+                    shared_by: Makerble
+                    used_by: 3
+                    published_at: "2026-11-24T09:00:00Z"
+                    yours: false
+                facets:
+                  - key: journey_part
+                    label: Part of the journey
+                    options:
+                      - value: safeguarding
+                        label: Safeguarding
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /explore/checklist_templates/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Checklist Template
+      operationId: getExploreChecklistTemplate
+      description: |
+        One Checklist Template listed on Explore Checklist Templates, as its preview shows it: the
+        fields of **Explore Checklist Templates** plus its `stages` (name, icon) and `steps` (title,
+        action type, and the `hint` for what counts as done where the step needs one). A template
+        that isn't listed (not shared or not approved) is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12
+      responses:
+        "200":
+          description: The template with its stages and steps
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                id: 12
+                name: Safeguarding onboarding
+                steps_count: 2
+                stages_count: 0
+                designed_for: everyone
+                journey_part: safeguarding
+                shared_by: Makerble
+                used_by: 3
+                yours: false
+                stages: []
+                steps:
+                  - id: 101
+                    stage_id: null
+                    title: Record consent
+                    action_type: complete_form
+                    action_name: Complete a form
+                    hint: a consent form
+                    needs_hint: true
+                  - id: 102
+                    stage_id: null
+                    title: Agree next steps with a key worker
+                    action_type: create_task
+                    action_name: Create a task
+                    hint: null
+                    needs_hint: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /explore/impact_frameworks:
     get:
       tags: [Explore]
@@ -14715,6 +14885,330 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /checklist_templates:
+    get:
+      tags: [Checklists]
+      summary: List My Checklist Templates
+      operationId: listChecklistTemplates
+      description: |
+        The Checklist Templates of the organisations you are an Organisation Admin or reporter of
+        (My Checklist Templates, the Templates tab of Manage Checklists), shared or not. `sharing` is
+        `organisation` (only your organisation can use it), `waiting_for_approval` (published to the
+        ImpactStore, waiting for Makerble to approve it) or `published` (listed in the ImpactStore).
+        `hints_needed` counts the steps that need a hint for what counts as done and `hints_set` those
+        that have one. `used_by_checklists` and `used_by_organisations` count the Checklists made from it.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: charity_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only this one of your organisations (404 if you aren't in it)
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: A page of templates
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: 31
+                    name: Induction
+                    sharing: organisation
+                    steps_count: 2
+                    hints_needed: 1
+                    hints_set: 1
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Checklists]
+      summary: Save a Checklist as a template
+      operationId: createChecklistTemplate
+      description: |
+        Saves one of your organisation's Checklists as a Checklist Template, as **Save as template** in
+        a Checklist's More Options does. Only Organisation Admins can (403 otherwise). Its stages, steps
+        and settings are copied; a step's owner is kept when it is "the colleague who added it" or
+        "nobody in particular", and saved as nobody in particular otherwise. `hints` maps the Checklist's
+        step (action) ids to a hint for what counts as done; steps left out start with a hint made from
+        the names of what they count. `share: impact_store` also publishes it for Makerble's approval;
+        if a step that needs a hint has none, the template is still saved and the response is 422 with
+        `missing_hint_step_ids` and `template_id`.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checklist_id]
+              properties:
+                checklist_id: {type: integer}
+                name: {type: string}
+                description: {type: string}
+                designed_for: {type: string, enum: [young_people, adults, families, volunteers, everyone]}
+                journey_part: {type: string, enum: [referral, enrolment, safeguarding, exit_and_alumni]}
+                hints: {type: object, additionalProperties: {type: string}}
+                share: {type: string, enum: [organisation, impact_store]}
+            example:
+              checklist_id: 44
+              name: Induction
+              designed_for: young_people
+              hints:
+                "301": a caregiver relationship
+              share: organisation
+      responses:
+        "201":
+          description: The saved template with its stages and steps
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                id: 31
+                charity_id: 5
+                name: Induction
+                description: For new members
+                designed_for: young_people
+                journey_part: referral
+                sharing: organisation
+                published_at: null
+                saved_from_checklist:
+                  id: 44
+                  name: Induction
+                steps_count: 2
+                stages_count: 1
+                hints_needed: 1
+                hints_set: 1
+                used_by_checklists: 0
+                used_by_organisations: 0
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+  /checklist_templates/{id}:
+    get:
+      tags: [Checklists]
+      summary: Get one of My Checklist Templates
+      operationId: getChecklistTemplate
+      description: |
+        One of your organisations' templates with its `stages` and `steps` (each with its `hint` and
+        `needs_hint`). Another organisation's template is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: The template with its stages and steps
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Checklists]
+      summary: Change, publish or stop sharing a Checklist Template
+      operationId: updateChecklistTemplate
+      description: |
+        Changes the name, description, Designed for, Part of the journey and hints (keyed by the
+        template's own step ids). `share: impact_store` publishes it to the ImpactStore for Makerble's
+        approval, and is a 422 naming the steps (`missing_hint_step_ids`) while any that needs a hint
+        has none. `share: organisation` stops sharing it; Checklists already made from it don't change.
+        Only Organisation Admins can (403 otherwise).
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                description: {type: string}
+                designed_for: {type: string, enum: [young_people, adults, families, volunteers, everyone]}
+                journey_part: {type: string, enum: [referral, enrolment, safeguarding, exit_and_alumni]}
+                hints: {type: object, additionalProperties: {type: string}}
+                share: {type: string, enum: [organisation, impact_store]}
+            example:
+              hints:
+                "88": a baseline wellbeing survey
+              share: impact_store
+      responses:
+        "200":
+          description: The changed template
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Checklists]
+      summary: Delete a Checklist Template
+      operationId: deleteChecklistTemplate
+      description: Deletes the template. Checklists made from it are copies, so they don't change. Only Organisation Admins can.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /checklist_templates/{id}/mapping:
+    get:
+      tags: [Checklists]
+      summary: Suggested mapping for using a Checklist Template
+      operationId: getChecklistTemplateMapping
+      description: |
+        The mapping step of **Use this template**, for an ImpactStore template or one of your own.
+        For each step: its `hint`, your organisation's `options` of the step's kind (each with an `id`
+        to send back and a `name`), the `suggested` match by name, the `original` (what the original
+        Checklist used, for your own organisation's template), whether a new one can be created
+        (`can_create`, with a `create_name` from the hint) and the `default` choice: `original`,
+        `suggested`, `leave` (nothing matched, so it is left to set up later) or `none` (nothing to set
+        up). `charity_id` picks which of your organisations is using it (default: the template's own if
+        it is yours, else your first).
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: charity_id
+          in: query
+          required: false
+          schema: {type: integer}
+      responses:
+        "200":
+          description: The steps and their choices
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                template_id: 12
+                charity_id: 5
+                own_template: false
+                needs_setting_up_count: 0
+                steps:
+                  - step_id: 101
+                    number: 1
+                    title: Record consent
+                    action_type: complete_form
+                    action_name: Complete a form
+                    hint: a consent form
+                    needs_mapping: true
+                    default: suggested
+                    default_item_id: "beneficiary_category_ids:7"
+                    suggested: {id: "beneficiary_category_ids:7", name: Consent}
+                    original: null
+                    options:
+                      - {id: "beneficiary_category_ids:7", name: Consent}
+                    can_create: false
+                    create_name: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /checklist_templates/{id}/use:
+    post:
+      tags: [Checklists]
+      summary: Use a Checklist Template
+      operationId: useChecklistTemplate
+      description: |
+        Creates a Checklist in your organisation from the template. `mapping` has one entry per step:
+        `{step_id, item_id}` with an option id from **Suggested mapping** (or `original`),
+        `{step_id, create: "<name>"}` to create a new role, specialist need, group or story label, or
+        `{step_id, leave: true}` to set it up later. Steps left out take their default. A step left for
+        later is never set to "Any": it shows as Needs setting up and doesn't tick off until someone
+        chooses what counts. Returns the new Checklist and the steps that still need setting up.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                charity_id: {type: integer}
+                name: {type: string}
+                mapping:
+                  type: array
+                  items:
+                    type: object
+                    required: [step_id]
+                    properties:
+                      step_id: {type: integer}
+                      item_id: {type: string}
+                      create: {type: string}
+                      leave: {type: boolean}
+            example:
+              name: Our safeguarding checks
+              mapping:
+                - {step_id: 101, item_id: "beneficiary_category_ids:7"}
+                - {step_id: 103, create: Safeguarding concern}
+                - {step_id: 104, leave: true}
+      responses:
+        "201":
+          description: The new Checklist and the steps still to set up
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                checklist: {id: 77, name: Our safeguarding checks, charity_id: 5}
+                needs_setting_up:
+                  - {step_id: 104, title: Flag any safeguarding concerns, hint: a safeguarding flag}
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
   /checklists:
     get:
       tags: [Checklists]
