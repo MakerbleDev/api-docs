@@ -4598,7 +4598,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Beneficiary'
+                $ref: '#/components/schemas/BeneficiaryDetail'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "422":
@@ -4619,7 +4619,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Beneficiary'
+                $ref: '#/components/schemas/BeneficiaryDetail'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -26127,7 +26127,8 @@ components:
                 type: integer
                 minimum: 0
 
-    Project:
+    ProjectListItem:
+      description: A Project as returned by `GET /projects`. `GET /projects/{id}`, `POST /projects` and `PATCH /projects/{id}` return the fuller Project.
       allOf:
         - $ref: '#/components/schemas/Timestamps'
         - type: object
@@ -26141,6 +26142,20 @@ components:
             charity_id:
               type: integer
               example: 31
+            is_closed:
+              type: boolean
+              example: false
+            beneficiary_category_ids:
+              type: array
+              items:
+                type: integer
+              description: The Contact Forms used to create Contacts in the Project.
+
+    Project:
+      allOf:
+        - $ref: '#/components/schemas/ProjectListItem'
+        - type: object
+          properties:
             default_results_template_id:
               type: integer
               nullable: true
@@ -26172,14 +26187,6 @@ components:
             project_category_id:
               type: integer
               example: 88
-            is_closed:
-              type: boolean
-              example: false
-            beneficiary_category_ids:
-              type: array
-              items:
-                type: integer
-              description: The Contact Forms used to create Contacts in the Project.
 
     ProjectSaveRequest:
       type: object
@@ -26384,17 +26391,22 @@ components:
               type: array
               description: What the Contact needs a specialist in, each Essential or Desirable, added by hand or from a form answer
               items: { $ref: '#/components/schemas/RequiredSkill' }
+
+    BeneficiaryDetail:
+      description: A Contact (Beneficiary) as returned by `GET /beneficiaries/{id}` and `POST /beneficiaries`. The list endpoint leaves out `weekly_availability`.
+      allOf:
+        - $ref: '#/components/schemas/Beneficiary'
+        - type: object
+          properties:
             weekly_availability:
-              allOf:
-                - $ref: '#/components/schemas/ContactWeeklyAvailability'
-              nullable: true
-              description: The Contact's Weekly availability, or null if they haven't answered a Weekly availability field
+              $ref: '#/components/schemas/ContactWeeklyAvailability'
 
     ContactWeeklyAvailability:
       type: object
+      nullable: true
       description: >-
-        The most recently saved answer to any Weekly availability field on the Contact's Contact Forms. Use it to
-        suggest appointment times the Contact can attend.
+        The most recently saved answer to any Weekly availability field on the Contact's Contact Forms, or null if
+        they haven't answered one. Use it to suggest appointment times the Contact can attend.
       properties:
         times:
           type: array
@@ -27506,7 +27518,7 @@ components:
             data:
               type: array
               items:
-                $ref: '#/components/schemas/Project'
+                $ref: '#/components/schemas/ProjectListItem'
 
     PaginatedUsers:
       allOf:
