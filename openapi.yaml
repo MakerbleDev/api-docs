@@ -14721,7 +14721,8 @@ paths:
       summary: List an Organisation's Checklists
       description: |
         The Checklists of an Organisation (Charity). Visible to the Organisation's editors and
-        reporters, and to managers (editors) of its Projects.
+        reporters, and to managers (editors) of its Projects. With `project_id`, only the Checklists
+        added to that Project, as the Checklist panel on its profile page shows them.
       operationId: listChecklists
       security: [{tokenAuth: []}]
       parameters:
@@ -14731,6 +14732,12 @@ paths:
           schema:
             type: integer
           description: The Organisation (Charity) ID
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only the Checklists added to this Project of the Organisation. Not found if the Project isn't the Organisation's.
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
@@ -15392,7 +15399,8 @@ paths:
         `action_id`, `number` (its place in the Checklist), `title`, `action_type`, `action_name` ("Not
         set yet" while no type is chosen), `done_count` (Contacts who have done it) and `waiting_count`
         (Contacts for whom it is the first step not done), out of `contacts_count`. Only Contacts the user
-        can see are counted.
+        can see are counted. With `project_id`, only the Contacts in that Project, as the Checklist panel
+        on the Project's profile page counts them.
       operationId: getChecklistJourney
       security: [{tokenAuth: []}]
       parameters:
@@ -15401,6 +15409,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Count only the Contacts in this Project. Not found unless the Checklist is added to it.
       responses:
         "200":
           description: The columns of the Journey view

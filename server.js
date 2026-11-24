@@ -3382,12 +3382,14 @@ function buildDocsPage() {
         <div class="endpoint-list">
           ${endpointCard("GET", "/checklists", "List an Organisation's Checklists", true, [
             { name: "charity_id", type: "integer", required: true, desc: "The Organisation ID" },
+            { name: "project_id", type: "integer", required: false, desc: "Only the Checklists added to this Project of the Organisation" },
             { name: "page", type: "integer", required: false, desc: "Page number" },
             { name: "per_page", type: "integer", required: false, desc: "Records per page" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Paginated list of Checklists with <code>actions_count</code>" },
-            { code: "403", cls: "response-4xx", desc: "No role in the Organisation that can see Checklists" }
+            { code: "403", cls: "response-4xx", desc: "No role in the Organisation that can see Checklists" },
+            { code: "404", cls: "response-4xx", desc: "Unknown Organisation, or a <code>project_id</code> that isn't the Organisation's" }
           ])}
           ${endpointCard("GET", "/checklists/action_types", "List the actions a Checklist can contain", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>{data: [{action_type, name, criteria_keys, any_name, project_scopable}]}</code>; <code>any_name</code> names the \"Any\" choice, e.g. \"Any relationship\" (<code>criteria: {any: true}</code>); <code>project_scopable</code> types can take <code>only_this_project</code>" }
@@ -3447,11 +3449,12 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's Project" }
           ], "\"Sketched from your setup\" on the Checklists page. Nothing is saved. Without <code>project_id</code>, drafts from the running Project with the most Contacts that has at least two of: an active Signup Page, a Contact Form (other than the default), a Waiting List or Alumni status, and a Survey. The draft uses the five Participant Journey stages, leaving out any with nothing found: Sign up (one \"Complete a form\" step per Signup Page), Arrange support (the Contact Forms, then Waiting List → Enrolled), Provide support (each Survey's first Wave, and \"Invite to an event\" for the Project's Event Formats), Monitor progress (later Waves) and Achieve the goal (Move to Alumni). Every step already says what counts as done, and <code>checklist</code> can be sent to <code>POST /checklists</code> as it is.")}
           ${endpointCard("GET", "/checklists/{id}/journey", "Get a Checklist's Participant Journey", true, [
-            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" }
+            { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
+            { name: "project_id", type: "integer", required: false, desc: "Count only the Contacts in this Project, one the Checklist is added to" }
           ], [
             { code: "200", cls: "response-2xx", desc: "<code>contacts_count</code> and <code>columns</code> in order, each <code>{stage_id, name, icon, colour, steps: [{action_id, number, title, action_type, action_name, done_count, waiting_count}]}</code>" },
-            { code: "404", cls: "response-4xx", desc: "Not found, or another Organisation's" }
-          ], "The Journey view on the Checklist's profile page: its stages left to right, each with its steps. Without stages, each step is its own column, \"Step 1\", \"Step 2\" and so on. <code>done_count</code>: Contacts who have done the step. <code>waiting_count</code>: Contacts for whom it is the first step not done. Only Contacts the user can see are counted.")}
+            { code: "404", cls: "response-4xx", desc: "Not found, another Organisation's, or a <code>project_id</code> the Checklist isn't added to" }
+          ], "The Journey view on the Checklist's profile page: its stages left to right, each with its steps. Without stages, each step is its own column, \"Step 1\", \"Step 2\" and so on. <code>done_count</code>: Contacts who have done the step. <code>waiting_count</code>: Contacts for whom it is the first step not done. Only Contacts the user can see are counted. With <code>project_id</code>, only that Project's Contacts, as the Checklist panel on its profile page counts them.")}
           ${endpointCard("PATCH", "/checklists/{id}/projects/{project_id}", "Set how a Project offers a Checklist", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Checklist ID" },
             { name: "project_id", in: "path", type: "integer", required: true, desc: "Project ID" },
