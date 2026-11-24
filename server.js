@@ -1006,6 +1006,7 @@ function buildDocsPage() {
         <a href="#focus"           class="nav-link"><span class="nav-method method-GET">GET</span>Focus</a>
         <a href="#snapshot"        class="nav-link"><span class="nav-method method-GET">GET</span>Snapshot</a>
         <a href="#start-page"      class="nav-link"><span class="nav-method method-GET">GET</span>Start page</a>
+        <a href="#my-apps-menu"    class="nav-link"><span class="nav-method method-GET">GET</span>My Apps menu</a>
         <a href="#ratio-sets"      class="nav-link"><span class="nav-method method-GET">GET</span>Ratio Sets</a>
         <a href="#case-forms"      class="nav-link"><span class="nav-method method-GET">GET</span>Case Forms</a>
       </div>
@@ -5614,6 +5615,27 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "<code>{start_page, options}</code>, as GET returns" },
             { code: "422", cls: "response-4xx", desc: "No <code>start_page</code>, or a page not offered to you" }
           ], "Saved for you only.")}
+        </div>
+      </section>
+
+      <!-- My Apps menu -->
+      <section class="section" id="my-apps-menu">
+        <div class="section-eyebrow">Navigation</div>
+        <h2 class="section-title">My Apps menu</h2>
+        <div class="section-desc">
+          <p>Whether the <strong>My Apps</strong> button shows in your top menu. You choose it under <strong>Personal Settings › Preferences › Show My Apps in the top menu</strong>. Colleagues who joined before this setting existed have it on; new colleagues start with it off, as the Project Toolbar and sidebar take them to the same places.</p>
+          <p>Contacts with a login and Survey Portal users have no My Apps menu, so <code>offered</code> is false for them and the setting can't be changed.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/my_apps_menu", "Get whether My Apps shows", true, [], [
+            { code: "200", cls: "response-2xx", desc: "<code>{offered, shown}</code>" }
+          ])}
+          ${endpointCard("PATCH", "/my_apps_menu", "Show or hide My Apps", true, [
+            { name: "shown", in: "body", type: "boolean", required: true, desc: "<code>true</code> to show My Apps in your top menu, <code>false</code> to hide it" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "<code>{offered, shown}</code>, as GET returns" },
+            { code: "422", cls: "response-4xx", desc: "<code>shown</code> is not true or false, or you have no My Apps menu" }
+          ], "Saved for you only. It takes effect the next time a page loads in full.")}
         </div>
       </section>
 

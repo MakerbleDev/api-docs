@@ -213,6 +213,10 @@ tags:
       Focus under Today: one list of everything that needs the signed-in user, grouped by when it's
       due (Overdue, Today, This week, Later) and filtered by type. The first source is Checklist
       Actions: the next step on each Contact's Checklist that the user is responsible for.
+  - name: My Apps menu
+    description: |
+      Whether the My Apps button shows in the signed-in user's top menu, as chosen under
+      Personal Settings › Preferences. Contacts with a login and Survey Portal users have no My Apps menu.
   - name: Start page
     description: |
       The page the signed-in user lands on after signing in, and whenever they click Home or the
@@ -19303,6 +19307,63 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /my_apps_menu:
+    get:
+      tags: [My Apps menu]
+      summary: Get whether My Apps shows in your top menu
+      description: |
+        Whether the My Apps button shows in your top menu, as chosen under Personal Settings › Preferences
+        › Show My Apps in the top menu. Colleagues who joined before this setting existed have it on; new
+        colleagues start with it off. `offered` is false for Contacts with a login and Survey Portal users,
+        who have no My Apps menu.
+      operationId: getMyAppsMenu
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Whether My Apps shows in your top menu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyAppsMenu'
+              example:
+                offered: true
+                shown: false
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [My Apps menu]
+      summary: Show or hide My Apps in your top menu
+      description: |
+        Show or hide the My Apps button in your top menu, as Personal Settings › Preferences › Show My Apps
+        in the top menu does. Saved for you only; it takes effect the next time a page loads in full.
+        Refused for Contacts with a login and Survey Portal users, who have no My Apps menu.
+      operationId: updateMyAppsMenu
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shown]
+              properties:
+                shown:
+                  type: boolean
+                  description: true to show My Apps in your top menu, false to hide it
+            example:
+              shown: false
+      responses:
+        "200":
+          description: The setting after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyAppsMenu'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /start_page:
     get:
       tags: [Start page]
@@ -22957,6 +23018,16 @@ components:
           type: string
           nullable: true
           description: The finished message, e.g. "12 contacts changed. 3 skipped …"; null until it has finished
+    MyAppsMenu:
+      type: object
+      required: [offered, shown]
+      properties:
+        offered:
+          type: boolean
+          description: False for Contacts with a login and Survey Portal users, who have no My Apps menu
+        shown:
+          type: boolean
+          description: True while the My Apps button shows in your top menu
     StartPage:
       type: object
       required: [start_page, options]
