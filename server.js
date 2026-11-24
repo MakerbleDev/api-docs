@@ -1717,6 +1717,15 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Paginated list of Users" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" }
           ])}
+          ${endpointCard("GET", "/users/notification_settings", "Get your notification settings", true, [], [
+            { code: "200", cls: "response-2xx", desc: "data: each setting's key, its label on the Notifications tab of User Settings, and enabled" }
+          ])}
+          ${endpointCard("PATCH", "/users/notification_settings", "Change your notification settings", true, [
+            { name: "settings", in: "body", type: "object", required: true, desc: "Setting keys and true or false, e.g. <code>{\"event_guest_cancelled\": false}</code>. Only those sent change" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "All your notification settings, after the change" },
+            { code: "422", cls: "response-4xx", desc: "An unknown setting, or a value that isn't true or false. Nothing changes" }
+          ])}
           ${endpointCard("GET", "/users/{id}", "Get a single User", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "User ID" }
           ], [
@@ -4470,6 +4479,13 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "event_id and guests_count" },
             { code: "422", cls: "response-4xx", desc: "Not a guest of this event" }
           ])}
+          ${endpointCard("GET", "/events/{id}/guests/{contact_id}/calendar_links", "Get a guest's Add to Calendar links", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
+            { name: "contact_id", in: "path", type: "integer", required: true, desc: "The guest's Contact (beneficiary) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "google_calendar_url, outlook_url, office365_url, ics_url and cancel_url (null when the Event Format doesn't let guests cancel). The .ics and cancel links work without signing in, for this guest only" },
+            { code: "404", cls: "response-4xx", desc: "Not a guest of this event, or an event you can't see" }
+          ])}
           ${endpointCard("GET", "/events/{id}/staff", "List an event's Event Managers and Workers", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
             { name: "page / per_page", type: "integer", required: false, desc: "Pagination" }
@@ -4654,7 +4670,7 @@ function buildDocsPage() {
           ${endpointCard("POST", "/event_categories", "Create an Event Format", true, [
             { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation the Event Format belongs to" },
             { name: "name", in: "body", type: "string", required: true, desc: "Name, e.g. Therapy session" },
-            { name: "guest_status_ids", in: "body", type: "integer[]", required: false, desc: "The organisation's Guest Statuses its events use, in order" },
+            { name: "guest_status_ids", in: "body", type: "integer[]", required: false, desc: "The organisation's Guest Statuses its events use, in order. If left out, a new Event Format gets Invited then Cancelled" },
             { name: "attendance_form_id", in: "body", type: "integer", required: false, desc: "The Survey (Story Category) used to record attendance, or null" },
             { name: "survey_kiosk_enabled", in: "body", type: "boolean", required: false, desc: "Self Check-in" },
             { name: "survey_kiosk_registration_enabled", in: "body", type: "boolean", required: false, desc: "Let new people register at Self Check-in" },
@@ -4669,7 +4685,10 @@ function buildDocsPage() {
             { name: "appointment_type", in: "body", type: "string", required: false, desc: "<code>one_to_one</code>, <code>group</code>, or null for Not an appointment" },
             { name: "default_length_minutes", in: "body", type: "integer", required: false, desc: "Usual length, in 5-minute steps up to 1440, or null" },
             { name: "preparation_minutes", in: "body", type: "integer", required: false, desc: "Preparation time before each appointment, 0–1440 (default 0)" },
-            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" }
+            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" },
+            { name: "send_add_to_calendar_email", in: "body", type: "boolean", required: false, desc: "Send an 'Add to Calendar' email to each guest added to an event of this format. Needs the organisation's email messaging turned on" },
+            { name: "allow_guests_to_cancel", in: "body", type: "boolean", required: false, desc: "Let guests cancel from that email. Only kept while send_add_to_calendar_email is true" },
+            { name: "cancellation_guest_status_id", in: "body", type: "integer", required: false, desc: "The Guest Status a guest who cancels is moved to: one of the Event Format's own. Required when allow_guests_to_cancel is true" }
           ], [
             { code: "201", cls: "response-2xx", desc: "Created — returns the Event Format with its settings" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of charity_id" },
@@ -4678,7 +4697,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/event_categories/{id}", "Get an Event Format", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Event Format with its settings, Guest Statuses, project_ids and appointment settings" },
+            { code: "200", cls: "response-2xx", desc: "The Event Format with its settings, Guest Statuses, project_ids, appointment settings and Add to Calendar email settings" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
           ])}
@@ -4700,7 +4719,10 @@ function buildDocsPage() {
             { name: "appointment_type", in: "body", type: "string", required: false, desc: "<code>one_to_one</code>, <code>group</code>, or null for Not an appointment" },
             { name: "default_length_minutes", in: "body", type: "integer", required: false, desc: "Usual length, in 5-minute steps up to 1440, or null" },
             { name: "preparation_minutes", in: "body", type: "integer", required: false, desc: "Preparation time before each appointment, 0–1440 (default 0)" },
-            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" }
+            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" },
+            { name: "send_add_to_calendar_email", in: "body", type: "boolean", required: false, desc: "Send an 'Add to Calendar' email to each guest added to an event of this format. Needs the organisation's email messaging turned on" },
+            { name: "allow_guests_to_cancel", in: "body", type: "boolean", required: false, desc: "Let guests cancel from that email. Only kept while send_add_to_calendar_email is true" },
+            { name: "cancellation_guest_status_id", in: "body", type: "integer", required: false, desc: "The Guest Status a guest who cancels is moved to: one of the Event Format's own. Required when allow_guests_to_cancel is true" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Edited — only the settings sent change" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },

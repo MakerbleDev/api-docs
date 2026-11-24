@@ -645,6 +645,64 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /users/notification_settings:
+    get:
+      tags: [Users]
+      summary: Get your notification settings
+      operationId: getUserNotificationSettings
+      description: |
+        Your own email notification settings, as on the **Notifications** tab of **User Settings**:
+        each setting's `key`, its `label` as the tab shows it, and whether it is `enabled`. Settings you
+        have never changed show their default. There is no user id: you can only see your own.
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Your notification settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserNotificationSettings' }
+              example:
+                data:
+                  - { key: event_guest_cancelled, label: When an event guest cancels, enabled: true }
+                  - { key: someone_tags_me, label: Someone tags me, enabled: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Users]
+      summary: Change your notification settings
+      operationId: updateUserNotificationSettings
+      description: |
+        Turns your own email notifications on or off, as ticking or unticking them on the
+        **Notifications** tab of **User Settings** does. Only the settings you send change. For example,
+        `event_guest_cancelled: false` stops the email you get when a guest at one of your events
+        cancels. An unknown key, or a value that isn't true or false, returns `422` and changes nothing.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                settings:
+                  type: object
+                  description: Setting keys (from GET) and true or false
+                  additionalProperties: { type: boolean }
+            example:
+              settings:
+                event_guest_cancelled: false
+      responses:
+        "200":
+          description: All your notification settings, after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserNotificationSettings' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /users/{id}:
     get:
       tags: [Users]
@@ -9681,7 +9739,15 @@ paths:
       description: |
         Creates an Event Format (Event Category in the API), as **Create Event Format** on the
         Manage Event Formats page does. Only an **Organisation Admin** of `charity_id` may create one.
-        Send `guest_status_ids` (the Guest Statuses its events use, in order).
+        Send `guest_status_ids` (the Guest Statuses its events use, in order). If you leave it out, the
+        new Event Format gets the organisation's Invited then Cancelled Guest Statuses, where it has them.
+
+        **Add to Calendar email** (all optional):
+        - `send_add_to_calendar_email`: email each guest (Contact) added to an event of this format, so
+          they can add it to their calendar. The organisation must have email messaging turned on.
+        - `allow_guests_to_cancel`: let guests cancel from that email.
+        - `cancellation_guest_status_id`: the Guest Status a guest who cancels is moved to. Required
+          when `allow_guests_to_cancel` is true, and must be one of `guest_status_ids`.
 
         **Appointment settings** (all optional):
         - `appointment_type`: `one_to_one`, `group`, or `null` for "Not an appointment" (the default).
@@ -9713,6 +9779,9 @@ paths:
               default_length_minutes: 60
               preparation_minutes: 30
               debrief_minutes: 30
+              send_add_to_calendar_email: true
+              allow_guests_to_cancel: true
+              cancellation_guest_status_id: 56
       responses:
         "201":
           description: The Event Format was created
@@ -9807,6 +9876,11 @@ paths:
       description: |
         Changes an Event Format's settings, as **Edit** on the Manage Event Formats page does. Only
         the settings you send change. Only an **Organisation Admin** of its organisation may edit it.
+
+        **Add to Calendar email** (all optional): `send_add_to_calendar_email`, `allow_guests_to_cancel`
+        and `cancellation_guest_status_id`, as on Create. The Guest Status used for cancellations must
+        stay one of the Event Format's Guest Statuses, so remove it from `guest_status_ids` only after
+        turning `allow_guests_to_cancel` off.
 
         **Appointment settings** (all optional):
         - `appointment_type`: `one_to_one`, `group`, or `null` for "Not an appointment" (the default).
@@ -11359,6 +11433,46 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
+
+  /events/{id}/guests/{contact_id}/calendar_links:
+    get:
+      tags: [Events]
+      summary: Get a guest's Add to Calendar links
+      operationId: getEventGuestCalendarLinks
+      description: |
+        The links a guest (Contact) uses to put the event in their own calendar, the same ones
+        their Personal Portal and the Add to Calendar email give them: Google Calendar, Outlook.com
+        and Microsoft 365 links that open a new, filled-in event, and an .ics file for Apple Calendar
+        and any other calendar app. `cancel_url` is the page where the guest can cancel their booking,
+        or null when the event's Event Format doesn't let guests cancel.
+
+        The `.ics` and cancel links work without signing in and belong to this one guest, so send them
+        only to that guest. Anyone who can open the event page can get them. A Contact who isn't a
+        guest of the event returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - { name: contact_id, in: path, required: true, schema: { type: integer }, description: "The guest's Contact (beneficiary) id" }
+      responses:
+        "200":
+          description: The guest's calendar links
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestCalendarLinks' }
+              example:
+                event_id: 881
+                contact_id: 5521
+                google_calendar_url: "https://calendar.google.com/calendar/render?action=TEMPLATE&dates=20300108T180000Z%2F20300108T200000Z&text=Pottery+taster"
+                outlook_url: "https://outlook.live.com/calendar/0/action/compose?path=%2Fcalendar%2Faction%2Fcompose&rru=addevent&subject=Pottery+taster"
+                office365_url: "https://outlook.office.com/calendar/0/action/compose?path=%2Fcalendar%2Faction%2Fcompose&rru=addevent&subject=Pottery+taster"
+                ics_url: "https://www.makerble.com/event-bookings/eyJfcmFpbHMi...--abc123/calendar.ics"
+                cancel_url: "https://www.makerble.com/event-bookings/eyJfcmFpbHMi...--abc123"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
 
   /events/{id}/staff:
     get:
@@ -31574,6 +31688,59 @@ components:
           minimum: 0
           maximum: 1440
           description: Debrief time a colleague needs after each appointment. Default 0.
+        send_add_to_calendar_email:
+          type: boolean
+          description: Send an 'Add to Calendar' email to each guest (Contact) added to an event of this format. Can only be turned on while the organisation has email messaging turned on. Default false.
+        allow_guests_to_cancel:
+          type: boolean
+          description: Let guests cancel from the 'Add to Calendar' email. Only kept while send_add_to_calendar_email is true. Default false.
+        cancellation_guest_status_id:
+          type: integer
+          nullable: true
+          description: The Guest Status a guest who cancels is moved to. Required when allow_guests_to_cancel is true, and must be one of the Event Format's own Guest Statuses. null when guests can't cancel.
+
+    EventGuestCalendarLinks:
+      type: object
+      description: A guest's Add to Calendar links (CP-7734).
+      properties:
+        event_id:
+          type: integer
+        contact_id:
+          type: integer
+        google_calendar_url:
+          type: string
+          description: Opens a new Google Calendar event with this event's name, times and location filled in
+        outlook_url:
+          type: string
+          description: The same for Outlook.com
+        office365_url:
+          type: string
+          description: The same for Microsoft 365 (Outlook on the web for work or school accounts)
+        ics_url:
+          type: string
+          description: The event as an .ics file, for Apple Calendar and other calendar apps. Works without signing in, for this guest only.
+        cancel_url:
+          type: string
+          nullable: true
+          description: The page where the guest can cancel, or null when the Event Format doesn't let guests cancel. Works without signing in, for this guest only.
+
+    UserNotificationSettings:
+      type: object
+      description: A user's own email notification settings (CP-7734).
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                description: The setting, e.g. event_guest_cancelled
+              label:
+                type: string
+                description: The setting as the Notifications tab of User Settings shows it
+              enabled:
+                type: boolean
 
     EventFormatDetail:
       type: object
@@ -31635,6 +31802,16 @@ components:
           minimum: 0
           maximum: 1440
           description: Debrief time a colleague needs after each appointment. Default 0.
+        send_add_to_calendar_email:
+          type: boolean
+          description: Sends an 'Add to Calendar' email to each guest added to an event of this format
+        allow_guests_to_cancel:
+          type: boolean
+          description: Guests can cancel from the 'Add to Calendar' email
+        cancellation_guest_status_id:
+          type: integer
+          nullable: true
+          description: The Guest Status a guest who cancels is moved to
         guest_statuses:
           type: array
           items:
