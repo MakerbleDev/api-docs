@@ -15103,6 +15103,13 @@ paths:
         `suggested`, `leave` (nothing matched, so it is left to set up later) or `none` (nothing to set
         up). `charity_id` picks which of your organisations is using it (default: the template's own if
         it is yours, else your first).
+
+        Installing a Toolkit: pass `toolkit_id`. Any template in a Toolkit you can see can be used,
+        published or not. Steps that point at the Toolkit's own Surveys, Contact Forms and story Labels
+        then default to `toolkit` (`default_item_id: toolkit`, with the installed item's name under
+        `toolkit`): the copies installing the Toolkit added, shown as "Installed with this Toolkit". A
+        step whose item wasn't installed falls back to its hint as usual. A template that isn't in the
+        Toolkit, or a Toolkit you can't see, is a 404.
       security: [{tokenAuth: []}]
       parameters:
         - name: id
@@ -15112,6 +15119,11 @@ paths:
         - name: charity_id
           in: query
           required: false
+          schema: {type: integer}
+        - name: toolkit_id
+          in: query
+          required: false
+          description: Installing this Toolkit, which holds the template
           schema: {type: integer}
       responses:
         "200":
@@ -15159,6 +15171,8 @@ paths:
         `{step_id, leave: true}` to set it up later. Steps left out take their default. A step left for
         later is never set to "Any": it shows as Needs setting up and doesn't tick off until someone
         chooses what counts. Returns the new Checklist and the steps that still need setting up.
+        With `toolkit_id` (installing a Toolkit), `item_id: toolkit` sets a step up with the Toolkit's
+        installed item; see **Suggested mapping**.
       security: [{tokenAuth: []}]
       parameters:
         - name: id
@@ -15173,6 +15187,7 @@ paths:
               type: object
               properties:
                 charity_id: {type: integer}
+                toolkit_id: {type: integer, description: Installing this Toolkit, which holds the template}
                 name: {type: string}
                 mapping:
                   type: array
