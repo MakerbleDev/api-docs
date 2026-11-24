@@ -3642,7 +3642,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/checklist_templates/{id}", "Get one of My Checklist Templates", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The template with its <code>stages</code> and <code>steps</code>, each with its <code>hint</code> and <code>needs_hint</code>" },
+            { code: "200", cls: "response-2xx", desc: "The template with its <code>stages</code> and <code>steps</code>, each with its <code>hint</code>, <code>needs_hint</code>, <code>toolkit_item_kind</code> and <code>toolkit_item</code> (<code>{type, id, name}</code> or <code>null</code>)" },
             { code: "404", cls: "response-4xx", desc: "Not one of your organisations' templates" }
           ])}
           ${endpointCard("POST", "/checklist_templates", "Save a Checklist as a template", true, [
@@ -3661,11 +3661,14 @@ function buildDocsPage() {
           ${endpointCard("PATCH", "/checklist_templates/{id}", "Change, publish or stop sharing a template", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" },
             { name: "hints", in: "body", type: "object", required: false, desc: "The template's step ids → hint" },
-            { name: "share", in: "body", type: "string", required: false, desc: "<code>impact_store</code> publishes it for Makerble's approval; <code>organisation</code> stops sharing it" }
+            { name: "share", in: "body", type: "string", required: false, desc: "<code>impact_store</code> publishes it for Makerble's approval; <code>organisation</code> stops sharing it" },
+            { name: "toolkit_id", in: "body", type: "integer", required: false, desc: "A Toolkit holding this template, that you can edit, for <code>toolkit_items</code>" },
+            { name: "toolkit_items", in: "body", type: "object", required: false, desc: "The template's step ids → one of the Toolkit's own items, as <code>StoryCategory:12</code> (Survey), <code>BeneficiaryCategory:5</code> (Contact Form) or <code>Label:7</code> (story Label), or <code>\"\"</code> for the hint alone. Installing the Toolkit sets those steps up with no mapping" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The changed template" },
-            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" },
-            { code: "422", cls: "response-4xx", desc: "A step that needs a hint has none: <code>missing_hint_step_ids</code>" }
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin, or you can't edit the Toolkit" },
+            { code: "404", cls: "response-4xx", desc: "Not one of your templates, or the Toolkit doesn't hold it" },
+            { code: "422", cls: "response-4xx", desc: "A step that needs a hint has none: <code>missing_hint_step_ids</code>; or a step's Toolkit item isn't one of the Toolkit's" }
           ])}
           ${endpointCard("DELETE", "/checklist_templates/{id}", "Delete a template", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" }

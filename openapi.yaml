@@ -15035,6 +15035,11 @@ paths:
         approval, and is a 422 naming the steps (`missing_hint_step_ids`) while any that needs a hint
         has none. `share: organisation` stops sharing it; Checklists already made from it don't change.
         Only Organisation Admins can (403 otherwise).
+
+        In a Toolkit, `toolkit_id` with `toolkit_items` points survey, form and story label steps at
+        the Toolkit's own Surveys, Contact Forms and story Labels, as Edit Toolkit items does on the
+        Toolkit's page. You must be able to edit the Toolkit (403), and it must hold this template (404).
+        An item that isn't one of the Toolkit's is a 422.
       security: [{tokenAuth: []}]
       parameters:
         - name: id
@@ -15054,6 +15059,17 @@ paths:
                 journey_part: {type: string, enum: [referral, enrolment, safeguarding, exit_and_alumni]}
                 hints: {type: object, additionalProperties: {type: string}}
                 share: {type: string, enum: [organisation, impact_store]}
+                toolkit_id:
+                  type: integer
+                  description: A Toolkit holding this template, that you can edit, for toolkit_items
+                toolkit_items:
+                  type: object
+                  additionalProperties: {type: string}
+                  description: |
+                    The template's step ids mapped to one of the Toolkit's own items: `StoryCategory:<id>`
+                    (a Survey), `BeneficiaryCategory:<id>` (a Contact Form) or `Label:<id>` (a story Label),
+                    or "" for the hint alone. Installing the Toolkit sets those steps up with no mapping.
+                    Each step's `toolkit_item_kind` says which kind it can take (null for none).
             example:
               hints:
                 "88": a baseline wellbeing survey
