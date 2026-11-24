@@ -1717,6 +1717,15 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "Paginated list of Users" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" }
           ])}
+          ${endpointCard("GET", "/users/notification_settings", "Get your notification settings", true, [], [
+            { code: "200", cls: "response-2xx", desc: "data: each setting's key, its label on the Notifications tab of User Settings, and enabled" }
+          ])}
+          ${endpointCard("PATCH", "/users/notification_settings", "Change your notification settings", true, [
+            { name: "settings", in: "body", type: "object", required: true, desc: "Setting keys and true or false, e.g. <code>{\"event_guest_cancelled\": false}</code>. Only those sent change" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "All your notification settings, after the change" },
+            { code: "422", cls: "response-4xx", desc: "An unknown setting, or a value that isn't true or false. Nothing changes" }
+          ])}
           ${endpointCard("GET", "/users/{id}", "Get a single User", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "User ID" }
           ], [

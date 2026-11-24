@@ -645,6 +645,64 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /users/notification_settings:
+    get:
+      tags: [Users]
+      summary: Get your notification settings
+      operationId: getUserNotificationSettings
+      description: |
+        Your own email notification settings, as on the **Notifications** tab of **User Settings**:
+        each setting's `key`, its `label` as the tab shows it, and whether it is `enabled`. Settings you
+        have never changed show their default. There is no user id: you can only see your own.
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: Your notification settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserNotificationSettings' }
+              example:
+                data:
+                  - { key: event_guest_cancelled, label: When an event guest cancels, enabled: true }
+                  - { key: someone_tags_me, label: Someone tags me, enabled: true }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Users]
+      summary: Change your notification settings
+      operationId: updateUserNotificationSettings
+      description: |
+        Turns your own email notifications on or off, as ticking or unticking them on the
+        **Notifications** tab of **User Settings** does. Only the settings you send change. For example,
+        `event_guest_cancelled: false` stops the email you get when a guest at one of your events
+        cancels. An unknown key, or a value that isn't true or false, returns `422` and changes nothing.
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                settings:
+                  type: object
+                  description: Setting keys (from GET) and true or false
+                  additionalProperties: { type: boolean }
+            example:
+              settings:
+                event_guest_cancelled: false
+      responses:
+        "200":
+          description: All your notification settings, after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserNotificationSettings' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
+
   /users/{id}:
     get:
       tags: [Users]
@@ -31614,6 +31672,24 @@ components:
           type: string
           nullable: true
           description: The page where the guest can cancel, or null when the Event Format doesn't let guests cancel. Works without signing in, for this guest only.
+
+    UserNotificationSettings:
+      type: object
+      description: A user's own email notification settings (CP-7734).
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                description: The setting, e.g. event_guest_cancelled
+              label:
+                type: string
+                description: The setting as the Notifications tab of User Settings shows it
+              enabled:
+                type: boolean
 
     EventFormatDetail:
       type: object
