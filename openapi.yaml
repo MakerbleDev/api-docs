@@ -6560,6 +6560,8 @@ paths:
         Returns all Stories visible to the authenticated user. Stories capture text, media, and progress towards Changes and Indicators, and can be tagged to Beneficiaries.
 
         **Timestamp note:** `actual_created_at` = Date Posted · `created_at` = Date Happened · `updated_at` = Date Edited
+
+        Returns up to 200 Stories per page. A `per_page` above 200 returns a 422 error; page through larger sets with `page`.
       operationId: listStories
       security: [{tokenAuth: []}]
       parameters:
@@ -6575,6 +6577,8 @@ paths:
                 $ref: '#/components/schemas/PaginatedStories'
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
     post:
       tags: [Stories]
