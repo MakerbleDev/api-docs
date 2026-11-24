@@ -953,6 +953,7 @@ function buildDocsPage() {
         <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Surveys</a>
         <a href="#explore-report-templates" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Report Templates</a>
         <a href="#explore-dropdowns" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Dropdowns</a>
+        <a href="#explore-checklist-templates" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Checklist Templates</a>
         <a href="#explore-impact-frameworks" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Impact Frameworks</a>
         <a href="#explore-ideas" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Ideas</a>
         <a href="#explore-metrics" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Metrics</a>
@@ -962,6 +963,7 @@ function buildDocsPage() {
         <a href="#duplicate-contacts" class="nav-link"><span class="nav-method method-GET">GET</span>Duplicate Contacts</a>
         <a href="#field-visibility" class="nav-link"><span class="nav-method method-GET">GET</span>Field Visibility</a>
         <a href="#checklists"      class="nav-link"><span class="nav-method method-POST">POST</span>Checklists</a>
+        <a href="#checklist-templates" class="nav-link"><span class="nav-method method-POST">POST</span>Checklist Templates</a>
         <a href="#add-metric-to"   class="nav-link"><span class="nav-method method-POST">POST</span>Add Metric To</a>
         <a href="#cohort-trackers" class="nav-link"><span class="nav-method method-POST">POST</span>Cohort Trackers</a>
         <a href="#workflow-trackers" class="nav-link"><span class="nav-method method-POST">POST</span>Workflow Trackers</a>
@@ -3028,6 +3030,38 @@ function buildDocsPage() {
         </div>
       </section>
 
+      <!-- Explore Checklist Templates -->
+      <section class="section" id="explore-checklist-templates">
+        <div class="section-eyebrow">Contacts</div>
+        <h2 class="section-title">Explore Checklist Templates</h2>
+        <div class="section-desc">
+          <p>Explore Checklist Templates lists the Checklist Templates shared to the Makerble&reg; ImpactStore&trade; and approved. A Checklist Template is a ready-made Checklist (participant journey) without an organisation's own content: each step carries a hint for what counts as done, such as "a baseline wellbeing survey", which is matched to your own Surveys, forms and statuses when you use it. The API gives the same search, filters, counts and sort as the Explore Checklist Templates page. Every caller sees the same templates; only <code>yours</code> depends on your organisations.</p>
+          <p>Filters take option keys, as arrays (<code>shape[]=with_stages</code>) or comma-separated (<code>journey_part=referral,enrolment</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/checklist_templates", "Explore Checklist Templates", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the template's name, description, or its steps' titles and hints" },
+            { name: "designed_for", type: "string", required: false, desc: "<code>young_people</code>, <code>adults</code>, <code>families</code>, <code>volunteers</code>, <code>everyone</code>" },
+            { name: "journey_part", type: "string", required: false, desc: "Part of the journey: <code>referral</code>, <code>enrolment</code>, <code>safeguarding</code>, <code>exit_and_alumni</code>" },
+            { name: "shape", type: "string", required: false, desc: "<code>with_stages</code>, <code>without_stages</code>" },
+            { name: "shared_by", type: "string", required: false, desc: "<code>makerble</code>, <code>others</code>" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Referral</code>, <code>Safeguarding</code>, <code>Enrolment</code>, <code>Volunteers</code>, <code>Bursary</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>used</code> (used by the most organisations first, default), <code>new</code>, <code>az</code> or <code>steps</code> (fewest steps first)" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Templates per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only templates updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Templates with <code>id</code>, <code>name</code>, <code>description</code>, <code>steps_count</code>, <code>stages_count</code>, <code>designed_for</code>, <code>journey_part</code>, <code>shared_by</code>, <code>used_by</code> (organisations), <code>published_at</code> and <code>yours</code>, plus <code>facets</code>" }
+          ])}
+          ${endpointCard("GET", "/explore/checklist_templates/{id}", "Preview an Explore Checklist Template", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The template's id from Explore Checklist Templates" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The template's fields as above plus its <code>stages</code> (name, icon) and <code>steps</code> (title, action type and the <code>hint</code> for what counts as done)" },
+            { code: "404", cls: "response-4xx", desc: "Not listed on Explore Checklist Templates (not shared or not approved)" }
+          ], "To use a template, get its suggested mapping with <code>GET /checklist_templates/{id}/mapping</code>, then create the Checklist with <code>POST /checklist_templates/{id}/use</code>.")}
+        </div>
+      </section>
+
       <!-- Explore Impact Frameworks -->
       <section class="section" id="explore-impact-frameworks">
         <div class="section-eyebrow">Impact framework</div>
@@ -3570,6 +3604,79 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "<code>{checklist_id, beneficiary_id, removed_at, removed_by_user_id}</code>. The Contact's progress is kept: adding the Checklist again restores it. An Organisation Admin can add back one a Project adds automatically" },
             { code: "403", cls: "response-4xx", desc: "Only an Organisation Admin, or a colleague who can add this Checklist to the Contact, can remove it" },
             { code: "404", cls: "response-4xx", desc: "A Contact the user can't see, or a Checklist the Contact doesn't have" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Checklist Templates -->
+      <section class="section" id="checklist-templates">
+        <div class="section-eyebrow">Contacts</div>
+        <h2 class="section-title">Checklist Templates</h2>
+        <div class="section-desc">
+          <p>A Checklist Template is a ready-made Checklist without an organisation's own content. Each step carries a <strong>hint</strong> for what counts as done, such as "a caregiver relationship", in place of the organisation's own Relationship Category, Survey, form or status. Your organisation's templates are on My Checklist Templates (the Templates tab of Manage Checklists); publishing one sends it to Makerble for approval before it is listed in the ImpactStore. Organisation Admins save, change, publish and delete templates; anyone who can create Checklists can use one.</p>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-icon">✓</span>
+          <span><strong>Workflow tip:</strong> To use a template, call <code>GET /checklist_templates/{id}/mapping</code>, show the person each step's suggested match and let them confirm or change it, then <code>POST /checklist_templates/{id}/use</code>. Leave a step for later rather than guess: it shows as Needs setting up until someone chooses what counts.</span>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/checklist_templates", "List My Checklist Templates", true, [
+            { name: "charity_id", type: "integer", required: false, desc: "Only this one of your organisations" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Templates per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only templates updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Templates with <code>sharing</code> (<code>organisation</code>, <code>waiting_for_approval</code> or <code>published</code>), <code>saved_from_checklist</code>, <code>steps_count</code>, <code>hints_needed</code>, <code>hints_set</code>, <code>used_by_checklists</code> and <code>used_by_organisations</code>" }
+          ])}
+          ${endpointCard("GET", "/checklist_templates/{id}", "Get one of My Checklist Templates", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The template with its <code>stages</code> and <code>steps</code>, each with its <code>hint</code> and <code>needs_hint</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not one of your organisations' templates" }
+          ])}
+          ${endpointCard("POST", "/checklist_templates", "Save a Checklist as a template", true, [
+            { name: "checklist_id", in: "body", type: "integer", required: true, desc: "The Checklist to save" },
+            { name: "name", in: "body", type: "string", required: false, desc: "Defaults to the Checklist's name" },
+            { name: "designed_for", in: "body", type: "string", required: false, desc: "<code>young_people</code>, <code>adults</code>, <code>families</code>, <code>volunteers</code>, <code>everyone</code> (default)" },
+            { name: "journey_part", in: "body", type: "string", required: false, desc: "<code>referral</code>, <code>enrolment</code>, <code>safeguarding</code>, <code>exit_and_alumni</code>" },
+            { name: "hints", in: "body", type: "object", required: false, desc: "The Checklist's step ids → hint. Steps left out start with a hint made from what they count" },
+            { name: "share", in: "body", type: "string", required: false, desc: "<code>organisation</code> (default) or <code>impact_store</code> to publish it for approval" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The template with its stages and steps" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" },
+            { code: "404", cls: "response-4xx", desc: "Checklist not found" },
+            { code: "422", cls: "response-4xx", desc: "<code>errors</code>; publishing with a hint missing also gives <code>missing_hint_step_ids</code> and the saved <code>template_id</code>" }
+          ])}
+          ${endpointCard("PATCH", "/checklist_templates/{id}", "Change, publish or stop sharing a template", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" },
+            { name: "hints", in: "body", type: "object", required: false, desc: "The template's step ids → hint" },
+            { name: "share", in: "body", type: "string", required: false, desc: "<code>impact_store</code> publishes it for Makerble's approval; <code>organisation</code> stops sharing it" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The changed template" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" },
+            { code: "422", cls: "response-4xx", desc: "A step that needs a hint has none: <code>missing_hint_step_ids</code>" }
+          ])}
+          ${endpointCard("DELETE", "/checklist_templates/{id}", "Delete a template", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Deleted. Checklists made from it don't change" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" }
+          ])}
+          ${endpointCard("GET", "/checklist_templates/{id}/mapping", "Suggested mapping for using a template", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "An ImpactStore template, or one of your own" },
+            { name: "charity_id", type: "integer", required: false, desc: "Which of your organisations is using it" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Each step's <code>hint</code>, <code>options</code>, <code>suggested</code> match, <code>original</code> (your own template), <code>can_create</code> and <code>default</code> (<code>original</code>, <code>suggested</code>, <code>leave</code> or <code>none</code>)" },
+            { code: "404", cls: "response-4xx", desc: "Another organisation's unpublished template" }
+          ])}
+          ${endpointCard("POST", "/checklist_templates/{id}/use", "Use a template", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" },
+            { name: "charity_id", in: "body", type: "integer", required: false, desc: "Which of your organisations is using it" },
+            { name: "name", in: "body", type: "string", required: false, desc: "The new Checklist's name" },
+            { name: "mapping", in: "body", type: "array", required: false, desc: "Per step: <code>{step_id, item_id}</code>, <code>{step_id, create}</code> or <code>{step_id, leave: true}</code>. Steps left out take their default" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>checklist</code> and the <code>needs_setting_up</code> steps" },
+            { code: "422", cls: "response-4xx", desc: "A choice that wasn't offered, or a new item that couldn't be created" }
           ])}
         </div>
       </section>
