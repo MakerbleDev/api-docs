@@ -22509,6 +22509,23 @@ components:
             `checklists`. The button then opens that page in the person's own organisation and closes the popup; give it a
             label that says where it goes ("Explore Checklists"). For someone who can't open the page, it only closes the
             popup. A live `feature_tour_id` takes priority. Send null to clear it.
+        placement:
+          type: string
+          enum: [popup, during_build]
+          description: |
+            Makerble's own only. Where it shows: `popup` (the default), the "What's new in Makerble" popup and What's new;
+            or `during_build`, the screen a new organisation sees while Makerble builds its first workspaces after the
+            onboarding journey. "During build" announcements never pop up and aren't listed in What's new: while live,
+            they take turns on that screen in `priority` order, each for `display_seconds`.
+        priority:
+          type: integer
+          minimum: 1
+          description: The order "During build" announcements show in, 1 first. Defaults to 1.
+        display_seconds:
+          type: integer
+          minimum: 3
+          maximum: 120
+          description: How many seconds a "During build" announcement shows before the next. Defaults to 10.
         audience:
           type: string
           enum: [everyone, colleagues, administrators]
@@ -22779,6 +22796,16 @@ components:
           type: string
           nullable: true
           description: The deep link the button opens, or null when it only closes the popup.
+        placement:
+          type: string
+          enum: [popup, during_build]
+          description: Where it shows, the popup or the onboarding journey's building screen ("During build").
+        priority:
+          type: integer
+          description: The order "During build" announcements show in, 1 first.
+        display_seconds:
+          type: integer
+          description: How many seconds a "During build" announcement shows before the next.
         button_click_count:
           type: integer
           description: People who clicked the button through to its page.
