@@ -26696,6 +26696,24 @@ components:
           description: True when Field Visibility hides this field from you; `value` is then null, whether or not it has an answer
           example: true
 
+    StoryCustomFieldValue:
+      type: object
+      description: An answer to one of the Story's own custom fields. Field Visibility applies to Contacts' fields, not these, so there is no `restricted` flag.
+      properties:
+        id:
+          type: integer
+          example: 88
+        name:
+          type: string
+          example: "Session location"
+        type:
+          type: string
+          example: "text"
+          description: "Field type: text, date, time, file, etc."
+        value:
+          description: Field value (string for most types; object for file attachments)
+          example: "Community centre"
+
     Story:
       allOf:
         - $ref: '#/components/schemas/Timestamps'
@@ -26749,7 +26767,7 @@ components:
             custom_fields:
               type: array
               items:
-                $ref: '#/components/schemas/CustomFieldValue'
+                $ref: '#/components/schemas/StoryCustomFieldValue'
             verdict_scores:
               type: array
               items:
@@ -27412,6 +27430,11 @@ components:
             indicator_id:
               type: integer
               example: 577
+            framework_indicator_id:
+              type: integer
+              nullable: true
+              example: null
+              description: For an Indicator linked to an Outcome in a Framework Set, which of the Outcome's own core Indicators it counts as (for example a TOMs Measure). Null when it counts as the Outcome itself, or isn't a linked Indicator.
 
     RatioSet:
       allOf:
