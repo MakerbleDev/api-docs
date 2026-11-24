@@ -19272,13 +19272,18 @@ paths:
       - $ref: '#/components/parameters/OrganisationId'
     post:
       tags: [Onboarding]
-      summary: Set up an area of work from a Toolkit
+      summary: Set up an area of work from a Toolkit or your own stages
       description: |
         Sets up an area of work as the onboarding journey's "Start from a toolkit designed for an
         organisation like mine" path does, with the same checks: one workspace (Project) per name in
         `workspace_names` with the Toolkit installed, one workspace per extra in `extra_ids` with that
         extra's Project Type (see GET /onboarding_extras), and a Checklist that every contact in the
         area's workspaces gets.
+
+        Or give `stages` instead of `toolkit_id`, as the "Personalise the platform to my organisation"
+        path does: the stages of the Organisation's own process, each with a `name` and the `action` that
+        happens at it. Each stage becomes one step of the same name in the Checklist. Content for the
+        stages (forms, surveys, flags and so on) isn't set up this way; add it in Makerble afterwards.
 
         `spacing` says how the area is split into workspaces: `facilitator` (one per coach, mentor or
         practitioner), `site` (one per location), `cohort` (one per intake of a group or class) or
@@ -19298,13 +19303,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [area_of_work, toolkit_id, spacing]
+              required: [area_of_work, spacing]
               properties:
                 area_of_work:
                   type: string
                   maxLength: 100
                 toolkit_id:
                   type: integer
+                  description: A listed Toolkit. Leave out when giving `stages`.
+                stages:
+                  type: array
+                  description: Instead of `toolkit_id`, the stages of the Organisation's process, in order.
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    $ref: '#/components/schemas/OnboardingStage'
                 spacing:
                   type: string
                   enum: [facilitator, site, cohort, single]
@@ -19326,13 +19339,25 @@ paths:
                   type: array
                   items:
                     type: integer
-            example:
-              area_of_work: Youth mentoring
-              toolkit_id: 62
-              spacing: site
-              workspace_names: [Leeds, York]
-              workspace_colours: ['#22B573', '#7E6CB0']
-              extra_ids: [1, 4]
+            examples:
+              toolkit:
+                summary: From a Toolkit
+                value:
+                  area_of_work: Youth mentoring
+                  toolkit_id: 62
+                  spacing: site
+                  workspace_names: [Leeds, York]
+                  workspace_colours: ['#22B573', '#7E6CB0']
+                  extra_ids: [1, 4]
+              stages:
+                summary: From your own stages
+                value:
+                  area_of_work: Youth mentoring
+                  stages:
+                    - {name: Sign up, action: complete_form_external}
+                    - {name: Assessment, action: complete_survey}
+                    - {name: Achieve the goal, action: add_flag}
+                  spacing: single
       responses:
         "202":
           description: The set-up, building in the background
@@ -19345,6 +19370,8 @@ paths:
                 organisation_id: 42
                 area_of_work: Youth mentoring
                 toolkit_id: 62
+                path: toolkit
+                stages: []
                 spacing: site
                 workspace_names: [Leeds, York]
                 workspace_colours: ['#22B573', '#7E6CB0']
@@ -22052,6 +22079,15 @@ components:
         organisation_id: {type: integer}
         area_of_work: {type: string}
         toolkit_id: {type: integer, nullable: true}
+        path:
+          type: string
+          enum: [toolkit, personalise]
+          description: How the area was set up, from a Toolkit or from the Organisation's own stages.
+        stages:
+          type: array
+          description: The stages given, on the personalise path; empty for a Toolkit.
+          items:
+            $ref: '#/components/schemas/OnboardingStage'
         spacing: {type: string, enum: [facilitator, site, cohort, single], nullable: true}
         workspace_names: {type: array, items: {type: string}}
         workspace_colours:
@@ -22064,6 +22100,21 @@ components:
         checklist_id: {type: integer, nullable: true}
         created_at: {type: string, format: date-time}
         completed_at: {type: string, format: date-time, nullable: true}
+    OnboardingStage:
+      type: object
+      required: [name, action]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: The stage's name, which is also its step's name, e.g. Assessment.
+        action:
+          type: string
+          description: >-
+            What happens at the stage. complete_form_external is a form the contact fills in and
+            complete_form_internal one a colleague fills in; add_role adds to an audience and add_skill a
+            specialist need.
+          enum: [complete_form_external, complete_form_internal, complete_survey, add_to_project, add_flag, invite_to_event, add_observer, add_relationship, add_role, add_skill, add_to_group, complete_form_for_relative, complete_survey_for_relative, create_case, create_task, invite_to_participate, send_sms, send_email, receive_sms, receive_email, send_survey, send_360_survey, create_labelled_story]
     SetupGuide:
       type: object
       properties:
