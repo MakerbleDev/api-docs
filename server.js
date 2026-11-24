@@ -991,6 +991,7 @@ function buildDocsPage() {
         <a href="#ai-assistant-link" class="nav-link"><span class="nav-method method-POST">POST</span>AI assistant link</a>
         <a href="#seats"           class="nav-link"><span class="nav-method method-GET">GET</span>Seats</a>
         <a href="#usage"           class="nav-link"><span class="nav-method method-GET">GET</span>Usage</a>
+        <a href="#onboarding"      class="nav-link"><span class="nav-method method-POST">POST</span>Onboarding</a>
         <a href="#setup-guide"     class="nav-link"><span class="nav-method method-GET">GET</span>Setup guide</a>
         <a href="#announcements"   class="nav-link"><span class="nav-method method-POST">POST</span>Announcements</a>
         <a href="#wishlist"        class="nav-link"><span class="nav-method method-POST">POST</span>Wishlist</a>
@@ -5063,6 +5064,43 @@ function buildDocsPage() {
           ], [
             { code: "200", cls: "response-2xx", desc: "data: the 12 months before this one, newest first, each with its currency, charge and usage (quantity, allowance, charge and waived per usage type)" },
             { code: "404", cls: "response-4xx", desc: "Not an admin of this Organisation" }
+          ])}
+        </div>
+      </section>
+
+      <!-- Onboarding -->
+      <section class="section" id="onboarding">
+        <div class="section-eyebrow">Organisation</div>
+        <h2 class="section-title">Onboarding</h2>
+        <div class="section-desc">
+          <p>Set up an area of work (a programme or service) for an Organisation, as the onboarding journey does after an Organisation is created: one workspace per name with a Toolkit installed, extra workspaces such as Referrals or Volunteers, each with its own Project Type, and a Checklist (participant journey) that every contact in the area's workspaces gets.</p>
+          <p><code>spacing</code> says how the area is split into workspaces: <code>facilitator</code>, <code>site</code>, <code>cohort</code> or <code>single</code>. The workspaces are made in the background: POST answers <code>202</code> with <code>status: building</code>; ask GET until it is <code>completed</code> or <code>failed</code>. Charity Editors and Charity Reporters of the Organisation can use it.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("POST", "/organisations/{organisation_id}/onboarding_journeys", "Set up an area of work from a Toolkit", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "area_of_work", in: "body", type: "string", required: true, desc: "The area of work's name, up to 100 characters" },
+            { name: "toolkit_id", in: "body", type: "integer", required: true, desc: "A listed Toolkit, installed into each of the area's workspaces" },
+            { name: "spacing", in: "body", type: "string", required: true, desc: "<code>facilitator</code>, <code>site</code>, <code>cohort</code> or <code>single</code>" },
+            { name: "workspace_names", in: "body", type: "array", required: false, desc: "One name per workspace, up to 50. For <code>single</code>, the area of work's name when empty" },
+            { name: "extra_ids", in: "body", type: "array", required: false, desc: "Extras from GET /onboarding_extras" }
+          ], [
+            { code: "202", cls: "response-2xx", desc: "The set-up, with status building" },
+            { code: "403", cls: "response-4xx", desc: "Not a Charity Editor or Charity Reporter of this Organisation" },
+            { code: "404", cls: "response-4xx", desc: "No such Organisation" },
+            { code: "422", cls: "response-4xx", desc: "A missing name, unknown spacing, unlisted Toolkit or too many workspaces; nothing is saved" }
+          ])}
+          ${endpointCard("GET", "/onboarding_journeys/{id}", "Get an area of work set-up", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "The set-up's ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "status (building, completed or failed), the answers, and once completed workspace_ids and checklist_id" },
+            { code: "404", cls: "response-4xx", desc: "No such set-up, or someone else's" }
+          ])}
+          ${endpointCard("GET", "/onboarding_extras", "List the extra workspaces an area of work can have", true, [
+            { name: "page", in: "query", type: "integer", required: false, desc: "Page number (default 1)" },
+            { name: "per_page", in: "query", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "page, page_size, page_count, total_count and data: each extra's id, name, description, project_type_id and project_type_name" }
           ])}
         </div>
       </section>
