@@ -14695,6 +14695,12 @@ paths:
         Category) id>" (a survey made with that Survey in any Project); or "shared:<Survey id>:<Shared Wave
         id>" (a survey tagged to that Shared Wave (Shared Interval) of the Survey, in any Project). The "for a
         relative" types take `relatives: [{relationship_side, beneficiary_category_ids | survey_waves}]`.
+
+        `action_type` values never change, so match on them. `name` and `any_name` (and `action_name`
+        elsewhere in the Checklists endpoints) are the on-screen wording and can change: since CP-9308,
+        `add_role` is "Add to an audience" (was "Add a role") with `any_name` "Any audience" (was "Any role"),
+        `send_email` is "Send an email to a contact" (was "Send an Email") and `receive_email` is
+        "Receive an email" (was "Receive an Email").
       operationId: listChecklistActionTypes
       security: [{tokenAuth: []}]
       responses:
