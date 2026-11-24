@@ -19299,7 +19299,8 @@ paths:
         `spacing` says how the area is split into workspaces: `facilitator` (one per coach, mentor or
         practitioner), `site` (one per location), `cohort` (one per intake of a group or class) or
         `single` (one workspace, named after the area of work when `workspace_names` is empty). Up to
-        50 workspace names of up to 100 characters each. `toolkit_id` must be a listed Toolkit.
+        50 workspace names of up to 100 characters each. `workspace_colours` optionally gives each
+        workspace its colour, in the same order. `toolkit_id` must be a listed Toolkit.
 
         The workspaces are made in the background, so this answers 202 with `status: building`. Ask
         GET /onboarding_journeys/{id} until `status` is `completed` (then `workspace_ids` and
@@ -19329,6 +19330,14 @@ paths:
                   items:
                     type: string
                     maxLength: 100
+                workspace_colours:
+                  type: array
+                  description: >-
+                    The colour of each workspace, in the same order as `workspace_names`, as a six-digit hex
+                    colour. A missing or invalid colour is replaced with the next Makerble brand colour.
+                  items:
+                    type: string
+                    pattern: '^#[0-9A-Fa-f]{6}$'
                 extra_ids:
                   type: array
                   items:
@@ -19338,6 +19347,7 @@ paths:
               toolkit_id: 62
               spacing: site
               workspace_names: [Leeds, York]
+              workspace_colours: ['#22B573', '#7E6CB0']
               extra_ids: [1, 4]
       responses:
         "202":
@@ -19353,6 +19363,7 @@ paths:
                 toolkit_id: 62
                 spacing: site
                 workspace_names: [Leeds, York]
+                workspace_colours: ['#22B573', '#7E6CB0']
                 extra_ids: [1, 4]
                 status: building
                 workspace_ids: []
@@ -19398,6 +19409,7 @@ paths:
                 toolkit_id: 62
                 spacing: site
                 workspace_names: [Leeds, York]
+                workspace_colours: ['#22B573', '#7E6CB0']
                 extra_ids: [1, 4]
                 status: completed
                 workspace_ids: [901, 902, 903, 904]
@@ -19415,7 +19427,8 @@ paths:
       description: |
         The extras offered on the onboarding journey's Add extras step, in order: Referrals, Parents,
         Referees, Volunteers, Fundraising and any others Makerble offers. Each one makes a workspace
-        with its own Project Type. Pass their ids as `extra_ids` when setting up an area of work.
+        with its own Project Type, and `icon` names the icon it is shown with (chosen by Makerble from a
+        fixed set, or null). Pass their ids as `extra_ids` when setting up an area of work.
       operationId: listOnboardingExtras
       security: [{tokenAuth: []}]
       parameters:
@@ -19437,11 +19450,13 @@ paths:
                     description: Take in referrals from other organisations and professionals.
                     project_type_id: 12
                     project_type_name: Referrals
+                    icon: referrals
                   - id: 4
                     name: Volunteers
                     description: Recruit, support and keep track of your volunteers.
                     project_type_id: null
                     project_type_name: null
+                    icon: volunteers
         "401":
           $ref: '#/components/responses/Unauthorized'
   /organisations/{organisation_id}/setup_guide:
@@ -22055,6 +22070,10 @@ components:
         toolkit_id: {type: integer, nullable: true}
         spacing: {type: string, enum: [facilitator, site, cohort, single], nullable: true}
         workspace_names: {type: array, items: {type: string}}
+        workspace_colours:
+          type: array
+          description: The colour each workspace is made in, in the same order as workspace_names.
+          items: {type: string}
         extra_ids: {type: array, items: {type: integer}}
         status: {type: string, enum: [in_progress, exited, building, failed, completed]}
         workspace_ids: {type: array, items: {type: integer}}
