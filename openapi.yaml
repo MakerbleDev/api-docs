@@ -4598,7 +4598,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Beneficiary'
+                $ref: '#/components/schemas/BeneficiaryDetail'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "422":
@@ -4619,7 +4619,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Beneficiary'
+                $ref: '#/components/schemas/BeneficiaryDetail'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -6560,6 +6560,8 @@ paths:
         Returns all Stories visible to the authenticated user. Stories capture text, media, and progress towards Changes and Indicators, and can be tagged to Beneficiaries.
 
         **Timestamp note:** `actual_created_at` = Date Posted · `created_at` = Date Happened · `updated_at` = Date Edited
+
+        Returns up to 200 Stories per page. A `per_page` above 200 returns a 422 error; page through larger sets with `page`.
       operationId: listStories
       security: [{tokenAuth: []}]
       parameters:
@@ -6575,6 +6577,8 @@ paths:
                 $ref: '#/components/schemas/PaginatedStories'
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
 
     post:
       tags: [Stories]
@@ -9729,7 +9733,7 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
         "422":
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/UnprocessableEntityList'
 
   /event_categories/{id}:
     get:
@@ -9846,7 +9850,7 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
         "422":
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/UnprocessableEntityList'
     delete:
       tags: [Event Formats]
       summary: Delete an Event Format
@@ -15211,7 +15215,8 @@ paths:
       summary: List an Organisation's Checklists
       description: |
         The Checklists of an Organisation (Charity). Visible to the Organisation's editors and
-        reporters, and to managers (editors) of its Projects.
+        reporters, and to managers (editors) of its Projects. With `project_id`, only the Checklists
+        added to that Project, as the Checklist panel on its profile page shows them.
       operationId: listChecklists
       security: [{tokenAuth: []}]
       parameters:
@@ -15221,6 +15226,18 @@ paths:
           schema:
             type: integer
           description: The Organisation (Charity) ID
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only the Checklists added to this Project of the Organisation. Not found if the Project isn't the Organisation's.
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only the Checklists added to this Album's (Bundle's) Projects that you can see. Not found for an Album you can't see.
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
@@ -15673,7 +15690,8 @@ paths:
         many of the project's contacts with the Checklist have done that step, as a count and a percentage.
         Only Organisation Admins (every open project of their organisation), Team Leaders (open projects
         where someone in a Team they lead is a colleague) and Album Editors (open projects in organisation
-        Albums they edit) may call it; anyone else gets 403. A Checklist that none of your projects uses
+        Albums they edit) may call it; anyone else gets 403. With `album_id`, it covers that Album's
+        projects instead, for anyone who can see the Album. A Checklist that none of your projects uses
         returns 404. Only contacts you may see, that aren't deleted and are still active in the project,
         are counted. Rows are sorted before pagination; the sort is not remembered.
       security: [{tokenAuth: []}]
@@ -15683,6 +15701,12 @@ paths:
           required: true
           description: Checklist id
           schema: {type: integer}
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Summarise this Album's (Bundle's) Projects that use the Checklist instead, for anyone who can see the Album, as the Summary tab of its Checklist panel does. Not found for an Album you can't see, or a Checklist none of its Projects uses.
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - name: sort
@@ -15755,6 +15779,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Count only the Contacts in this Album's (Bundle's) Projects, as the Checklist panel on its profile page does. Not found for an Album you can't see, or a `project_id` outside it.
         - name: project_id
           in: query
           required: false
@@ -15825,6 +15855,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only the Contacts in this Album's (Bundle's) Projects. Not found for an Album you can't see.
         - name: list
           in: query
           required: true
@@ -15882,7 +15918,8 @@ paths:
         `action_id`, `number` (its place in the Checklist), `title`, `action_type`, `action_name` ("Not
         set yet" while no type is chosen), `done_count` (Contacts who have done it) and `waiting_count`
         (Contacts for whom it is the first step not done), out of `contacts_count`. Only Contacts the user
-        can see are counted.
+        can see are counted. With `project_id`, only the Contacts in that Project, as the Checklist panel
+        on the Project's profile page counts them.
       operationId: getChecklistJourney
       security: [{tokenAuth: []}]
       parameters:
@@ -15891,6 +15928,18 @@ paths:
           required: true
           schema:
             type: integer
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Count only the Contacts in this Album's (Bundle's) Projects. Not found for an Album you can't see.
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Count only the Contacts in this Project. Not found unless the Checklist is added to it.
       responses:
         "200":
           description: The columns of the Journey view
@@ -26572,7 +26621,8 @@ components:
                 type: integer
                 minimum: 0
 
-    Project:
+    ProjectListItem:
+      description: A Project as returned by `GET /projects`. `GET /projects/{id}`, `POST /projects` and `PATCH /projects/{id}` return the fuller Project.
       allOf:
         - $ref: '#/components/schemas/Timestamps'
         - type: object
@@ -26586,6 +26636,20 @@ components:
             charity_id:
               type: integer
               example: 31
+            is_closed:
+              type: boolean
+              example: false
+            beneficiary_category_ids:
+              type: array
+              items:
+                type: integer
+              description: The Contact Forms used to create Contacts in the Project.
+
+    Project:
+      allOf:
+        - $ref: '#/components/schemas/ProjectListItem'
+        - type: object
+          properties:
             default_results_template_id:
               type: integer
               nullable: true
@@ -26617,14 +26681,6 @@ components:
             project_category_id:
               type: integer
               example: 88
-            is_closed:
-              type: boolean
-              example: false
-            beneficiary_category_ids:
-              type: array
-              items:
-                type: integer
-              description: The Contact Forms used to create Contacts in the Project.
 
     ProjectSaveRequest:
       type: object
@@ -26829,17 +26885,22 @@ components:
               type: array
               description: What the Contact needs a specialist in, each Essential or Desirable, added by hand or from a form answer
               items: { $ref: '#/components/schemas/RequiredSkill' }
+
+    BeneficiaryDetail:
+      description: A Contact (Beneficiary) as returned by `GET /beneficiaries/{id}` and `POST /beneficiaries`. The list endpoint leaves out `weekly_availability`.
+      allOf:
+        - $ref: '#/components/schemas/Beneficiary'
+        - type: object
+          properties:
             weekly_availability:
-              allOf:
-                - $ref: '#/components/schemas/ContactWeeklyAvailability'
-              nullable: true
-              description: The Contact's Weekly availability, or null if they haven't answered a Weekly availability field
+              $ref: '#/components/schemas/ContactWeeklyAvailability'
 
     ContactWeeklyAvailability:
       type: object
+      nullable: true
       description: >-
-        The most recently saved answer to any Weekly availability field on the Contact's Contact Forms. Use it to
-        suggest appointment times the Contact can attend.
+        The most recently saved answer to any Weekly availability field on the Contact's Contact Forms, or null if
+        they haven't answered one. Use it to suggest appointment times the Contact can attend.
       properties:
         times:
           type: array
@@ -27141,6 +27202,24 @@ components:
           description: True when Field Visibility hides this field from you; `value` is then null, whether or not it has an answer
           example: true
 
+    StoryCustomFieldValue:
+      type: object
+      description: An answer to one of the Story's own custom fields. Field Visibility applies to Contacts' fields, not these, so there is no `restricted` flag.
+      properties:
+        id:
+          type: integer
+          example: 88
+        name:
+          type: string
+          example: "Session location"
+        type:
+          type: string
+          example: "text"
+          description: "Field type: text, date, time, file, etc."
+        value:
+          description: Field value (string for most types; object for file attachments)
+          example: "Community centre"
+
     Story:
       allOf:
         - $ref: '#/components/schemas/Timestamps'
@@ -27194,7 +27273,7 @@ components:
             custom_fields:
               type: array
               items:
-                $ref: '#/components/schemas/CustomFieldValue'
+                $ref: '#/components/schemas/StoryCustomFieldValue'
             verdict_scores:
               type: array
               items:
@@ -27857,6 +27936,11 @@ components:
             indicator_id:
               type: integer
               example: 577
+            framework_indicator_id:
+              type: integer
+              nullable: true
+              example: null
+              description: For an Indicator linked to an Outcome in a Framework Set, which of the Outcome's own core Indicators it counts as (for example a TOMs Measure). Null when it counts as the Outcome itself, or isn't a linked Indicator.
 
     RatioSet:
       allOf:
@@ -27928,7 +28012,7 @@ components:
             data:
               type: array
               items:
-                $ref: '#/components/schemas/Project'
+                $ref: '#/components/schemas/ProjectListItem'
 
     PaginatedUsers:
       allOf:
