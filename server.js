@@ -5201,6 +5201,7 @@ function buildDocsPage() {
             { name: "toolkit_id", in: "body", type: "integer", required: true, desc: "A listed Toolkit, installed into each of the area's workspaces" },
             { name: "spacing", in: "body", type: "string", required: true, desc: "<code>facilitator</code>, <code>site</code>, <code>cohort</code> or <code>single</code>" },
             { name: "workspace_names", in: "body", type: "array", required: false, desc: "One name per workspace, up to 50. For <code>single</code>, the area of work's name when empty" },
+            { name: "workspace_colours", in: "body", type: "array", required: false, desc: "Each workspace's colour as a six-digit hex colour, in the same order as workspace_names; a missing or invalid one gets the next Makerble brand colour" },
             { name: "extra_ids", in: "body", type: "array", required: false, desc: "Extras from GET /onboarding_extras" }
           ], [
             { code: "202", cls: "response-2xx", desc: "The set-up, with status building" },
@@ -5218,7 +5219,7 @@ function buildDocsPage() {
             { name: "page", in: "query", type: "integer", required: false, desc: "Page number (default 1)" },
             { name: "per_page", in: "query", type: "integer", required: false, desc: "Records per page (default 10, max 200)" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "page, page_size, page_count, total_count and data: each extra's id, name, description, project_type_id and project_type_name" }
+            { code: "200", cls: "response-2xx", desc: "page, page_size, page_count, total_count and data: each extra's id, name, description, project_type_id, project_type_name and icon" }
           ])}
         </div>
       </section>
