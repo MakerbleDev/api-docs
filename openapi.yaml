@@ -4598,7 +4598,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Beneficiary'
+                $ref: '#/components/schemas/BeneficiaryDetail'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "422":
@@ -4619,7 +4619,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Beneficiary'
+                $ref: '#/components/schemas/BeneficiaryDetail'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -9733,7 +9733,7 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
         "422":
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/UnprocessableEntityList'
 
   /event_categories/{id}:
     get:
@@ -9850,7 +9850,7 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
         "422":
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/UnprocessableEntityList'
     delete:
       tags: [Event Formats]
       summary: Delete an Event Format
@@ -26127,7 +26127,8 @@ components:
                 type: integer
                 minimum: 0
 
-    Project:
+    ProjectListItem:
+      description: A Project as returned by `GET /projects`. `GET /projects/{id}`, `POST /projects` and `PATCH /projects/{id}` return the fuller Project.
       allOf:
         - $ref: '#/components/schemas/Timestamps'
         - type: object
@@ -26141,6 +26142,20 @@ components:
             charity_id:
               type: integer
               example: 31
+            is_closed:
+              type: boolean
+              example: false
+            beneficiary_category_ids:
+              type: array
+              items:
+                type: integer
+              description: The Contact Forms used to create Contacts in the Project.
+
+    Project:
+      allOf:
+        - $ref: '#/components/schemas/ProjectListItem'
+        - type: object
+          properties:
             default_results_template_id:
               type: integer
               nullable: true
@@ -26172,14 +26187,6 @@ components:
             project_category_id:
               type: integer
               example: 88
-            is_closed:
-              type: boolean
-              example: false
-            beneficiary_category_ids:
-              type: array
-              items:
-                type: integer
-              description: The Contact Forms used to create Contacts in the Project.
 
     ProjectSaveRequest:
       type: object
@@ -26384,17 +26391,22 @@ components:
               type: array
               description: What the Contact needs a specialist in, each Essential or Desirable, added by hand or from a form answer
               items: { $ref: '#/components/schemas/RequiredSkill' }
+
+    BeneficiaryDetail:
+      description: A Contact (Beneficiary) as returned by `GET /beneficiaries/{id}` and `POST /beneficiaries`. The list endpoint leaves out `weekly_availability`.
+      allOf:
+        - $ref: '#/components/schemas/Beneficiary'
+        - type: object
+          properties:
             weekly_availability:
-              allOf:
-                - $ref: '#/components/schemas/ContactWeeklyAvailability'
-              nullable: true
-              description: The Contact's Weekly availability, or null if they haven't answered a Weekly availability field
+              $ref: '#/components/schemas/ContactWeeklyAvailability'
 
     ContactWeeklyAvailability:
       type: object
+      nullable: true
       description: >-
-        The most recently saved answer to any Weekly availability field on the Contact's Contact Forms. Use it to
-        suggest appointment times the Contact can attend.
+        The most recently saved answer to any Weekly availability field on the Contact's Contact Forms, or null if
+        they haven't answered one. Use it to suggest appointment times the Contact can attend.
       properties:
         times:
           type: array
@@ -26696,6 +26708,24 @@ components:
           description: True when Field Visibility hides this field from you; `value` is then null, whether or not it has an answer
           example: true
 
+    StoryCustomFieldValue:
+      type: object
+      description: An answer to one of the Story's own custom fields. Field Visibility applies to Contacts' fields, not these, so there is no `restricted` flag.
+      properties:
+        id:
+          type: integer
+          example: 88
+        name:
+          type: string
+          example: "Session location"
+        type:
+          type: string
+          example: "text"
+          description: "Field type: text, date, time, file, etc."
+        value:
+          description: Field value (string for most types; object for file attachments)
+          example: "Community centre"
+
     Story:
       allOf:
         - $ref: '#/components/schemas/Timestamps'
@@ -26749,7 +26779,7 @@ components:
             custom_fields:
               type: array
               items:
-                $ref: '#/components/schemas/CustomFieldValue'
+                $ref: '#/components/schemas/StoryCustomFieldValue'
             verdict_scores:
               type: array
               items:
@@ -27412,6 +27442,11 @@ components:
             indicator_id:
               type: integer
               example: 577
+            framework_indicator_id:
+              type: integer
+              nullable: true
+              example: null
+              description: For an Indicator linked to an Outcome in a Framework Set, which of the Outcome's own core Indicators it counts as (for example a TOMs Measure). Null when it counts as the Outcome itself, or isn't a linked Indicator.
 
     RatioSet:
       allOf:
@@ -27483,7 +27518,7 @@ components:
             data:
               type: array
               items:
-                $ref: '#/components/schemas/Project'
+                $ref: '#/components/schemas/ProjectListItem'
 
     PaginatedUsers:
       allOf:
