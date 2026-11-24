@@ -9733,7 +9733,7 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
         "422":
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/UnprocessableEntityList'
 
   /event_categories/{id}:
     get:
@@ -9850,7 +9850,7 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
         "422":
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/UnprocessableEntityList'
     delete:
       tags: [Event Formats]
       summary: Delete an Event Format
