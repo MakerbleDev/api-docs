@@ -9681,7 +9681,15 @@ paths:
       description: |
         Creates an Event Format (Event Category in the API), as **Create Event Format** on the
         Manage Event Formats page does. Only an **Organisation Admin** of `charity_id` may create one.
-        Send `guest_status_ids` (the Guest Statuses its events use, in order).
+        Send `guest_status_ids` (the Guest Statuses its events use, in order). If you leave it out, the
+        new Event Format gets the organisation's Invited then Cancelled Guest Statuses, where it has them.
+
+        **Add to Calendar email** (all optional):
+        - `send_add_to_calendar_email`: email each guest (Contact) added to an event of this format, so
+          they can add it to their calendar. The organisation must have email messaging turned on.
+        - `allow_guests_to_cancel`: let guests cancel from that email.
+        - `cancellation_guest_status_id`: the Guest Status a guest who cancels is moved to. Required
+          when `allow_guests_to_cancel` is true, and must be one of `guest_status_ids`.
 
         **Appointment settings** (all optional):
         - `appointment_type`: `one_to_one`, `group`, or `null` for "Not an appointment" (the default).
@@ -9713,6 +9721,9 @@ paths:
               default_length_minutes: 60
               preparation_minutes: 30
               debrief_minutes: 30
+              send_add_to_calendar_email: true
+              allow_guests_to_cancel: true
+              cancellation_guest_status_id: 56
       responses:
         "201":
           description: The Event Format was created
@@ -9807,6 +9818,11 @@ paths:
       description: |
         Changes an Event Format's settings, as **Edit** on the Manage Event Formats page does. Only
         the settings you send change. Only an **Organisation Admin** of its organisation may edit it.
+
+        **Add to Calendar email** (all optional): `send_add_to_calendar_email`, `allow_guests_to_cancel`
+        and `cancellation_guest_status_id`, as on Create. The Guest Status used for cancellations must
+        stay one of the Event Format's Guest Statuses, so remove it from `guest_status_ids` only after
+        turning `allow_guests_to_cancel` off.
 
         **Appointment settings** (all optional):
         - `appointment_type`: `one_to_one`, `group`, or `null` for "Not an appointment" (the default).
@@ -31504,6 +31520,16 @@ components:
           minimum: 0
           maximum: 1440
           description: Debrief time a colleague needs after each appointment. Default 0.
+        send_add_to_calendar_email:
+          type: boolean
+          description: Send an 'Add to Calendar' email to each guest (Contact) added to an event of this format. Can only be turned on while the organisation has email messaging turned on. Default false.
+        allow_guests_to_cancel:
+          type: boolean
+          description: Let guests cancel from the 'Add to Calendar' email. Only kept while send_add_to_calendar_email is true. Default false.
+        cancellation_guest_status_id:
+          type: integer
+          nullable: true
+          description: The Guest Status a guest who cancels is moved to. Required when allow_guests_to_cancel is true, and must be one of the Event Format's own Guest Statuses. null when guests can't cancel.
 
     EventFormatDetail:
       type: object
@@ -31565,6 +31591,16 @@ components:
           minimum: 0
           maximum: 1440
           description: Debrief time a colleague needs after each appointment. Default 0.
+        send_add_to_calendar_email:
+          type: boolean
+          description: Sends an 'Add to Calendar' email to each guest added to an event of this format
+        allow_guests_to_cancel:
+          type: boolean
+          description: Guests can cancel from the 'Add to Calendar' email
+        cancellation_guest_status_id:
+          type: integer
+          nullable: true
+          description: The Guest Status a guest who cancels is moved to
         guest_statuses:
           type: array
           items:

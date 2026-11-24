@@ -4654,7 +4654,7 @@ function buildDocsPage() {
           ${endpointCard("POST", "/event_categories", "Create an Event Format", true, [
             { name: "charity_id", in: "body", type: "integer", required: true, desc: "The Organisation the Event Format belongs to" },
             { name: "name", in: "body", type: "string", required: true, desc: "Name, e.g. Therapy session" },
-            { name: "guest_status_ids", in: "body", type: "integer[]", required: false, desc: "The organisation's Guest Statuses its events use, in order" },
+            { name: "guest_status_ids", in: "body", type: "integer[]", required: false, desc: "The organisation's Guest Statuses its events use, in order. If left out, a new Event Format gets Invited then Cancelled" },
             { name: "attendance_form_id", in: "body", type: "integer", required: false, desc: "The Survey (Story Category) used to record attendance, or null" },
             { name: "survey_kiosk_enabled", in: "body", type: "boolean", required: false, desc: "Self Check-in" },
             { name: "survey_kiosk_registration_enabled", in: "body", type: "boolean", required: false, desc: "Let new people register at Self Check-in" },
@@ -4669,7 +4669,10 @@ function buildDocsPage() {
             { name: "appointment_type", in: "body", type: "string", required: false, desc: "<code>one_to_one</code>, <code>group</code>, or null for Not an appointment" },
             { name: "default_length_minutes", in: "body", type: "integer", required: false, desc: "Usual length, in 5-minute steps up to 1440, or null" },
             { name: "preparation_minutes", in: "body", type: "integer", required: false, desc: "Preparation time before each appointment, 0–1440 (default 0)" },
-            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" }
+            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" },
+            { name: "send_add_to_calendar_email", in: "body", type: "boolean", required: false, desc: "Send an 'Add to Calendar' email to each guest added to an event of this format. Needs the organisation's email messaging turned on" },
+            { name: "allow_guests_to_cancel", in: "body", type: "boolean", required: false, desc: "Let guests cancel from that email. Only kept while send_add_to_calendar_email is true" },
+            { name: "cancellation_guest_status_id", in: "body", type: "integer", required: false, desc: "The Guest Status a guest who cancels is moved to: one of the Event Format's own. Required when allow_guests_to_cancel is true" }
           ], [
             { code: "201", cls: "response-2xx", desc: "Created — returns the Event Format with its settings" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of charity_id" },
@@ -4678,7 +4681,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/event_categories/{id}", "Get an Event Format", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event Format (Event Category) ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Event Format with its settings, Guest Statuses, project_ids and appointment settings" },
+            { code: "200", cls: "response-2xx", desc: "The Event Format with its settings, Guest Statuses, project_ids, appointment settings and Add to Calendar email settings" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found, or belongs to an organisation you are not in" }
           ])}
@@ -4700,7 +4703,10 @@ function buildDocsPage() {
             { name: "appointment_type", in: "body", type: "string", required: false, desc: "<code>one_to_one</code>, <code>group</code>, or null for Not an appointment" },
             { name: "default_length_minutes", in: "body", type: "integer", required: false, desc: "Usual length, in 5-minute steps up to 1440, or null" },
             { name: "preparation_minutes", in: "body", type: "integer", required: false, desc: "Preparation time before each appointment, 0–1440 (default 0)" },
-            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" }
+            { name: "debrief_minutes", in: "body", type: "integer", required: false, desc: "Debrief time after each appointment, 0–1440 (default 0)" },
+            { name: "send_add_to_calendar_email", in: "body", type: "boolean", required: false, desc: "Send an 'Add to Calendar' email to each guest added to an event of this format. Needs the organisation's email messaging turned on" },
+            { name: "allow_guests_to_cancel", in: "body", type: "boolean", required: false, desc: "Let guests cancel from that email. Only kept while send_add_to_calendar_email is true" },
+            { name: "cancellation_guest_status_id", in: "body", type: "integer", required: false, desc: "The Guest Status a guest who cancels is moved to: one of the Event Format's own. Required when allow_guests_to_cancel is true" }
           ], [
             { code: "200", cls: "response-2xx", desc: "Edited — only the settings sent change" },
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the owning organisation" },
