@@ -2372,9 +2372,12 @@ function buildDocsPage() {
         <div class="endpoint-list">
           ${endpointCard("GET", "/stories", "List all Stories", true, [
             { name: "page", type: "integer", required: false, desc: "Page number" },
-            { name: "per_page", type: "integer", required: false, desc: "Records per page" },
+            { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
             { name: "last_sync_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
-          ], [{ code: "200", cls: "response-2xx", desc: "Paginated list of Stories with custom fields and beneficiary IDs" }])}
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Paginated list of Stories with custom fields and beneficiary IDs" },
+            { code: "422", cls: "response-4xx", desc: "per_page is above 200" }
+          ])}
           ${endpointCard("GET", "/stories/{id}", "Get a single Story", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Story ID" }
           ], [
