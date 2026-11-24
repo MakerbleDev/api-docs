@@ -357,6 +357,12 @@ tags:
       Seats per Colleague: which seat each colleague holds on each of an Organisation's current
       Contracts, and changing one. A colleague's roles decide the lowest seat (Billing Role) they
       need on Role-based Pricing. Only the Organisation's admins can change seats.
+  - name: Onboarding
+    description: |
+      Setting up an area of work (a programme or service) for an Organisation, as the onboarding
+      journey does after an Organisation is created: workspaces with a Toolkit installed, extra
+      workspaces such as Referrals or Volunteers, and a Checklist (participant journey) for the
+      area's contacts. Charity Editors and Charity Reporters of the Organisation can use it.
   - name: Setup guide
     description: |
       An Organisation's Setup guide: the main things to set up in Makerble, how far each has got,
@@ -18732,6 +18738,167 @@ paths:
         "404":
           $ref: '#/components/responses/NotFound'
 
+  /organisations/{organisation_id}/onboarding_journeys:
+    parameters:
+      - $ref: '#/components/parameters/OrganisationId'
+    post:
+      tags: [Onboarding]
+      summary: Set up an area of work from a Toolkit
+      description: |
+        Sets up an area of work as the onboarding journey's "Start from a toolkit designed for an
+        organisation like mine" path does, with the same checks: one workspace (Project) per name in
+        `workspace_names` with the Toolkit installed, one workspace per extra in `extra_ids` with that
+        extra's Project Type (see GET /onboarding_extras), and a Checklist that every contact in the
+        area's workspaces gets.
+
+        `spacing` says how the area is split into workspaces: `facilitator` (one per coach, mentor or
+        practitioner), `site` (one per location), `cohort` (one per intake of a group or class) or
+        `single` (one workspace, named after the area of work when `workspace_names` is empty). Up to
+        50 workspace names of up to 100 characters each. `toolkit_id` must be a listed Toolkit.
+
+        The workspaces are made in the background, so this answers 202 with `status: building`. Ask
+        GET /onboarding_journeys/{id} until `status` is `completed` (then `workspace_ids` and
+        `checklist_id` are filled in) or `failed` (nothing was made). Needs a Charity Editor or Charity
+        Reporter of the Organisation.
+      operationId: createOnboardingJourney
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [area_of_work, toolkit_id, spacing]
+              properties:
+                area_of_work:
+                  type: string
+                  maxLength: 100
+                toolkit_id:
+                  type: integer
+                spacing:
+                  type: string
+                  enum: [facilitator, site, cohort, single]
+                workspace_names:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                    maxLength: 100
+                extra_ids:
+                  type: array
+                  items:
+                    type: integer
+            example:
+              area_of_work: Youth mentoring
+              toolkit_id: 62
+              spacing: site
+              workspace_names: [Leeds, York]
+              extra_ids: [1, 4]
+      responses:
+        "202":
+          description: The set-up, building in the background
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingJourney'
+              example:
+                id: 318
+                organisation_id: 42
+                area_of_work: Youth mentoring
+                toolkit_id: 62
+                spacing: site
+                workspace_names: [Leeds, York]
+                extra_ids: [1, 4]
+                status: building
+                workspace_ids: []
+                checklist_id: null
+                created_at: "2026-11-24T10:15:00Z"
+                completed_at: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+  /onboarding_journeys/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The set-up's id, from POST /organisations/{organisation_id}/onboarding_journeys.
+        schema:
+          type: integer
+    get:
+      tags: [Onboarding]
+      summary: Get an area of work set-up
+      description: |
+        How a set-up is going: `status` is `building`, `completed` or `failed`. Once completed,
+        `workspace_ids` lists the workspaces (Projects) it made, the area's own first, then the
+        extras', and `checklist_id` is its Checklist. Only the person who set it up can see it.
+      operationId: getOnboardingJourney
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The set-up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingJourney'
+              example:
+                id: 318
+                organisation_id: 42
+                area_of_work: Youth mentoring
+                toolkit_id: 62
+                spacing: site
+                workspace_names: [Leeds, York]
+                extra_ids: [1, 4]
+                status: completed
+                workspace_ids: [901, 902, 903, 904]
+                checklist_id: 77
+                created_at: "2026-11-24T10:15:00Z"
+                completed_at: "2026-11-24T10:15:20Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /onboarding_extras:
+    get:
+      tags: [Onboarding]
+      summary: List the extra workspaces an area of work can have
+      description: |
+        The extras offered on the onboarding journey's Add extras step, in order: Referrals, Parents,
+        Referees, Volunteers, Fundraising and any others Makerble offers. Each one makes a workspace
+        with its own Project Type. Pass their ids as `extra_ids` when setting up an area of work.
+      operationId: listOnboardingExtras
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: The extras offered
+          content:
+            application/json:
+              example:
+                page: 1
+                page_size: 2
+                page_count: 1
+                total_count: 2
+                data:
+                  - id: 1
+                    name: Referrals
+                    description: Take in referrals from other organisations and professionals.
+                    project_type_id: 12
+                    project_type_name: Referrals
+                  - id: 4
+                    name: Volunteers
+                    description: Recruit, support and keep track of your volunteers.
+                    project_type_id: null
+                    project_type_name: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
   /organisations/{organisation_id}/setup_guide:
     parameters:
       - $ref: '#/components/parameters/OrganisationId'
@@ -21334,6 +21501,21 @@ components:
                 error: "Webhooks are not turned on for this organisation"
 
   schemas:
+    OnboardingJourney:
+      type: object
+      properties:
+        id: {type: integer}
+        organisation_id: {type: integer}
+        area_of_work: {type: string}
+        toolkit_id: {type: integer, nullable: true}
+        spacing: {type: string, enum: [facilitator, site, cohort, single], nullable: true}
+        workspace_names: {type: array, items: {type: string}}
+        extra_ids: {type: array, items: {type: integer}}
+        status: {type: string, enum: [in_progress, exited, building, failed, completed]}
+        workspace_ids: {type: array, items: {type: integer}}
+        checklist_id: {type: integer, nullable: true}
+        created_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time, nullable: true}
     SetupGuide:
       type: object
       properties:
