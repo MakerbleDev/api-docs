@@ -5195,10 +5195,11 @@ function buildDocsPage() {
           <p><code>spacing</code> says how the area is split into workspaces: <code>facilitator</code>, <code>site</code>, <code>cohort</code> or <code>single</code>. The workspaces are made in the background: POST answers <code>202</code> with <code>status: building</code>; ask GET until it is <code>completed</code> or <code>failed</code>. Charity Editors and Charity Reporters of the Organisation can use it.</p>
         </div>
         <div class="endpoint-list">
-          ${endpointCard("POST", "/organisations/{organisation_id}/onboarding_journeys", "Set up an area of work from a Toolkit", true, [
+          ${endpointCard("POST", "/organisations/{organisation_id}/onboarding_journeys", "Set up an area of work from a Toolkit or your own stages", true, [
             { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
             { name: "area_of_work", in: "body", type: "string", required: true, desc: "The area of work's name, up to 100 characters" },
-            { name: "toolkit_id", in: "body", type: "integer", required: true, desc: "A listed Toolkit, installed into each of the area's workspaces" },
+            { name: "toolkit_id", in: "body", type: "integer", required: false, desc: "A listed Toolkit, installed into each of the area's workspaces. Give this or <code>stages</code>" },
+            { name: "stages", in: "body", type: "array", required: false, desc: "Instead of a Toolkit, the stages of your own process, as the Personalise path does: up to 20 of <code>{name, action}</code>, each becoming a step of the same name in the Checklist. <code>action</code> is what happens at the stage, such as <code>complete_form_external</code>, <code>complete_form_internal</code>, <code>complete_survey</code>, <code>add_to_project</code>, <code>add_flag</code> or <code>invite_to_event</code>" },
             { name: "spacing", in: "body", type: "string", required: true, desc: "<code>facilitator</code>, <code>site</code>, <code>cohort</code> or <code>single</code>" },
             { name: "workspace_names", in: "body", type: "array", required: false, desc: "One name per workspace, up to 50. For <code>single</code>, the area of work's name when empty" },
             { name: "workspace_colours", in: "body", type: "array", required: false, desc: "Each workspace's colour as a six-digit hex colour, in the same order as workspace_names; a missing or invalid one gets the next Makerble brand colour" },
@@ -5207,7 +5208,7 @@ function buildDocsPage() {
             { code: "202", cls: "response-2xx", desc: "The set-up, with status building" },
             { code: "403", cls: "response-4xx", desc: "Not a Charity Editor or Charity Reporter of this Organisation" },
             { code: "404", cls: "response-4xx", desc: "No such Organisation" },
-            { code: "422", cls: "response-4xx", desc: "A missing name, unknown spacing, unlisted Toolkit or too many workspaces; nothing is saved" }
+            { code: "422", cls: "response-4xx", desc: "A missing name, unknown spacing, unlisted Toolkit, unknown stage action or too many workspaces; nothing is saved" }
           ])}
           ${endpointCard("GET", "/onboarding_journeys/{id}", "Get an area of work set-up", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The set-up's ID" }
