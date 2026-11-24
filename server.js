@@ -4470,6 +4470,13 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "event_id and guests_count" },
             { code: "422", cls: "response-4xx", desc: "Not a guest of this event" }
           ])}
+          ${endpointCard("GET", "/events/{id}/guests/{contact_id}/calendar_links", "Get a guest's Add to Calendar links", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
+            { name: "contact_id", in: "path", type: "integer", required: true, desc: "The guest's Contact (beneficiary) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "google_calendar_url, outlook_url, office365_url, ics_url and cancel_url (null when the Event Format doesn't let guests cancel). The .ics and cancel links work without signing in, for this guest only" },
+            { code: "404", cls: "response-4xx", desc: "Not a guest of this event, or an event you can't see" }
+          ])}
           ${endpointCard("GET", "/events/{id}/staff", "List an event's Event Managers and Workers", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Event ID" },
             { name: "page / per_page", type: "integer", required: false, desc: "Pagination" }

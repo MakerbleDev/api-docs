@@ -11376,6 +11376,46 @@ paths:
         "422":
           $ref: '#/components/responses/UnprocessableEntityList'
 
+  /events/{id}/guests/{contact_id}/calendar_links:
+    get:
+      tags: [Events]
+      summary: Get a guest's Add to Calendar links
+      operationId: getEventGuestCalendarLinks
+      description: |
+        The links a guest (Contact) uses to put the event in their own calendar, the same ones
+        their Personal Portal and the Add to Calendar email give them: Google Calendar, Outlook.com
+        and Microsoft 365 links that open a new, filled-in event, and an .ics file for Apple Calendar
+        and any other calendar app. `cancel_url` is the page where the guest can cancel their booking,
+        or null when the event's Event Format doesn't let guests cancel.
+
+        The `.ics` and cancel links work without signing in and belong to this one guest, so send them
+        only to that guest. Anyone who can open the event page can get them. A Contact who isn't a
+        guest of the event returns `404`.
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - { name: contact_id, in: path, required: true, schema: { type: integer }, description: "The guest's Contact (beneficiary) id" }
+      responses:
+        "200":
+          description: The guest's calendar links
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventGuestCalendarLinks' }
+              example:
+                event_id: 881
+                contact_id: 5521
+                google_calendar_url: "https://calendar.google.com/calendar/render?action=TEMPLATE&dates=20300108T180000Z%2F20300108T200000Z&text=Pottery+taster"
+                outlook_url: "https://outlook.live.com/calendar/0/action/compose?path=%2Fcalendar%2Faction%2Fcompose&rru=addevent&subject=Pottery+taster"
+                office365_url: "https://outlook.office.com/calendar/0/action/compose?path=%2Fcalendar%2Faction%2Fcompose&rru=addevent&subject=Pottery+taster"
+                ics_url: "https://www.makerble.com/event-bookings/eyJfcmFpbHMi...--abc123/calendar.ics"
+                cancel_url: "https://www.makerble.com/event-bookings/eyJfcmFpbHMi...--abc123"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
   /events/{id}/staff:
     get:
       tags: [Events]
@@ -31549,6 +31589,31 @@ components:
           type: integer
           nullable: true
           description: The Guest Status a guest who cancels is moved to. Required when allow_guests_to_cancel is true, and must be one of the Event Format's own Guest Statuses. null when guests can't cancel.
+
+    EventGuestCalendarLinks:
+      type: object
+      description: A guest's Add to Calendar links (CP-7734).
+      properties:
+        event_id:
+          type: integer
+        contact_id:
+          type: integer
+        google_calendar_url:
+          type: string
+          description: Opens a new Google Calendar event with this event's name, times and location filled in
+        outlook_url:
+          type: string
+          description: The same for Outlook.com
+        office365_url:
+          type: string
+          description: The same for Microsoft 365 (Outlook on the web for work or school accounts)
+        ics_url:
+          type: string
+          description: The event as an .ics file, for Apple Calendar and other calendar apps. Works without signing in, for this guest only.
+        cancel_url:
+          type: string
+          nullable: true
+          description: The page where the guest can cancel, or null when the Event Format doesn't let guests cancel. Works without signing in, for this guest only.
 
     EventFormatDetail:
       type: object
