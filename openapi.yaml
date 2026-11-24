@@ -14738,6 +14738,12 @@ paths:
           schema:
             type: integer
           description: Only the Checklists added to this Project of the Organisation. Not found if the Project isn't the Organisation's.
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only the Checklists added to this Album's (Bundle's) Projects that you can see. Not found for an Album you can't see.
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - $ref: '#/components/parameters/LastSyncDatetime'
@@ -15190,7 +15196,8 @@ paths:
         many of the project's contacts with the Checklist have done that step, as a count and a percentage.
         Only Organisation Admins (every open project of their organisation), Team Leaders (open projects
         where someone in a Team they lead is a colleague) and Album Editors (open projects in organisation
-        Albums they edit) may call it; anyone else gets 403. A Checklist that none of your projects uses
+        Albums they edit) may call it; anyone else gets 403. With `album_id`, it covers that Album's
+        projects instead, for anyone who can see the Album. A Checklist that none of your projects uses
         returns 404. Only contacts you may see, that aren't deleted and are still active in the project,
         are counted. Rows are sorted before pagination; the sort is not remembered.
       security: [{tokenAuth: []}]
@@ -15200,6 +15207,12 @@ paths:
           required: true
           description: Checklist id
           schema: {type: integer}
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Summarise this Album's (Bundle's) Projects that use the Checklist instead, for anyone who can see the Album, as the Summary tab of its Checklist panel does. Not found for an Album you can't see, or a Checklist none of its Projects uses.
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - name: sort
@@ -15272,6 +15285,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Count only the Contacts in this Album's (Bundle's) Projects, as the Checklist panel on its profile page does. Not found for an Album you can't see, or a `project_id` outside it.
         - name: project_id
           in: query
           required: false
@@ -15342,6 +15361,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only the Contacts in this Album's (Bundle's) Projects. Not found for an Album you can't see.
         - name: list
           in: query
           required: true
@@ -15409,6 +15434,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: album_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Count only the Contacts in this Album's (Bundle's) Projects. Not found for an Album you can't see.
         - name: project_id
           in: query
           required: false
