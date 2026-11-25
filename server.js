@@ -952,6 +952,7 @@ function buildDocsPage() {
         <a href="#library"         class="nav-link"><span class="nav-method method-GET">GET</span>Library</a>
         <a href="#explore-surveys" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Surveys</a>
         <a href="#explore-report-templates" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Report Templates</a>
+        <a href="#explore-forms" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Forms</a>
         <a href="#explore-dropdowns" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Dropdowns</a>
         <a href="#explore-checklist-templates" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Checklist Templates</a>
         <a href="#explore-impact-frameworks" class="nav-link"><span class="nav-method method-GET">GET</span>Explore Impact Frameworks</a>
@@ -3030,6 +3031,38 @@ function buildDocsPage() {
             { code: "200", cls: "response-2xx", desc: "The Report Template's fields as above plus <code>questions</code>, each with its <code>title</code> and the <code>answer_formats</code> it asks for, in order" },
             { code: "404", cls: "response-4xx", desc: "Not in the ImpactStore" }
           ], "To use a Report Template, add it to your organisation's library in Makerble with Add to your library on Explore Report Templates.")}
+        </div>
+      </section>
+
+      <!-- Explore Forms -->
+      <section class="section" id="explore-forms">
+        <div class="section-eyebrow">Forms and surveys</div>
+        <h2 class="section-title">Explore Forms</h2>
+        <div class="section-desc">
+          <p>Explore Forms lists the forms published to the Makerble&reg; ImpactStore&trade; and approved by Makerble: Contact Forms (bio forms), Case Forms, Custom Forms for Contacts, Event Forms and Project Forms. The API gives the same search, filters, counts and sort as the Explore Forms page. Every caller sees the same forms; only <code>yours</code> depends on your organisations.</p>
+          <p>Each form's <code>id</code> is a key naming its type and number, such as <code>contact-4</code> or <code>case-5</code>. Filters take option keys, as arrays (<code>type[]=case_form</code>) or comma-separated (<code>type=case_form,event_form</code>). Options in one filter match any of them; different filters must all match.</p>
+        </div>
+        <div class="endpoint-list">
+          ${endpointCard("GET", "/explore/forms", "Explore Forms", true, [
+            { name: "query", type: "string", required: false, desc: "Words in the form's name, or a Contact Form's description" },
+            { name: "type", type: "string", required: false, desc: "Type of form: <code>contact_form</code>, <code>case_form</code>, <code>custom_contact_form</code>, <code>event_form</code>, <code>project_form</code>" },
+            { name: "theme", type: "string", required: false, desc: "<code>referral_and_intake</code>, <code>equality_monitoring</code>, <code>safeguarding</code>, <code>events</code>, <code>project_information</code>" },
+            { name: "fields", type: "string", required: false, desc: "Number of fields: <code>up_to_10</code>, <code>11_to_25</code>, <code>over_25</code>" },
+            { name: "includes", type: "string", required: false, desc: "<code>consent</code> (a consent question), <code>standard_dropdowns</code> (Dropdowns from the ImpactStore), <code>address</code> (an address or postcode field)" },
+            { name: "chip", type: "string", required: false, desc: "A Popular chip: <code>Referral</code>, <code>Equality monitoring</code>, <code>Safeguarding</code>, <code>Registration</code>" },
+            { name: "sort", type: "string", required: false, desc: "<code>added</code> (used by the most organisations first, default), <code>new</code> or <code>az</code>" },
+            { name: "page", type: "integer", required: false, desc: "Page number" },
+            { name: "per_page", type: "integer", required: false, desc: "Forms per page (default 10, max 200)" },
+            { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 — only forms updated after this" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Forms with <code>id</code>, <code>name</code>, <code>type</code>, <code>field_count</code>, <code>uses_standard_dropdowns</code>, <code>themes</code>, <code>shared_by</code>, <code>used_by_count</code>, <code>yours</code> and <code>public_url</code> (Contact Forms and Case Forms), plus <code>facets</code>: each filter's options with how many forms each would return given the other filters" }
+          ])}
+          ${endpointCard("GET", "/explore/forms/{id}", "Preview an Explore Form", true, [
+            { name: "id", in: "path", type: "string", required: true, desc: "The form's key from Explore Forms, e.g. <code>case-5</code>" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The form's fields as above plus the name of every field it asks, in order, as <code>fields</code>" },
+            { code: "404", cls: "response-4xx", desc: "Not listed on Explore Forms (not published or not approved), or no such form" }
+          ], "To use a form, add it to your organisation in Makerble with Add to organisation on Explore Forms.")}
         </div>
       </section>
 
