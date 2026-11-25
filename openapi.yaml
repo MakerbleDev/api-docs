@@ -1867,7 +1867,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FeatureLaunch'
+                $ref: '#/components/schemas/FeatureLaunchWithNotices'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -1970,7 +1970,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FeatureLaunch'
+                $ref: '#/components/schemas/FeatureLaunchWithNotices'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -2004,7 +2004,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FeatureLaunch'
+                $ref: '#/components/schemas/FeatureLaunchWithNotices'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -23665,6 +23665,12 @@ components:
           type: string
           nullable: true
           description: The still frame made from the feature's animation, or null until it is made
+        video_url:
+          type: string
+          nullable: true
+          description: >-
+            An MP4 of the feature's animation (1920 by 1080, or its crop's shape at 1920 wide, 30 frames a second), to
+            download for Vimeo, the website or social posts. Null until one is made with `make_video`.
         announcement_ids:
           type: array
           items:
@@ -23682,9 +23688,26 @@ components:
         updated_at:
           type: string
           format: date-time
+    FeatureLaunchWithNotices:
+      allOf:
+        - $ref: '#/components/schemas/FeatureLaunch'
+        - type: object
+          properties:
+            notices:
+              type: array
+              items:
+                type: string
+              description: >-
+                Empty, unless `make_video` was sent, when it says whether the video is being made or why it can't be
+                (the launch has no animation). The rest of the change is saved either way.
     FeatureLaunchInput:
       type: object
       properties:
+        make_video:
+          type: boolean
+          description: >-
+            Make an MP4 of the feature's animation (the one its email GIF is made from) in the background. It takes a
+            few minutes; `video_url` gives it when it is ready. Making it again replaces the last one.
         name:
           type: string
           maxLength: 80
