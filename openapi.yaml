@@ -12192,6 +12192,168 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+  /explore/forms:
+    get:
+      tags: [Explore]
+      summary: Explore Forms
+      operationId: listExploreForms
+      description: |
+        Lists the forms published to the Makerble® ImpactStore™ and approved by Makerble, with the
+        same search, filters, counts and sort as the Explore Forms page: Contact Forms (bio forms),
+        Case Forms, Custom Forms for Contacts, Event Forms and Project Forms. Every caller sees the
+        same forms; `yours` depends on the caller's organisations.
+
+        - Each form's `id` is a key naming its type and number, such as `contact-4`, `case-5`,
+          `event-6` or `project-7`. Case Forms and Custom Forms for Contacts both use `case-`.
+        - `query` matches the form's name, and a Contact Form's description.
+        - The filters take option keys, as arrays (`type[]=case_form`) or comma-separated
+          (`type=case_form,event_form`). Options in one filter combine with OR and filters
+          combine with AND:
+          - `type` (Type of form): `contact_form`, `case_form`, `custom_contact_form`, `event_form`,
+            `project_form`
+          - `theme`: `referral_and_intake`, `equality_monitoring`, `safeguarding`, `events`,
+            `project_information`. Event Forms always have `events` and Project Forms
+            `project_information`.
+          - `fields` (Number of fields): `up_to_10`, `11_to_25`, `over_25`
+          - `includes`: `consent` (a consent question), `standard_dropdowns` (Dropdowns from the
+            ImpactStore), `address` (an address or postcode field)
+        - A form's fields are the questions it asks: built-in fields and section headings are not
+          counted.
+        - `chip` is one of the page's Popular chips: `Referral`, `Equality monitoring`,
+          `Safeguarding`, `Registration`.
+        - `facets` gives each filter's options with how many forms each would return, given the
+          other filters already chosen.
+        - `sort` is `added` (used by the most organisations first, the default), `new` or `az`.
+        - Add a form to your organisation in the app with **Add to organisation** on Explore Forms.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          example: referral
+          description: Words to look for in the form's name, or a Contact Form's description
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+          example: case_form
+          description: Type of form option keys, comma-separated or repeated as type[]
+        - name: theme
+          in: query
+          required: false
+          schema:
+            type: string
+          example: safeguarding
+          description: Theme option keys, comma-separated or repeated as theme[]
+        - name: fields
+          in: query
+          required: false
+          schema:
+            type: string
+          example: up_to_10
+          description: Number of fields option keys, comma-separated or repeated as fields[]
+        - name: includes
+          in: query
+          required: false
+          schema:
+            type: string
+          example: standard_dropdowns
+          description: Includes option keys, comma-separated or repeated as includes[]
+        - name: chip
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Referral, Equality monitoring, Safeguarding, Registration]
+          description: One of the Popular chips
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [added, new, az]
+            default: added
+          description: Most added, Newest, or A to Z
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/LastSyncDatetime'
+      responses:
+        "200":
+          description: The listed forms that match, and each filter's option counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExploreForms'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 1
+                total_count: 1
+                data:
+                  - id: case-5
+                    name: Safeguarding concern
+                    type: case_form
+                    field_count: 14
+                    uses_standard_dropdowns: true
+                    themes: [safeguarding]
+                    shared_by: Makerble Templates
+                    used_by_count: 12
+                    yours: false
+                    public_url: https://www.makerble.com/case-forms/safeguarding-concern
+                facets:
+                  - key: type
+                    label: Type of form
+                    options:
+                      - value: case_form
+                        label: Case form
+                        count: 1
+                        selected: true
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /explore/forms/{id}:
+    get:
+      tags: [Explore]
+      summary: Preview an Explore Form
+      operationId: getExploreForm
+      description: |
+        One form listed on Explore Forms: the fields of **Explore Forms** plus the name of every
+        field it asks, in order. A form that isn't listed on Explore (not published or not
+        approved), or a key that names no form, is a 404.
+      security: [{tokenAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: case-5
+          description: The form's key from Explore Forms
+      responses:
+        "200":
+          description: The form and its fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreFormPreview'
+              example:
+                id: case-5
+                name: Safeguarding concern
+                type: case_form
+                field_count: 3
+                uses_standard_dropdowns: false
+                themes: [safeguarding]
+                shared_by: Makerble Templates
+                used_by_count: 12
+                yours: false
+                public_url: https://www.makerble.com/case-forms/safeguarding-concern
+                fields: [Date of concern, What happened, Action taken]
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
   /explore/dropdowns:
     get:
       tags: [Explore]
@@ -24467,6 +24629,72 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ExploreReportTemplate'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreFacetGroup'
+
+    ExploreFormPreview:
+      allOf:
+        - $ref: '#/components/schemas/ExploreForm'
+        - type: object
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+
+    ExploreForm:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The form's key, naming its type and number, e.g. case-5
+        name:
+          type: string
+        type:
+          type: string
+          enum: [contact_form, case_form, custom_contact_form, event_form, project_form]
+        field_count:
+          type: integer
+          description: How many fields it asks, leaving out built-in fields and section headings
+        uses_standard_dropdowns:
+          type: boolean
+          description: Whether any field uses a Dropdown from the ImpactStore
+        themes:
+          type: array
+          items:
+            type: string
+            enum: [referral_and_intake, equality_monitoring, safeguarding, events, project_information]
+        shared_by:
+          type: string
+          nullable: true
+        used_by_count:
+          type: integer
+          description: How many organisations use it
+        yours:
+          type: boolean
+          description: Whether one of the caller's organisations owns it
+        public_url:
+          type: string
+          nullable: true
+          description: Its public page, for Contact Forms and Case Forms
+
+    PaginatedExploreForms:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        page_count:
+          type: integer
+        total_count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreForm'
         facets:
           type: array
           items:
