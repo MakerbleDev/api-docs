@@ -3709,14 +3709,16 @@ function buildDocsPage() {
           ])}
           ${endpointCard("GET", "/checklist_templates/{id}/mapping", "Suggested mapping for using a template", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "An ImpactStore template, or one of your own" },
-            { name: "charity_id", type: "integer", required: false, desc: "Which of your organisations is using it" }
+            { name: "charity_id", type: "integer", required: false, desc: "Which of your organisations is using it" },
+            { name: "toolkit_id", type: "integer", required: false, desc: "Installing this Toolkit: steps pointing at its own Surveys, Contact Forms and story Labels default to <code>toolkit</code>, the copies the install added" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Each step's <code>hint</code>, <code>options</code>, <code>suggested</code> match, <code>original</code> (your own template), <code>can_create</code> and <code>default</code> (<code>original</code>, <code>suggested</code>, <code>leave</code> or <code>none</code>)" },
-            { code: "404", cls: "response-4xx", desc: "Another organisation's unpublished template" }
+            { code: "200", cls: "response-2xx", desc: "Each step's <code>hint</code>, <code>options</code>, <code>suggested</code> match, <code>original</code> (your own template), <code>toolkit</code> (installing a Toolkit), <code>can_create</code> and <code>default</code> (<code>toolkit</code>, <code>original</code>, <code>suggested</code>, <code>leave</code> or <code>none</code>)" },
+            { code: "404", cls: "response-4xx", desc: "Another organisation's unpublished template, or one that isn't in the Toolkit" }
           ])}
           ${endpointCard("POST", "/checklist_templates/{id}/use", "Use a template", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" },
             { name: "charity_id", in: "body", type: "integer", required: false, desc: "Which of your organisations is using it" },
+            { name: "toolkit_id", in: "body", type: "integer", required: false, desc: "Installing this Toolkit; <code>item_id: toolkit</code> then uses its installed item" },
             { name: "name", in: "body", type: "string", required: false, desc: "The new Checklist's name" },
             { name: "mapping", in: "body", type: "array", required: false, desc: "Per step: <code>{step_id, item_id}</code>, <code>{step_id, create}</code> or <code>{step_id, leave: true}</code>. Steps left out take their default" }
           ], [
