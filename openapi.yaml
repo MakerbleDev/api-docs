@@ -19699,13 +19699,18 @@ paths:
         is true once every item is done or not relevant.
 
         Items (`key`): `teams` (Create your teams; only for Organisations with 11 or more staff),
-        `workspaces` (Add your workspaces), `welcome_tour` (Set up your team's Welcome Tour),
-        `checklists` (Set up a checklist on each workspace), and under "Automate your reporting"
-        (`section`): `reporting_requirements`, `demographics` and `metrics`. Workspaces are Projects;
-        closed ones, and the one Makerble creates with the Organisation, never count.
+        `workspaces` (Add your workspaces), `another_area` (Set up another area of work; done once an
+        area of work started from the Setup guide or the Create menu has been built; only while the
+        onboarding journey is on), `welcome_tour` (Set up your team's Welcome Tour), `welcome_journey`
+        (Go through the Welcome Journey; only for the person who created the Organisation),
+        `specialisms` (Link your Specialisms to Ratio Sets; shown once a Specialism isn't linked to
+        answers of a Ratio Set on the Contact forms, done when every one is), `checklists` (Set up a
+        checklist on each workspace), and under "Automate your reporting" (`section`):
+        `reporting_requirements`, `demographics` and `metrics`. Workspaces are Projects; closed ones,
+        and the one Makerble creates with the Organisation, never count.
 
-        This is the Setup guide page, under Help › Setup guide. The guide is at most seven items, so
-        it isn't paginated.
+        This is the Setup guide page, under Help › Setup guide. The guide is a short, fixed list of
+        items, so it isn't paginated.
       operationId: getSetupGuide
       security: [{tokenAuth: []}]
       responses:
@@ -19750,7 +19755,7 @@ paths:
         description: The item's `key`, e.g. `checklists`.
         schema:
           type: string
-          enum: [teams, workspaces, welcome_tour, checklists, reporting_requirements, demographics, metrics]
+          enum: [teams, workspaces, another_area, welcome_tour, welcome_journey, specialisms, checklists, reporting_requirements, demographics, metrics]
     patch:
       tags: [Setup guide]
       summary: Mark a Setup guide item Not relevant, or undo it
@@ -22354,7 +22359,7 @@ components:
       properties:
         key:
           type: string
-          enum: [teams, workspaces, welcome_tour, checklists, reporting_requirements, demographics, metrics]
+          enum: [teams, workspaces, another_area, welcome_tour, welcome_journey, specialisms, checklists, reporting_requirements, demographics, metrics]
         title:
           type: string
         section:
