@@ -1509,7 +1509,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/toolkits/{id}", "Get a Toolkit", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Toolkit ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Toolkit: <code>toolkit_number</code>, <code>thumbnail_image_url</code>, <code>cover_image_url</code>, <code>cover_image_alt</code>, <code>darken_thumbnail_image</code>, <code>darken_cover_image</code> and its page <code>url</code>" },
+            { code: "200", cls: "response-2xx", desc: "The Toolkit: <code>toolkit_number</code>, <code>thumbnail_image_url</code>, <code>cover_image_url</code>, <code>cover_image_alt</code>, <code>darken_thumbnail_image</code>, <code>darken_cover_image</code>, its page <code>url</code>, and its <code>checklist_templates</code> and <code>story_labels</code> (each <code>{id, name}</code>)" },
             { code: "401", cls: "response-4xx", desc: "Not authenticated" },
             { code: "404", cls: "response-4xx", desc: "Not found, or a Toolkit you can't see" }
           ])}
@@ -1537,6 +1537,28 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or a Toolkit you can't see" },
             { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. an unknown <code>kind</code> or a file that isn't an image" }
           ], "As <b>Replace</b> does on Site Overview › Manage Toolkits.")}
+          ${endpointCard("POST", "/toolkits/{id}/items", "Add a Checklist Template or story Label to a Toolkit", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Toolkit ID" },
+            { name: "item_type", type: "string", required: true, desc: "<code>checklist_template</code> or <code>story_label</code>" },
+            { name: "item_id", type: "integer", required: true, desc: "The Checklist Template's or story Label's ID" }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "<code>{item_type, item_id, name}</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You can see the Toolkit but not edit it" },
+            { code: "404", cls: "response-4xx", desc: "Not found: the Toolkit, or an item that isn't one of your organisations'" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. an unknown <code>item_type</code>" }
+          ], "As <b>Available Fields</b> does on the Create/Edit Collection page. A Checklist Template's steps can then count the Toolkit's own Surveys, Contact Forms and story Labels as done, so they arrive already set up when the Toolkit is installed. Adding an item the Toolkit already has changes nothing.")}
+          ${endpointCard("DELETE", "/toolkits/{id}/items", "Take a Checklist Template or story Label out of a Toolkit", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Toolkit ID" },
+            { name: "item_type", type: "string", required: true, desc: "<code>checklist_template</code> or <code>story_label</code>" },
+            { name: "item_id", type: "integer", required: true, desc: "The Checklist Template's or story Label's ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Taken out; the item itself stays" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "You can see the Toolkit but not edit it" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or the Toolkit doesn't have that item" },
+            { code: "422", cls: "response-4xx", desc: "<code>{errors: [...]}</code>, e.g. an unknown <code>item_type</code>" }
+          ])}
         </div>
       </section>
 
@@ -3651,7 +3673,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/checklist_templates/{id}", "Get one of My Checklist Templates", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The template with its <code>stages</code> and <code>steps</code>, each with its <code>hint</code> and <code>needs_hint</code>" },
+            { code: "200", cls: "response-2xx", desc: "The template with its <code>stages</code> and <code>steps</code>, each with its <code>hint</code>, <code>needs_hint</code>, <code>toolkit_item_kind</code> and <code>toolkit_item</code> (<code>{type, id, name}</code> or <code>null</code>)" },
             { code: "404", cls: "response-4xx", desc: "Not one of your organisations' templates" }
           ])}
           ${endpointCard("POST", "/checklist_templates", "Save a Checklist as a template", true, [
@@ -3670,11 +3692,14 @@ function buildDocsPage() {
           ${endpointCard("PATCH", "/checklist_templates/{id}", "Change, publish or stop sharing a template", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" },
             { name: "hints", in: "body", type: "object", required: false, desc: "The template's step ids → hint" },
-            { name: "share", in: "body", type: "string", required: false, desc: "<code>impact_store</code> publishes it for Makerble's approval; <code>organisation</code> stops sharing it" }
+            { name: "share", in: "body", type: "string", required: false, desc: "<code>impact_store</code> publishes it for Makerble's approval; <code>organisation</code> stops sharing it" },
+            { name: "toolkit_id", in: "body", type: "integer", required: false, desc: "A Toolkit holding this template, that you can edit, for <code>toolkit_items</code>" },
+            { name: "toolkit_items", in: "body", type: "object", required: false, desc: "The template's step ids → one of the Toolkit's own items, as <code>StoryCategory:12</code> (Survey), <code>BeneficiaryCategory:5</code> (Contact Form) or <code>Label:7</code> (story Label), or <code>\"\"</code> for the hint alone. Installing the Toolkit sets those steps up with no mapping" }
           ], [
             { code: "200", cls: "response-2xx", desc: "The changed template" },
-            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin" },
-            { code: "422", cls: "response-4xx", desc: "A step that needs a hint has none: <code>missing_hint_step_ids</code>" }
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin, or you can't edit the Toolkit" },
+            { code: "404", cls: "response-4xx", desc: "Not one of your templates, or the Toolkit doesn't hold it" },
+            { code: "422", cls: "response-4xx", desc: "A step that needs a hint has none: <code>missing_hint_step_ids</code>; or a step's Toolkit item isn't one of the Toolkit's" }
           ])}
           ${endpointCard("DELETE", "/checklist_templates/{id}", "Delete a template", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" }
@@ -3684,14 +3709,16 @@ function buildDocsPage() {
           ])}
           ${endpointCard("GET", "/checklist_templates/{id}/mapping", "Suggested mapping for using a template", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "An ImpactStore template, or one of your own" },
-            { name: "charity_id", type: "integer", required: false, desc: "Which of your organisations is using it" }
+            { name: "charity_id", type: "integer", required: false, desc: "Which of your organisations is using it" },
+            { name: "toolkit_id", type: "integer", required: false, desc: "Installing this Toolkit: steps pointing at its own Surveys, Contact Forms and story Labels default to <code>toolkit</code>, the copies the install added" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Each step's <code>hint</code>, <code>options</code>, <code>suggested</code> match, <code>original</code> (your own template), <code>can_create</code> and <code>default</code> (<code>original</code>, <code>suggested</code>, <code>leave</code> or <code>none</code>)" },
-            { code: "404", cls: "response-4xx", desc: "Another organisation's unpublished template" }
+            { code: "200", cls: "response-2xx", desc: "Each step's <code>hint</code>, <code>options</code>, <code>suggested</code> match, <code>original</code> (your own template), <code>toolkit</code> (installing a Toolkit), <code>can_create</code> and <code>default</code> (<code>toolkit</code>, <code>original</code>, <code>suggested</code>, <code>leave</code> or <code>none</code>)" },
+            { code: "404", cls: "response-4xx", desc: "Another organisation's unpublished template, or one that isn't in the Toolkit" }
           ])}
           ${endpointCard("POST", "/checklist_templates/{id}/use", "Use a template", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "The template's id" },
             { name: "charity_id", in: "body", type: "integer", required: false, desc: "Which of your organisations is using it" },
+            { name: "toolkit_id", in: "body", type: "integer", required: false, desc: "Installing this Toolkit; <code>item_id: toolkit</code> then uses its installed item" },
             { name: "name", in: "body", type: "string", required: false, desc: "The new Checklist's name" },
             { name: "mapping", in: "body", type: "array", required: false, desc: "Per step: <code>{step_id, item_id}</code>, <code>{step_id, create}</code> or <code>{step_id, leave: true}</code>. Steps left out take their default" }
           ], [

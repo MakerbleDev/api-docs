@@ -3362,7 +3362,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Toolkit'
+                $ref: '#/components/schemas/ToolkitWithItems'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -3396,7 +3396,78 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Toolkit'
+                $ref: '#/components/schemas/ToolkitWithItems'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /toolkits/{id}/items:
+    post:
+      tags: [Toolkits]
+      summary: Add a Checklist Template or story Label to a Toolkit
+      description: |
+        Adds one of your organisation's Checklist Templates, or a story Label, to a Toolkit, as
+        Available Fields does on the Create/Edit Collection page. Inside a Toolkit, a checklist step
+        can then count the Toolkit's own Surveys, Contact Forms and story Labels as done, so those steps
+        arrive already set up when the Toolkit is installed. The user must be able to edit the
+        Toolkit, and the item must belong to one of their organisations (a story Label may also be
+        their own). Adding an item the Toolkit already has changes nothing.
+      operationId: addToolkitItem
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolkitItemRequest'
+            example:
+              item_type: checklist_template
+              item_id: 42
+      responses:
+        "201":
+          description: The item, now in the Toolkit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolkitItem'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Toolkits]
+      summary: Take a Checklist Template or story Label out of a Toolkit
+      description: |
+        Takes a Checklist Template or story Label out of a Toolkit. The item itself stays as it is. The
+        user must be able to edit the Toolkit.
+      operationId: removeToolkitItem
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolkitItemRequest'
+            example:
+              item_type: story_label
+              item_id: 7
+      responses:
+        "204":
+          description: Taken out of the Toolkit
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -3439,7 +3510,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Toolkit'
+                $ref: '#/components/schemas/ToolkitWithItems'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -15149,6 +15220,11 @@ paths:
         approval, and is a 422 naming the steps (`missing_hint_step_ids`) while any that needs a hint
         has none. `share: organisation` stops sharing it; Checklists already made from it don't change.
         Only Organisation Admins can (403 otherwise).
+
+        In a Toolkit, `toolkit_id` with `toolkit_items` points survey, form and story label steps at
+        the Toolkit's own Surveys, Contact Forms and story Labels, as Edit Toolkit items does on the
+        Toolkit's page. You must be able to edit the Toolkit (403), and it must hold this template (404).
+        An item that isn't one of the Toolkit's is a 422.
       security: [{tokenAuth: []}]
       parameters:
         - name: id
@@ -15168,6 +15244,17 @@ paths:
                 journey_part: {type: string, enum: [referral, enrolment, safeguarding, exit_and_alumni]}
                 hints: {type: object, additionalProperties: {type: string}}
                 share: {type: string, enum: [organisation, impact_store]}
+                toolkit_id:
+                  type: integer
+                  description: A Toolkit holding this template, that you can edit, for toolkit_items
+                toolkit_items:
+                  type: object
+                  additionalProperties: {type: string}
+                  description: |
+                    The template's step ids mapped to one of the Toolkit's own items: `StoryCategory:<id>`
+                    (a Survey), `BeneficiaryCategory:<id>` (a Contact Form) or `Label:<id>` (a story Label),
+                    or "" for the hint alone. Installing the Toolkit sets those steps up with no mapping.
+                    Each step's `toolkit_item_kind` says which kind it can take (null for none).
             example:
               hints:
                 "88": a baseline wellbeing survey
@@ -15217,6 +15304,13 @@ paths:
         `suggested`, `leave` (nothing matched, so it is left to set up later) or `none` (nothing to set
         up). `charity_id` picks which of your organisations is using it (default: the template's own if
         it is yours, else your first).
+
+        Installing a Toolkit: pass `toolkit_id`. Any template in a Toolkit you can see can be used,
+        published or not. Steps that point at the Toolkit's own Surveys, Contact Forms and story Labels
+        then default to `toolkit` (`default_item_id: toolkit`, with the installed item's name under
+        `toolkit`): the copies installing the Toolkit added, shown as "Installed with this Toolkit". A
+        step whose item wasn't installed falls back to its hint as usual. A template that isn't in the
+        Toolkit, or a Toolkit you can't see, is a 404.
       security: [{tokenAuth: []}]
       parameters:
         - name: id
@@ -15226,6 +15320,11 @@ paths:
         - name: charity_id
           in: query
           required: false
+          schema: {type: integer}
+        - name: toolkit_id
+          in: query
+          required: false
+          description: Installing this Toolkit, which holds the template
           schema: {type: integer}
       responses:
         "200":
@@ -15273,6 +15372,8 @@ paths:
         `{step_id, leave: true}` to set it up later. Steps left out take their default. A step left for
         later is never set to "Any": it shows as Needs setting up and doesn't tick off until someone
         chooses what counts. Returns the new Checklist and the steps that still need setting up.
+        With `toolkit_id` (installing a Toolkit), `item_id: toolkit` sets a step up with the Toolkit's
+        installed item; see **Suggested mapping**.
       security: [{tokenAuth: []}]
       parameters:
         - name: id
@@ -15287,6 +15388,7 @@ paths:
               type: object
               properties:
                 charity_id: {type: integer}
+                toolkit_id: {type: integer, description: Installing this Toolkit, which holds the template}
                 name: {type: string}
                 mapping:
                   type: array
@@ -26001,6 +26103,53 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    ToolkitWithItems:
+      description: One Toolkit, with its Checklist Templates and story Labels
+      allOf:
+        - $ref: '#/components/schemas/Toolkit'
+        - type: object
+          properties:
+            checklist_templates:
+              type: array
+              description: The Toolkit's Checklist Templates, by name
+              items:
+                $ref: '#/components/schemas/ToolkitItemName'
+            story_labels:
+              type: array
+              description: The Toolkit's story Labels (Labels in the database), by name
+              items:
+                $ref: '#/components/schemas/ToolkitItemName'
+
+    ToolkitItemName:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    ToolkitItemRequest:
+      type: object
+      required: [item_type, item_id]
+      properties:
+        item_type:
+          type: string
+          enum: [checklist_template, story_label]
+          description: A Checklist Template, or a story Label (Label in the database)
+        item_id:
+          type: integer
+
+    ToolkitItem:
+      type: object
+      properties:
+        item_type:
+          type: string
+          enum: [checklist_template, story_label]
+        item_id:
+          type: integer
+        name:
+          type: string
 
     ToolkitList:
       type: object
