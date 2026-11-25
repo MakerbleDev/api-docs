@@ -5545,6 +5545,7 @@ function buildDocsPage() {
         <div class="section-desc">
           <p>A feature launch is one record per Makerble feature holding its launch content: the feature's <code>name</code> as people see it in Makerble (such as Registers), its <code>tier</code> (<code>minor</code>, <code>standard</code> or <code>major</code>), the <code>short_description</code> its announcements show, a longer <code>email_description</code> for the feature launch emails, its links (<code>user_guide_url</code>, <code>blog_url</code>, <code>deep_link</code>, <code>feature_tour_id</code>, <code>intro_key</code>), its email visual (<code>gif</code>, <code>still_frame</code>, <code>image</code> or <code>none</code>) and which of its links the email shows (<code>email_primary_link</code> as the main button and up to two <code>email_text_links</code>).</p>
           <p>An announcement for a launch (<code>feature_launch_id</code> on the announcement) shows the launch's short description, User Guide link, deep link and feature tour wherever it has none of its own. System Access users (Makerble staff) only; anyone else gets <code>403</code>.</p>
+          <p><strong>Video:</strong> send <code>make_video: true</code> on a create or update to make an MP4 of the feature's animation (the one its email GIF is made from) in the background: 1920 by 1080, or the shape of an illustration storyboard's crop at 1920 wide, 30 frames a second, the finished picture's hold and then one loop. It takes a few minutes. The response's <code>notices</code> says whether it is being made, or why it can't be (the launch has no animation), and <code>video_url</code> gives it once it is ready. Making it again replaces the last one.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/feature_launches", "List feature launches", true, [
@@ -5559,7 +5560,7 @@ function buildDocsPage() {
           ${endpointCard("GET", "/feature_launches/{id}", "Get a feature launch", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Feature launch ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The feature launch, with its uploaded image's, GIF's and still frame's addresses once there are any" },
+            { code: "200", cls: "response-2xx", desc: "The feature launch, with its uploaded image's, GIF's, still frame's and video's addresses once there are any" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
             { code: "404", cls: "response-4xx", desc: "Not found" }
           ])}
@@ -5567,7 +5568,7 @@ function buildDocsPage() {
             { code: "201", cls: "response-2xx", desc: "Feature launch created" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
             { code: "422", cls: "response-4xx", desc: "Validation failed, e.g. a name already taken, a User Guide link outside the Makerble User Guide, or a main button whose link the launch doesn't have" }
-          ], "Body: <code>name</code> (required, unique), <code>tier</code>, <code>short_description</code> (up to 280), <code>email_description</code> (2 to 4 sentences, up to 600), <code>user_guide_url</code> (a Makerble User Guide page), <code>blog_url</code> (https), <code>deep_link</code> (a name from List Deep Links), <code>feature_tour_id</code>, <code>intro_key</code>, <code>email_visual</code>, <code>email_visual_alt</code> (required unless the visual is <code>none</code>), <code>email_image</code> (for <code>image</code>: a file in a <code>multipart/form-data</code> request, or <code>{filename, data}</code> in base64), <code>email_primary_link</code> and <code>email_text_links</code> (each <code>deep_link</code>, <code>tour</code>, <code>user_guide</code> or <code>blog</code>, one the launch has), <code>jira_keys</code>, <code>released_on</code>.")}
+          ], "Body: <code>name</code> (required, unique), <code>tier</code>, <code>short_description</code> (up to 280), <code>email_description</code> (2 to 4 sentences, up to 600), <code>user_guide_url</code> (a Makerble User Guide page), <code>blog_url</code> (https), <code>deep_link</code> (a name from List Deep Links), <code>feature_tour_id</code>, <code>intro_key</code>, <code>email_visual</code>, <code>email_visual_alt</code> (required unless the visual is <code>none</code>), <code>email_image</code> (for <code>image</code>: a file in a <code>multipart/form-data</code> request, or <code>{filename, data}</code> in base64), <code>email_primary_link</code> and <code>email_text_links</code> (each <code>deep_link</code>, <code>tour</code>, <code>user_guide</code> or <code>blog</code>, one the launch has), <code>jira_keys</code>, <code>released_on</code>, <code>make_video</code> (true to make the video, see above).")}
           ${endpointCard("PATCH", "/feature_launches/{id}", "Update a feature launch", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Feature launch ID" }
           ], [
@@ -5575,7 +5576,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
             { code: "404", cls: "response-4xx", desc: "Not found" },
             { code: "422", cls: "response-4xx", desc: "Validation failed" }
-          ], "Only the fields sent change; null or an empty string clears one. <code>jira_keys</code> and <code>email_text_links</code> replace the whole list. A new <code>email_image</code> replaces the saved one, and changing <code>email_visual</code> away from <code>image</code> removes it.")}
+          ], "Only the fields sent change; null or an empty string clears one. <code>jira_keys</code> and <code>email_text_links</code> replace the whole list. A new <code>email_image</code> replaces the saved one, and changing <code>email_visual</code> away from <code>image</code> removes it. <code>make_video: true</code> makes the video again (see above).")}
           ${endpointCard("POST", "/feature_launches/email_preview", "Preview the feature launch email", true, [], [
             { code: "200", cls: "response-2xx", desc: "<code>subject</code>, <code>to</code>, and the <code>html</code> and plain-text (<code>text</code>) versions. Nothing is sent" },
             { code: "403", cls: "response-4xx", desc: "The user doesn't have System Access" },
