@@ -3100,6 +3100,133 @@ paths:
           $ref: '#/components/responses/NotFound'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+  /organisations/{organisation_id}/supplementary_details:
+    parameters:
+      - name: organisation_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Charities]
+      summary: Get an Organisation's Supplementary Details
+      description: |
+        The details about an Organisation (Charity) and the person who represents it that Twilio, Makerble's
+        SMS partner, needs before the Organisation can send SMS messages, as on its Supplementary details page.
+        Before anything is saved every field is blank. `missing_fields` lists what Twilio still needs, and
+        `verification_status` where Twilio's check has got to. Only an Editor of the Organisation.
+      operationId: getSupplementaryDetails
+      security: [{tokenAuth: []}]
+      responses:
+        "200":
+          description: The details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplementaryDetails'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Charities]
+      summary: Update an Organisation's Supplementary Details
+      description: |
+        Saves the fields sent and leaves the rest. They can be saved part-filled. Refused with 422 while
+        Twilio is checking them, or once it has approved them (`editable` false). Send `country_id` to set
+        the Organisation's country when it has none; it is ignored when the Organisation already has one.
+      operationId: updateSupplementaryDetails
+      security: [{tokenAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                country_id:
+                  type: integer
+                website_url:
+                  type: string
+                  description: "Website. Starts with http:// or https://"
+                business_type:
+                  type: string
+                  description: "Organisation type: Sole Proprietorship, Partnership, Limited Liability Corporation, Co-operative, Non-profit Corporation or Corporation"
+                business_industry:
+                  type: string
+                  description: "Industry, as Twilio names it, e.g. NOT_FOR_PROFIT, EDUCATION, HEALTHCARE"
+                business_registration_identifier:
+                  type: string
+                  description: "Registration ID type: EIN, CBN, CN, ACN, CIN, VAT, VATRN, RN or Other. Set from the Organisation's country when registration_identifier_automatic is true, whatever is sent"
+                other_registration_identifier:
+                  type: string
+                  description: "Name of the other registration type, when the type is Other"
+                business_registration_number:
+                  type: string
+                  description: "Registration number"
+                business_regions_of_operation:
+                  type: string
+                  description: "Region of operation: AFRICA, ASIA, EUROPE, LATIN_AMERICA, USA_AND_CANADA or AUSTRALIA"
+                address_friendly_name:
+                  type: string
+                  description: "Address name, e.g. Headquarters"
+                street:
+                  type: string
+                  description: "Street address"
+                street_secondary:
+                  type: string
+                  description: "Street address line 2 (optional)"
+                city:
+                  type: string
+                  description: "City"
+                region:
+                  type: string
+                  description: "State, province or region"
+                postal_code:
+                  type: string
+                  description: "Postal code"
+                representative_first_name:
+                  type: string
+                  description: "The representative's first name"
+                representative_last_name:
+                  type: string
+                  description: "The representative's last name"
+                representative_business_title:
+                  type: string
+                  description: "The representative's job title"
+                representative_job_position:
+                  type: string
+                  description: "Job position: Director, GM, VP, CEO, CFO, General Counsel or Other"
+                representative_other_job_position:
+                  type: string
+                  description: "The job position, when Job position is Other"
+                representative_email:
+                  type: string
+                  description: "The representative's email address"
+                representative_phone_number:
+                  type: string
+                  description: "The representative's phone number in international format, e.g. +447700900123"
+            example:
+              website_url: https://www.example.org
+              city: London
+              representative_phone_number: "+447700900123"
+      responses:
+        "200":
+          description: The details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplementaryDetails'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntityList'
   /organisations/{organisation_id}/welcome_journey_settings:
     parameters:
       - name: organisation_id
@@ -33227,3 +33354,110 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/WebhookDelivery'
+    SupplementaryDetails:
+      type: object
+      properties:
+        organisation_id:
+          type: integer
+        country:
+          type: string
+          nullable: true
+          description: The Organisation's country. Set it with country_id when it has none
+        country_iso_code:
+          type: string
+          nullable: true
+        registration_identifier_automatic:
+          type: boolean
+          description: Whether the country decides the registration ID type
+        verification_status:
+          type: string
+          enum: [not_started, pending_review, in_review, twilio_rejected, twilio_approved]
+          description: Where Twilio's check of the details has got to
+        editable:
+          type: boolean
+          description: False while Twilio is checking the details and once it has approved them
+        missing_fields:
+          type: array
+          description: Fields Twilio needs that are still blank
+          items:
+            type: string
+        website_url:
+          type: string
+          nullable: true
+          description: "Website. Starts with http:// or https://"
+        business_type:
+          type: string
+          nullable: true
+          description: "Organisation type: Sole Proprietorship, Partnership, Limited Liability Corporation, Co-operative, Non-profit Corporation or Corporation"
+        business_industry:
+          type: string
+          nullable: true
+          description: "Industry, as Twilio names it, e.g. NOT_FOR_PROFIT, EDUCATION, HEALTHCARE"
+        business_registration_identifier:
+          type: string
+          nullable: true
+          description: "Registration ID type: EIN, CBN, CN, ACN, CIN, VAT, VATRN, RN or Other. Set from the Organisation's country when registration_identifier_automatic is true, whatever is sent"
+        other_registration_identifier:
+          type: string
+          nullable: true
+          description: "Name of the other registration type, when the type is Other"
+        business_registration_number:
+          type: string
+          nullable: true
+          description: "Registration number"
+        business_regions_of_operation:
+          type: string
+          nullable: true
+          description: "Region of operation: AFRICA, ASIA, EUROPE, LATIN_AMERICA, USA_AND_CANADA or AUSTRALIA"
+        address_friendly_name:
+          type: string
+          nullable: true
+          description: "Address name, e.g. Headquarters"
+        street:
+          type: string
+          nullable: true
+          description: "Street address"
+        street_secondary:
+          type: string
+          nullable: true
+          description: "Street address line 2 (optional)"
+        city:
+          type: string
+          nullable: true
+          description: "City"
+        region:
+          type: string
+          nullable: true
+          description: "State, province or region"
+        postal_code:
+          type: string
+          nullable: true
+          description: "Postal code"
+        representative_first_name:
+          type: string
+          nullable: true
+          description: "The representative's first name"
+        representative_last_name:
+          type: string
+          nullable: true
+          description: "The representative's last name"
+        representative_business_title:
+          type: string
+          nullable: true
+          description: "The representative's job title"
+        representative_job_position:
+          type: string
+          nullable: true
+          description: "Job position: Director, GM, VP, CEO, CFO, General Counsel or Other"
+        representative_other_job_position:
+          type: string
+          nullable: true
+          description: "The job position, when Job position is Other"
+        representative_email:
+          type: string
+          nullable: true
+          description: "The representative's email address"
+        representative_phone_number:
+          type: string
+          nullable: true
+          description: "The representative's phone number in international format, e.g. +447700900123"

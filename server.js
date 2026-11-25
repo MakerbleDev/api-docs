@@ -1266,6 +1266,25 @@ function buildDocsPage() {
             { code: "404", cls: "response-4xx", desc: "Not found, or not one of your Organisations" },
             { code: "422", cls: "response-4xx", desc: "<code>default_project_story_privacy</code> isn't one of the four levels, or <code>participant_pass_sign_in_enabled</code> isn't true or false" }
           ], "Only an Organisation Admin can change these settings, the same people who can use Charity Preferences. Only the settings sent are changed.")}
+          ${endpointCard("GET", "/organisations/{organisation_id}/supplementary_details", "Get an Organisation's Supplementary Details", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "Every field, plus <code>verification_status</code>, <code>editable</code> and <code>missing_fields</code>" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found" }
+          ], "The details Twilio needs before the Organisation can send SMS messages, as on its Supplementary details page.")}
+          ${endpointCard("PATCH", "/organisations/{organisation_id}/supplementary_details", "Update an Organisation's Supplementary Details", true, [
+            { name: "organisation_id", in: "path", type: "integer", required: true, desc: "The Organisation (Charity) ID" },
+            { name: "country_id", in: "body", type: "integer", required: false, desc: "Sets the Organisation's country when it has none" },
+            { name: "website_url, business_type, …", in: "body", type: "string", required: false, desc: "Any of the fields GET returns; send only those to change" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The details after the change" },
+            { code: "401", cls: "response-4xx", desc: "Not authenticated" },
+            { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
+            { code: "404", cls: "response-4xx", desc: "Not found" },
+            { code: "422", cls: "response-4xx", desc: "Invalid answers, or Twilio is checking or has approved the details" }
+          ])}
         </div>
       </section>
 
