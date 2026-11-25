@@ -915,6 +915,7 @@ function buildDocsPage() {
         <a href="#introduction"    class="nav-link active">Introduction</a>
         <a href="#authentication"  class="nav-link">Authentication</a>
         <a href="#pagination"      class="nav-link">Pagination</a>
+        <a href="#rate-limits"     class="nav-link">Rate limits</a>
         <a href="#terminology"     class="nav-link">Terminology</a>
         <a href="#mock-server"     class="nav-link">Mock server</a>
       </div>
@@ -1185,6 +1186,35 @@ function buildDocsPage() {
         <div class="callout callout-tip" style="margin-top:20px">
           <span class="callout-icon">✓</span>
           <span>All paginated responses wrap results in: <code>{ page, page_size, page_count, total_count, data: [] }</code></span>
+        </div>
+      </section>
+
+      <!-- Rate limits -->
+      <section class="section" id="rate-limits">
+        <div class="section-eyebrow">Reference</div>
+        <h2 class="section-title">Rate limits</h2>
+        <div class="section-desc">
+          <p>To keep the API fast for every organisation, calls are limited per clock minute. A call over a limit gets <code>429 Too Many Requests</code> with a <code>Retry-After</code> header in seconds, and a message saying when the limit resets.</p>
+        </div>
+        <table class="info-table" style="margin-top:20px">
+          <thead><tr><th>Who</th><th>Limit</th><th><code>scope</code> in a 429</th></tr></thead>
+          <tbody>
+            <tr><td>Each API key, connected app token, or person's email and token</td><td>120 requests a minute</td><td>api_key</td></tr>
+            <tr><td>All of one Organisation's API keys and connected apps together</td><td>300 requests a minute</td><td>organisation</td></tr>
+          </tbody>
+        </table>
+        <table class="info-table" style="margin-top:20px">
+          <thead><tr><th>Response header</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>X-RateLimit-Limit</td><td>Requests allowed per minute for this key or token</td></tr>
+            <tr><td>X-RateLimit-Remaining</td><td>Requests left this minute</td></tr>
+            <tr><td>X-RateLimit-Reset</td><td>When the minute resets, as a Unix timestamp</td></tr>
+            <tr><td>Retry-After</td><td>On a 429 only: seconds to wait before trying again</td></tr>
+          </tbody>
+        </table>
+        <div class="callout callout-tip" style="margin-top:20px">
+          <span class="callout-icon">✓</span>
+          <span>To stay within the limits, space requests out (one every half second keeps a key under its limit), wait <code>Retry-After</code> seconds after a 429, and fetch lists a page at a time with <code>per_page</code> up to 200 and <code>last_synced_datetime</code> rather than one record at a time: 5,000 Survey Responses take 25 calls to <code>GET /stories?per_page=200</code>, but 5,000 calls to <code>GET /stories/{id}</code>.</span>
         </div>
       </section>
 

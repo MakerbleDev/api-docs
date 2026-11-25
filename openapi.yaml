@@ -96,6 +96,37 @@ info:
     { "page": 1, "page_size": 10, "page_count": 146, "total_count": 1458, "data": [] }
     ```
 
+    ## Rate limits
+    To keep the API fast for every organisation, calls are limited per minute:
+
+    | Who | Limit |
+    |---|---|
+    | Each API key, connected app token, or person's email and token | 120 requests a minute |
+    | All of one Organisation's API keys and connected apps together | 300 requests a minute |
+
+    The minute is a fixed clock minute (it resets at :00 seconds). Every response carries headers so an integration can pace itself:
+
+    | Header | Meaning |
+    |---|---|
+    | `X-RateLimit-Limit` | Requests allowed per minute for this key or token |
+    | `X-RateLimit-Remaining` | Requests left this minute |
+    | `X-RateLimit-Reset` | When the minute resets, as a Unix timestamp |
+
+    A call over a limit gets `429 Too Many Requests` with a `Retry-After` header (seconds) and this body:
+    ```json
+    {
+      "error": "Too many requests: this API key or token has made more than 120 requests in a minute. The limit resets at 17:31:00 UTC, in 23 seconds; try again then. ...",
+      "scope": "api_key",
+      "limit": 120,
+      "retry_after": 23,
+      "resets_at": "2026-11-25T17:31:00Z",
+      "documentation": "https://api-docs.makerble.com/#rate-limits"
+    }
+    ```
+    `scope` is `api_key` for the key or token's own limit and `organisation` for the Organisation's shared one.
+
+    **To stay within the limits:** wait `Retry-After` seconds after a `429` before trying again; space requests out (one every half second keeps a key under its limit); and fetch lists a page at a time with `per_page` up to 200 and `last_synced_datetime` to get only what changed since your last sync, instead of fetching records one by one. For example, 5,000 Survey Responses (Stories) take 25 calls to `GET /stories?per_page=200`, but 5,000 calls to `GET /stories/{id}`.
+
     ## Webhooks
     Instead of polling, an Organisation's admins can register **webhook endpoints**: HTTPS URLs that Makerble sends a signed JSON `POST` to when records change. Manage them under **Connect > Webhooks** or with the Webhooks endpoints below. An Organisation's admin turns webhooks on by ticking **Turn on Webhooks** in the Organisation's Settings (Preferences) page; until then those endpoints answer `403`.
 
@@ -6708,6 +6739,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "422":
           $ref: '#/components/responses/UnprocessableEntity'
+        "429":
+          $ref: '#/components/responses/TooManyRequests'
 
     post:
       tags: [Stories]
@@ -6849,6 +6882,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "404":
           $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/TooManyRequests'
 
   /stories/{id}/attachments:
     get:
@@ -22421,6 +22456,39 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: "You need to sign in before continuing."
+    TooManyRequests:
+      description: Over a rate limit (see Rate limits). Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds until the limit resets
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              scope:
+                type: string
+                enum: [api_key, organisation]
+              limit:
+                type: integer
+              retry_after:
+                type: integer
+              resets_at:
+                type: string
+                format: date-time
+              documentation:
+                type: string
+          example:
+            error: "Too many requests: this API key or token has made more than 120 requests in a minute. The limit resets at 17:31:00 UTC, in 23 seconds; try again then. To stay within it, space your requests out (about 0.5 seconds apart), and fetch lists a page at a time with per_page (up to 200) and last_synced_datetime, to get only what has changed, rather than one record per request. See https://api-docs.makerble.com/#rate-limits"
+            scope: api_key
+            limit: 120
+            retry_after: 23
+            resets_at: "2026-11-25T17:31:00Z"
+            documentation: "https://api-docs.makerble.com/#rate-limits"
     NotFound:
       description: Resource not found
       content:
