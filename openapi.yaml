@@ -20786,6 +20786,47 @@ paths:
         "403":
           $ref: '#/components/responses/ForbiddenError'
 
+  /guidance_panels/illustrations:
+    get:
+      tags: [Guidance Panels]
+      summary: List the illustrations an animation can play
+      description: |
+        The flat illustrations of a feature's screens that an Intro's or announcement's animation can play
+        (an illustration storyboard; see `GuidancePanelStoryboard`). Developers add them to Makerble; they
+        can't be uploaded through the API. Each has its `name` (the storyboard's `illustration`, or a
+        `scene` step's), its `view_box` (`[x, y, width, height]`, the units a `crop` is given in) and its
+        `parts`, which steps target: a `field` is filled in by `type` and `swap`, a `scroll` part is
+        scrolled by `scroll`, and any part can appear, be pointed at, highlighted, clicked or zoomed on.
+        Only Makerble staff with System Access, with their own token.
+      operationId: listGuidancePanelIllustrations
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        "200":
+          description: Paginated list of illustrations, by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGuidancePanelIllustrations'
+              example:
+                page: 1
+                page_size: 1
+                page_count: 3
+                total_count: 3
+                data:
+                  - name: event_booking
+                    view_box: [0, 0, 1600, 1000]
+                    parts:
+                      - { name: content, kind: part }
+                      - { name: first_name, kind: field }
+                      - { name: confirmation, kind: part }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+
   /guidance_panels/{key}:
     parameters:
       - name: key
@@ -20832,8 +20873,9 @@ paths:
         (unlisted videos) or `https://player.vimeo.com/video/<id>?h=<hash>`. An empty `vimeo_url` puts the
         page back to its fallback visual.
 
-        `storyboard` is the Intro's animation, drawn from Makerble building blocks when there is no Vimeo
-        link (see `GuidancePanelStoryboard` for its rules). Send it as an object, or `null` to remove it.
+        `storyboard` is the Intro's animation, drawn from Makerble building blocks, or from one of the
+        feature's illustrations (`GET /guidance_panels/illustrations`), when there is no Vimeo link (see
+        `GuidancePanelStoryboard` for its rules). Send it as an object, or `null` to remove it.
 
         `feature_tour_id` chooses the feature tour the Intro offers with "Take the tour" (`null` for none).
         It sets that tour's `page_key` to this Intro and unlinks any other tour that pointed here, naming it in
@@ -33082,7 +33124,22 @@ components:
     GuidancePanelStoryboardStep:
       type: object
       description: |
-        One step of an Intro animation. Steps play in order, evenly spread across the loop.
+        One step of an Intro animation. Steps play in order, evenly spread across the loop, or each at its
+        `at` (seconds from the start of the loop, to one decimal place, in order; on every step or on none).
+
+        In an illustration storyboard, steps work on the illustration's parts:
+
+        - `appear` shows a `part` with a `motion`: `fade`, `rise`, `lift` (the default) or `pop`. Parts that
+          no `appear` names are there from the start.
+        - `move_cursor` (with optional `seconds`, 0.2 to 3), `click`, `highlight` and `zoom` act on the part
+          named in `target`. The cursor glides in from the bottom right corner on a gentle arc.
+        - `type` and `swap` fill in a `field` part with `text`; `scroll` moves a `scroll` part `to` 0 (the
+          top) or 1 (the bottom), or between, over `seconds` (0.2 to 10).
+        - `scene` starts a new scene with another `illustration`, with a `transition` of `cut`, `fade` (the
+          default) or `slide`. A slide moves the `moving` part, which both illustrations must have, out to
+          the left and in from the right, while everything else (a header, say) stays put.
+
+        In a building-block storyboard:
 
         - `appear` puts a building block on the stage: `block` (required), and optionally an `id` that later
           steps target, a `text` label, a `value` (required for a `chart_bar`, from 0 to 100, and for a
@@ -33104,7 +33161,29 @@ components:
       properties:
         type:
           type: string
-          enum: [appear, move_cursor, click, type, highlight, check, swap, cut, frame, carry, zoom]
+          enum: [appear, move_cursor, click, type, highlight, check, swap, cut, frame, carry, zoom, scroll, scene]
+        at:
+          type: number
+          minimum: 0
+          description: Seconds from the start of the loop that the step plays at
+        part:
+          type: string
+          description: In an illustration storyboard, the part an `appear` step shows
+        motion:
+          type: string
+          enum: [fade, rise, lift, pop]
+        seconds:
+          type: number
+          description: How long a `move_cursor` (0.2 to 3) or `scroll` (0.2 to 10) takes
+        illustration:
+          type: string
+          description: For `scene`, the next scene's illustration
+        transition:
+          type: string
+          enum: [cut, fade, slide]
+        moving:
+          type: string
+          description: For a `slide`, the part that slides, which both illustrations have
         block:
           type: string
           enum: [top_bar, sidebar_item, table_row, card, button, field, chip, avatar, chart_bar, cell, timeline_item, calendar_event, icon]
@@ -33134,9 +33213,15 @@ components:
           type: string
           enum: [register, profile, table, web_page, calendar, compare]
         to:
-          type: string
-          pattern: '^[a-z][a-z0-9_]{0,29}$'
-          description: For `carry`, the `id` of the block the carried block lands on, which appears after the next `cut`
+          oneOf:
+            - type: string
+              pattern: '^[a-z][a-z0-9_]{0,29}$'
+            - type: number
+              minimum: 0
+              maximum: 1
+          description: >-
+            For `carry`, the `id` of the block the carried block lands on, which appears after the next `cut`.
+            For `scroll`, how far down to scroll, from 0 (the top) to 1 (the bottom).
 
 
     GuidancePanelStoryboard:
@@ -33145,6 +33230,12 @@ components:
       description: |
         An Intro's animation: a short loop of Makerble building blocks drawn in the panel's module colour,
         shown when there is no Vimeo link. Up to 8,000 characters of JSON.
+
+        An illustration storyboard names an `illustration` instead, and animates its parts, following the
+        visitor through the feature across scenes. It may run up to 40 seconds, 40 steps and 12,000
+        characters, push the `camera` slowly in across each loop, and `crop` the first illustration for the
+        small Intro panel (an announcement plays it uncropped). People who turn off motion, or pause it, see
+        the finished picture of its last scene.
       required: [archetype, loop_seconds, alt, steps]
       additionalProperties: false
       properties:
@@ -33158,16 +33249,38 @@ components:
         loop_seconds:
           type: integer
           minimum: 4
-          maximum: 20
+          maximum: 40
+          description: Up to 20 for building blocks, 40 for an illustration storyboard
         alt:
           type: string
           minLength: 10
           maxLength: 250
           description: What the animation shows, read out by screen readers
+        illustration:
+          type: string
+          description: The first scene's illustration, from `GET /guidance_panels/illustrations`
+        hold_seconds:
+          type: number
+          minimum: 2
+          maximum: 8
+          description: How long the finished picture holds before the loop starts again; 2.5 if left out
+        camera:
+          type: string
+          enum: [push]
+          description: Illustration storyboards only. A slow 2.5% zoom in across each loop
+        crop:
+          type: array
+          items:
+            type: number
+          minItems: 4
+          maxItems: 4
+          description: >-
+            Illustration storyboards only. `[x, y, width, height]` of the first illustration, inside its
+            `view_box`: the piece the small Intro panel shows
         steps:
           type: array
           minItems: 1
-          maxItems: 24
+          maxItems: 40
           items:
             $ref: '#/components/schemas/GuidancePanelStoryboardStep'
       example:
@@ -33332,6 +33445,39 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/GuidancePanel'
+
+    GuidancePanelIllustration:
+      type: object
+      properties:
+        name:
+          type: string
+          example: event_booking
+        view_box:
+          type: array
+          items:
+            type: number
+          example: [0, 0, 1600, 1000]
+        parts:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: first_name
+              kind:
+                type: string
+                enum: [part, field, scroll]
+
+    PaginatedGuidancePanelIllustrations:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/GuidancePanelIllustration'
 
     PaginatedApiKeys:
       allOf:
