@@ -3362,7 +3362,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Toolkit'
+                $ref: '#/components/schemas/ToolkitWithItems'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "404":
@@ -3396,7 +3396,78 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Toolkit'
+                $ref: '#/components/schemas/ToolkitWithItems'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /toolkits/{id}/items:
+    post:
+      tags: [Toolkits]
+      summary: Add a Checklist Template or story Label to a Toolkit
+      description: |
+        Adds one of your organisation's Checklist Templates, or a story Label, to a Toolkit, as
+        Available Fields does on the Create/Edit Collection page. Inside a Toolkit, a checklist step
+        can then count the Toolkit's own Surveys, Contact Forms and story Labels as done, so those steps
+        arrive already set up when the Toolkit is installed. The user must be able to edit the
+        Toolkit, and the item must belong to one of their organisations (a story Label may also be
+        their own). Adding an item the Toolkit already has changes nothing.
+      operationId: addToolkitItem
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolkitItemRequest'
+            example:
+              item_type: checklist_template
+              item_id: 42
+      responses:
+        "201":
+          description: The item, now in the Toolkit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolkitItem'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/ForbiddenError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Toolkits]
+      summary: Take a Checklist Template or story Label out of a Toolkit
+      description: |
+        Takes a Checklist Template or story Label out of a Toolkit. The item itself stays as it is. The
+        user must be able to edit the Toolkit.
+      operationId: removeToolkitItem
+      security: [{tokenAuth: []}]
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolkitItemRequest'
+            example:
+              item_type: story_label
+              item_id: 7
+      responses:
+        "204":
+          description: Taken out of the Toolkit
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -3439,7 +3510,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Toolkit'
+                $ref: '#/components/schemas/ToolkitWithItems'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -25974,6 +26045,53 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    ToolkitWithItems:
+      description: One Toolkit, with its Checklist Templates and story Labels
+      allOf:
+        - $ref: '#/components/schemas/Toolkit'
+        - type: object
+          properties:
+            checklist_templates:
+              type: array
+              description: The Toolkit's Checklist Templates, by name
+              items:
+                $ref: '#/components/schemas/ToolkitItemName'
+            story_labels:
+              type: array
+              description: The Toolkit's story Labels (Labels in the database), by name
+              items:
+                $ref: '#/components/schemas/ToolkitItemName'
+
+    ToolkitItemName:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    ToolkitItemRequest:
+      type: object
+      required: [item_type, item_id]
+      properties:
+        item_type:
+          type: string
+          enum: [checklist_template, story_label]
+          description: A Checklist Template, or a story Label (Label in the database)
+        item_id:
+          type: integer
+
+    ToolkitItem:
+      type: object
+      properties:
+        item_type:
+          type: string
+          enum: [checklist_template, story_label]
+        item_id:
+          type: integer
+        name:
+          type: string
 
     ToolkitList:
       type: object
