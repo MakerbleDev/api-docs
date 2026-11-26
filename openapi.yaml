@@ -3150,7 +3150,7 @@ paths:
                   type: integer
                 website_url:
                   type: string
-                  description: "Website. Starts with http:// or https://"
+                  description: "Website, e.g. www.example.org. https:// is added when it doesn't start with http:// or https://"
                 business_type:
                   type: string
                   description: "Organisation type: Sole Proprietorship, Partnership, Limited Liability Corporation, Co-operative, Non-profit Corporation or Corporation"
@@ -33384,7 +33384,7 @@ components:
         website_url:
           type: string
           nullable: true
-          description: "Website. Starts with http:// or https://"
+          description: "Website, e.g. www.example.org. https:// is added when it doesn't start with http:// or https://"
         business_type:
           type: string
           nullable: true
