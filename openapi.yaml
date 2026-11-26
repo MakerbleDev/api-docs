@@ -3137,6 +3137,8 @@ paths:
         Saves the fields sent and leaves the rest. They can be saved part-filled. Refused with 422 while
         Twilio is checking them, or once it has approved them (`editable` false). Send `country_id` to set
         the Organisation's country when it has none; it is ignored when the Organisation already has one.
+        Once every field Twilio needs is filled in (`missing_fields` is empty), saving sends the details to
+        Twilio to check, and `verification_status` moves on from `not_started` as Twilio's check proceeds.
       operationId: updateSupplementaryDetails
       security: [{tokenAuth: []}]
       requestBody:

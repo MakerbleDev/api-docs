@@ -1284,7 +1284,7 @@ function buildDocsPage() {
             { code: "403", cls: "response-4xx", desc: "Not an Organisation Admin of the Organisation" },
             { code: "404", cls: "response-4xx", desc: "Not found" },
             { code: "422", cls: "response-4xx", desc: "Invalid answers, or Twilio is checking or has approved the details" }
-          ])}
+          ], "Once nothing is missing, saving sends the details to Twilio to check.")}
         </div>
       </section>
 
