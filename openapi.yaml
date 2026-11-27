@@ -19243,7 +19243,9 @@ components:
             criteria:
               type: object
               additionalProperties: true
-              description: The filter settings, in the shape the page's filters send them
+              description: |
+                The filter settings, in the shape the page's filters send them. Conditions on contact fields you
+                don't have permission to see are left out.
             shortcut_views:
               type: array
               description: The views a shortcut to this filter can open
