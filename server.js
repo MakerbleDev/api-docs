@@ -1466,6 +1466,7 @@ function buildDocsPage() {
         <div class="section-desc">
           <p>A <strong>Saved Filter</strong> is a filter on Contacts, Events or Cases that someone saved, either for themselves or shared with colleagues. Any of them can be added to a Project's toolbar (its Workflow) as a <strong>shortcut</strong>: clicking it opens the chosen view, such as Contacts &rsaquo; Overview, Events &rsaquo; Calendar or one of your Custom tables, with the filter applied.</p>
           <p>A Saved Filter can be added only to a Project named in its criteria (<code>project_ids</code>), by an Organisation Admin or an Editor of that Project. Colleagues who can't see the Saved Filter don't see its shortcut. To add one: list the filters, get one for its <code>shortcut_views</code> and <code>shortcut_projects</code>, then post a shortcut with one of each.</p>
+          <p>You can also save, change and delete Saved Filters, as the Save the filter button and the edit popup on those pages do. A filter's <code>criteria</code> are the page's filter settings, in the shape its filters send them; read an existing filter's <code>criteria</code> to see the shape. Items it names that are later deleted are ignored when the filter is applied. <code>can_edit</code> tells you whether you can change or delete it: its owner always can, and so can the people in <code>editor_ids</code>, or, when <code>who_can_edit</code> is <code>organisation_admins</code>, the Organisation Admins of its Organisation.</p>
         </div>
         <div class="endpoint-list">
           ${endpointCard("GET", "/saved_filters", "List Saved Filters", true, [
@@ -1474,13 +1475,40 @@ function buildDocsPage() {
             { name: "per_page", type: "integer", required: false, desc: "Records per page (default 10, max 200)" },
             { name: "last_synced_datetime", type: "string", required: false, desc: "ISO 8601 incremental sync" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "Paginated Saved Filters you can see, your own and colleagues' shared ones, by name, each with <code>type</code>, <code>project_ids</code> and <code>can_add_shortcut</code>" },
+            { code: "200", cls: "response-2xx", desc: "Paginated Saved Filters you can see, your own and colleagues' shared ones, by name, each with <code>type</code>, <code>project_ids</code>, <code>can_add_shortcut</code>, <code>can_edit</code>, <code>who_can_edit</code> and <code>editor_ids</code>" },
             { code: "422", cls: "response-4xx", desc: "Unknown <code>type</code>" }
           ])}
           ${endpointCard("GET", "/saved_filters/{id}", "Get a Saved Filter", true, [
             { name: "id", in: "path", type: "integer", required: true, desc: "Saved Filter ID" }
           ], [
-            { code: "200", cls: "response-2xx", desc: "The Saved Filter, with <code>shortcut_views</code> (each <code>key</code>, <code>label</code>, <code>group</code>) and <code>shortcut_projects</code> (each <code>id</code>, <code>name</code>; empty when <code>can_add_shortcut</code> is false)" },
+            { code: "200", cls: "response-2xx", desc: "The Saved Filter, with its <code>criteria</code>, <code>shortcut_views</code> (each <code>key</code>, <code>label</code>, <code>group</code>) and <code>shortcut_projects</code> (each <code>id</code>, <code>name</code>; empty when <code>can_add_shortcut</code> is false)" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one you can see" }
+          ])}
+          ${endpointCard("POST", "/saved_filters", "Create a Saved Filter", true, [
+            { name: "name", in: "body", type: "string", required: true, desc: "What people see in the Saved Filters list" },
+            { name: "type", in: "body", type: "string", required: true, desc: "<code>contacts</code>, <code>events</code> or <code>cases</code>. Can't be changed later." },
+            { name: "organisation_id", in: "body", type: "integer", required: false, desc: "Required only if you belong to more than one Organisation. Can't be changed later." },
+            { name: "criteria", in: "body", type: "object", required: false, desc: "The filter settings, e.g. for Cases <code>{ \"project_ids\": [\"42\"], \"close_cases\": false }</code>" },
+            { name: "shared", in: "body", type: "boolean", required: false, desc: "<code>true</code> to let colleagues use it; <code>false</code> (default) for only you" },
+            { name: "who_can_edit", in: "body", type: "string", required: false, desc: "<code>individuals</code> (default) or <code>organisation_admins</code>" },
+            { name: "editor_ids", in: "body", type: "array", required: false, desc: "Users in the filter's Organisation who can edit it, when <code>who_can_edit</code> is <code>individuals</code>. Defaults to you." }
+          ], [
+            { code: "201", cls: "response-2xx", desc: "The Saved Filter, as Get a Saved Filter returns it" },
+            { code: "422", cls: "response-4xx", desc: "<code>errors</code> lists every problem: no name, an unknown <code>type</code>, an Organisation you aren't in, no editors, or editors from outside the Organisation" }
+          ], "Saves the criteria as a Saved Filter, as the Save the filter button on the Contacts, Events and Manage Cases pages does.")}
+          ${endpointCard("PATCH", "/saved_filters/{id}", "Update a Saved Filter", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Saved Filter ID" }
+          ], [
+            { code: "200", cls: "response-2xx", desc: "The Saved Filter, as Get a Saved Filter returns it" },
+            { code: "403", cls: "response-4xx", desc: "You can see the filter but not edit it" },
+            { code: "404", cls: "response-4xx", desc: "Not found, or not one you can see" },
+            { code: "422", cls: "response-4xx", desc: "<code>errors</code> lists every problem, including a change of <code>type</code> or <code>organisation_id</code>" }
+          ], "Body: any of the Create fields. Only the fields you send change; sending <code>criteria</code> replaces them all.")}
+          ${endpointCard("DELETE", "/saved_filters/{id}", "Delete a Saved Filter", true, [
+            { name: "id", in: "path", type: "integer", required: true, desc: "Saved Filter ID" }
+          ], [
+            { code: "204", cls: "response-2xx", desc: "Deleted, with any shortcuts to it on Project toolbars" },
+            { code: "403", cls: "response-4xx", desc: "You can see the filter but not edit it" },
             { code: "404", cls: "response-4xx", desc: "Not found, or not one you can see" }
           ])}
           ${endpointCard("POST", "/saved_filters/{id}/shortcuts", "Add a Saved Filter to a Project's toolbar", true, [
